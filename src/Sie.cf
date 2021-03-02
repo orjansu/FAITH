@@ -1,0 +1,19 @@
+-- Language to parse the proof script.
+
+DProofScript. ProofScript ::= ProgBindings [Theorem];
+
+DProgBindings. ProgBindings ::= "bindings" "{" [ProgBinding] "}";
+terminator ProgBinding ".";
+
+DProgBinding. ProgBinding ::= CapitalIdent "=" LetBindings;
+
+token CapitalIdent (upper letter*);
+
+DLetBindings. LetBindings ::= "()";
+
+DTheorem.     Theorem ::= Proposition Proof;
+separator Theorem "";
+DProposition. Proposition ::= "proposition" ":" "()" ".";
+DProof.       Proof ::= "proof" ":" "()" Qed ".";
+
+DQed. Qed ::= "qed";
