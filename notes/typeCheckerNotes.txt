@@ -1,0 +1,10 @@
+konvertera när det inte finns viktnotation till att det är vikt 1,1
+se till att bara reductions kan ha viktnotation - fixat tror jag
+Se till att det är rätt uttryck som får ha wildcard och M
+Kolla om man enkelt kan ändra pretty-printern. Annars ändra språket
+så att det kan pretty-printas snyggt.
+
+Language notes:
+{} versus : qed.
+"" eller $$ runt termer?
+Stora bokstäver på keywords för att inte krocka med kommandon?
