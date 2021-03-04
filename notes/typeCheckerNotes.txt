@@ -8,3 +8,50 @@ Language notes:
 {} versus : qed.
 "" eller $$ runt termer?
 Stora bokstäver på keywords för att inte krocka med kommandon?
+c y vs f x är bara vad variabelnamnen heter. Jag tror att man behöver stora
+bokstäver för konstruktorer av den anledningen.
+ev göra om så att man kan skriva [2] s^M, men jag gillar mer [2]s^M. se
+THeapSpikes t.ex.
+
+Kolla varningar/ambiguitet!
+
+Language notes, laws:
+R, C, D, V, W, M, N måste nog vara reserverade.
+V används både som value och som kontext. Lösning nu: context är Vctx[]
+bara här används alts
+blir det förvirrande med [] både för contexts, listor och vikter? och även substitutioner [x/y]
+hur göra generella vektorer \vec{y}?
+  - y1...yn
+  - ->y
+  - [y]
+  - ys
+Jag tror att allt ska vara reserverat här, även variabler. På det viset kan vi
+säga ys och liknande.
+=def=
+X kan nu vara ett set med variabler, istället för {x}.
+  lösning: {X}d^. Det är ett set av set, men det blir konstigt annars, om man
+  ska ha ex FV(R) däri.
+~~> reduces to
+eventuellt får vi göra åtminstone case-fallet på ~~> via en funktion. Det är
+nog rätt krångligt att supporta alla varianter av språket man erbjuder om man
+introducerar indexering. Ev kolla på Ott.
+<m + n> är den faktiska additionen. Ev ändra syntax.
+true :: Constructor
+false :: Constructor
+FV -- Term or context -> Set(Var). Del av syntax och ej variabel
+
+Language notes, patternmatch:
+bara här används "?"
+
+Proofs:
+Ide: om man vill kanske man kan ha en av variablerna från laws.sie här?
+t.ex.
+  on "s^M" spike-algebra-13.
+  istället för
+  on "s^?" spike-algebra-13.
+Eventuellt kan det vara okej att specificera mer nogrannt alla substitutionerna
+när man använder ih.
+
+
+Language notes, detailed:
+[.] som hole

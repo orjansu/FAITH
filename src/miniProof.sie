@@ -1,12 +1,8 @@
 bindings {
-G = {repeat =[0,0]= \x. let {ys = repeat x} in x:ys} .
+--G = {repeat =[0,0]= \x. let {ys = repeat x} in x:ys} .
 }
 
-proposition: G |- let {xs = repeat x} in M |~> let {xs = x : xs} in M.
-proof:
-fix-point-induction "repeat"
-  base{
-  }
-  induction{
-  }
-qed.
+proposition: G |- x |~> x.
+proof: ()
+--fix-point-induction
+--qed.

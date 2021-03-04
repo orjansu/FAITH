@@ -1,0 +1,45 @@
+borde man inte kunna representera
+let x = M in N
+som
+\x (M,N)
+eller
+let x = M in N (+ bind x in M, bind x in N +)
+
+let x1 ... xn = M1...Mn in N (+ bind x1...xn in N, M1...Mn +)
+
+
+ott notes
+syntactic sugar vs concrete terms is nice. Ex weights.
+Ott genererar OCaml. Det kanske är bra för mig.
+Ott does notgenerate OCaml code for the definitions of judgments
+
+permutes kanske är bra för att hantera icke-ordningen på let:s?
+
+"Ott supports the definition ofsingle-hole contexts" - men nog ok iom att man nog kan applicera en regel en gång per hål. Men de kanske menar endast ett hål per produktion, och det har jag ju.
+
+p83: Ja, jag märker det att space improvement-språket är ambigous, så jag behöver göra om det.
+
+Modular definitions (p 84, sect 2.5) - detta känner jag igen, t.ex. det i att det är i princip 3 st subspråk just nu; Konkret syntax, regler och selection/patternmatch.
+
+Det skulle vara coolt att parsea till latex...
+
+
+"[Generation of proof-assistant representations for binding structures]  has  been  the  subject  of  considerable  attention,  with  representation techniques based on names, De Bruijn indices, higher order abstract syntax (HOAS),locally nameless terms, nominal sets and so forth, in various proof assistants. The annotated bibliography by Chargu ́eraud (2006) collects around 40 papers on this, and it was a central focus of the POPLmark challenge (Aydemiret al.2005)."
+
+Om man helt ska använda ott kan man också definiera start- och sluttermerna i Ott för att kunna använda dem i bevisen enkelt.
+
+"We give meaning to these binding specifications in two ways. The first semantics iswhat we term afully concreterepresentation. Perhaps surprisingly, a reasonably widerange of programming language definitions can be expressed satisfactorily withoutintroducing alpha equivalence (we discuss what can and cannot be expressed inSection 6). In typical CBV or call-by-name languages, there is no reduction underterm variable binders. The substitutions that arise therefore only substituteclosedterms,  so  there  is  no  danger  of  capture." (p88) - De menar att om man gör en substitution över en öppen term så finns det risk att man råkar göra en variable capture. Jag kanske vill göra det; vi får se.
+
+in de-brujin-variant där man använder 2 eller fler index? typ en för let:en och en för ordningen i let:en eller ngt?
+
+
+"The  fully  concrete  representation  suffices  for  the  case  studies  we  describe  here(notably including the OCaml fragment), but sometimes alpha equivalence reallyis  needed  –  e.g.  where  there  is  substitution  under  binders,  for  dependent  type environments, or  for  compositional  reasoning  about  terms." Gör jag "compositional reasoning about terms?"
+
+-----------Reflektioner------------
+Ott gör i princip det jag behöver göra, men mer generellt vilket tyvärr nog innebär att man inte kan använda Letrecs helt. De har också ett specifieringsspråk, och de variablerna som förekommer i laws.sie är ju meta-variabler i samma bemärkelse som i Ott, och transformationer M |~> N är ju inductive judgements over the language, så man borde kunna uttrycka dem i Ott. Det som egentligen är lite oklart är om man kan uttrycka rätt sorts substitution som tar hänsyn till alpha-ekvivalens över letrec-termer. Jag tycker det är konstigt att de gör sig besväret att beskriva alpha-ekvivalens väldigt tydligt, men sen slutar med att säga "Generating proof assistant code that respects this notion of alpha equivalence, for arbitrary binding specifications, is a substantial question for future work." på sida 90. Det verkar som de i alla fall genererar någon slags hjälpfunktion; closed_reln och open_reln.
+
+Jag tror att det kan vara värt att försöka specificera mitt språk och ett par improvements/equivalences i mitt språk och se vad som spottas ut. Jag kommer ju få några substitutionsmetoder i bevisassistenter, och något för OCaml, som jag kanske skulle kunna använda på samma sätt som Haskell. Det är dock oklart om den genererar en parser? För det behöver jag om jag ska göra en deep embedding via OCaml.
+
+Det kan bli så att jag har nytta av det mesta, men att jag behöver definiera t.ex. substitution själv.
+
+Att skriva ut lagarna i egen ascii-syntax kan vara bra som referens när man ska göra bevis, även om de inte parseas. Dock kan det bli förvirrande om jag inte skriver explicit att de inte används. Men jag skulle kunna skriva brevid vilka funktioner de motsvarar, så länge. De kan kanske heta samma som deras namn/kommando eller så kan det stå.

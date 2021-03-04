@@ -9,7 +9,7 @@ proof:
       let {xs = repeat^0 x} in M.
       on "repeat" def-unwindings base.
       -- jag tror egentligen att första steget är bra, för då kan nästa rad autogenereras
-      =   let {xs = {repeat}d^¤ x} in M.
+      =def=  let {xs = {repeat}d^¤ x} in M.
       on "{repeat}d^¤" dummy-ref-algebra-8.
       -- tror att "on" är bra för att begränsa sökning av nästa steg (autocomplete)
       |~> let {xs = ¤ x} in M.
@@ -21,8 +21,8 @@ proof:
     }
     induction{
       let {xs = repeat^(n+1) x} in M.
-      on "repeat" def-unwindings induction-var="n". --vet ej om argumentet till def-unwindings behövs
-      = let {xs = [0]s^(\x. let {ys = repeat^n x
+      on whole def-unwindings induction-var="n". --vet ej om argumentet till def-unwindings behövs
+      =def= let {xs = [0]s^(\x. let {ys = repeat^n x
                             } in x : ys
                        ) x
         } in M.

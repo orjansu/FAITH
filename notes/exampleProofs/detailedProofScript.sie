@@ -1,0 +1,80 @@
+bindings {
+G = {repeat =[0,0]= \x. let {ys = repeat x} in x:ys}.
+}
+
+-- kommentarer är tillåtna.
+proposition: G |- let {xs = repeat x} in M |~> let {xs = x : xs} in M.
+proof:
+  fix-point-induction repeat
+    base{
+      let {xs = repeat^0 x} in M.
+      on whole def-unwindings-base f=repeat
+                                   w=0
+                                   v=0
+                                   Vctx=(\x. let {ys = [.] x} in x:ys)
+                                   C=(let {xs = [.] x} in M).
+      =def= let {xs = {repeat}d^¤ x} in M.
+      on ({repeat}d^¤) dummy-ref-algebra-8 {X}={repeat}
+                                           M=¤.
+      |~> let {xs = ¤ x} in M.
+      on (¤ x) ¤-rules-3 R=([.] x).
+      <~> let {xs = {x}d^¤} in M.
+      on ({x}d^¤) ¤-rules-1 {X}={x}
+                            M=(x:xs).
+      |~> let {xs = x:xs} in M.
+      qed.
+    }
+    induction{
+      let {xs = repeat^(n+1) x} in M.
+      on whole def-unwindings-induction f=repeat
+                                        w=0
+                                        v=0
+                                        Vctx=(\x. let {ys = [.] x} in x:ys)
+                                        C=(let {xs = [.] x} in M)
+                                        n=n.
+      = let {xs = [0]s^(\x. let {ys = repeat^n x
+                            } in x : ys
+                       ) x
+        } in M.
+      on ([0]s^(\x. let {ys = repeat^n x} in x : ys) x)
+         spike-algebra-zero-stack-spike
+            M=((\x. let {ys = repeat^n x} in x : ys) x).
+      <~> let {xs = (\x. let {ys = repeat^n x
+                            } in x : ys
+                    ) x
+          } in M.
+      on ((\x. let {ys = repeat^n x
+                            } in x : ys
+          ) x)
+          reduction w=1
+                    R=([.] x)
+                    V=(let {ys = repeat^n x} in x : ys)
+                    X={}
+                    reduction-rule=reduction-beta. -- not sure if needed.
+      <~> let {xs = s^let {ys = repeat^n x
+                      } in x : ys
+
+          } in M.
+      on (s^let {ys = repeat^n x} in x : ys) spike-algebra-13
+          w=1
+          M=(let {ys = repeat^n x} in x : ys).
+      |~> let {xs = let {ys = repeat^n x
+                    } in x : ys
+
+          } in M.
+      on (let {ys = repeat^n x} in x : ys) ih xs=ys
+                                              x=x
+                                              M=(x:ys).
+      |~> let {xs = let {ys = x : ys
+                    } in x : ys
+
+          } in M.
+      on whole value-merge' G={}
+                            x=xs
+                            y=ys
+                            V=(x:ys)
+                            M=M.
+      |~> let {xs = x:xs} in M.
+      qed.
+    }
+  qed.
