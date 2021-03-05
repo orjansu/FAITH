@@ -12,6 +12,9 @@ c y vs f x är bara vad variabelnamnen heter. Jag tror att man behöver stora
 bokstäver för konstruktorer av den anledningen.
 ev göra om så att man kan skriva [2] s^M, men jag gillar mer [2]s^M. se
 THeapSpikes t.ex.
+--------för att allt ska funka:
+Konstruktorer behöver vara stor bokstav och parentes runt argument
+-commandonamn måste börja med '-'
 
 Kolla varningar/ambiguitet!
 

@@ -1,5 +1,7 @@
 -- Language to parse the proof script. Not to parse rules.
 
+entrypoints ProofScript;
+
 DProofScript. ProofScript ::= ProgBindings [Theorem];
 
 DProgBindings. ProgBindings ::= "bindings" "{" [ProgBinding] "}";
@@ -14,7 +16,7 @@ comment "{-" "-}";
 
 --------------- Terms ------------------------------
 
--- har inte med var här iom att vi inte ska parsea ngt annat än konkreta termer.
+LBVar.   LetBindings ::= CapitalIdent;
 LBSet.   LetBindings ::= "{" [LetBinding] "}";
 separator LetBinding ",";
 
@@ -35,52 +37,54 @@ coercions IntExpr 1;
 DRedWeight. RedWeight ::= "[" StackWeight "]";
 
 TAny.             Term1 ::= "?";
-TTermVar.         Term1 ::= CapitalIdent;
+TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
 TNonTerminating.  Term1 ::= "¤" ;
 TVar.             Term1 ::= Ident;
 TNum.             Term1 ::= Integer;
-THole.            Term  ::= "[.]";
+THole.            Term1  ::= "[.]";
 -- Temporary. Might want to do separate grammar for contexts.
--- TConstructor.     Term  ::= Constructor;
--- TLam.             Term  ::= "\\" Ident "." Term ;
--- TLet.             Term  ::= "let" LetBindings "in" Term;
--- TRedWeight.       Term  ::= RedWeight Reduction1;
--- TRed.             Term  ::= Reduction;
-TStackSpike.      Term  ::= "s^" Term;
--- TStackSpikes.     Term  ::= "["StackWeight"]s^" Term;
--- THeapSpike.       Term  ::= "h^" Term;
--- THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term;
--- TDummyBinds.      Term  ::= VarSet "d^" Term;
-coercions Term 1;
+TConstructor.     Term  ::= Constructor;
+TLam.             Term  ::= "\\" Ident "." Term1 ;
+TLet.             Term  ::= "let" LetBindings "in" Term1;
+TStackSpike.      Term  ::= "s^" Term1;
+TStackSpikes.     Term  ::= "["StackWeight "]s^" Term1;
+THeapSpike.       Term  ::= "h^" Term1;
+THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
+TDummyBinds.      Term  ::= VarSet "d^" Term1;
+TRedWeight.       Term  ::= RedWeight "(" Red ")";
+TRed.             Term  ::= Red;
 
---RCase.       Reduction1 ::= "case" Term "of" "{" [CaseStm] "}";
---RApp.        Reduction1 ::= Term Var;
---RAppInd.     Reduction1 ::= Term "^" IndExpr Var;
---RAddConst.   Reduction1 ::= "add" Integer Term;
---RIsZero.     Reduction1 ::= "iszero" Term;
---RSeq.        Reduction  ::= "seq" Term Term ;
---RPlusWeight. Reduction  ::= Term "+" RedWeight Term;
---RPlus.       Reduction  ::= Term "+" Term;
---coercions Reduction 1;
+RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
+RApp.        Red ::= Term Var;
+RAppInd.     Red ::= Var "^" IndExpr Var;
+RAddConst.   Red ::= "add" Integer Term1;
+RIsZero.     Red ::= "iszero" Term1;
+RSeq.        Red  ::= "seq" Term1 Term1 ;
+RPlusWeight. Red  ::= Term "+" RedWeight Term1;
+RPlus.       Red  ::= Term "+" Term1;
+
+coercions Term 3;
 
 DIndExpr. IndExpr ::= IntExpr1;
-GeneralConstructor. Constructor ::= Ident [Var];
-ConsConstructor. Constructor ::= Ident ":" Ident;
+CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
+CCons. Constructor ::= Ident ":" Ident;
+CTrue. Constructor ::= "true";
+CFalse. Constructor ::= "false";
 -- Ev inte cons här, men vi gör så just nu.
 DVar. Var ::= Ident;
 separator Var " ";
 DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
 
+separator CaseStm ",";
 CaseStmAlts.     CaseStm ::= "alts";
 CaseStmConcrete. CaseStm ::= Constructor "->" Term;
-separator CaseStm ",";
 
 --------------- Theorem --------------------
 
 DTheorem.     Theorem ::= Proposition Proof;
 separator Theorem "";
 DProposition. Proposition ::= "proposition" ":" InContext Term ImpRel Term ".";
-DProof.       Proof ::= "proof" ":" "()" ;-- CommandName [CmdArgument] [SubProof] Qed ".";
+DProof.       Proof ::= "proof" ":" CommandName [CmdArgument] [SubProof] Qed ".";
 DQed.         Qed ::= "qed";
 
 WithContext. InContext ::= CapitalIdent "|-";
@@ -94,21 +98,28 @@ WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
 
--- token CommandName ((letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
+token CommandName ('-' (letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
 
--- CAValue.          CmdArgument ::= CmdValue;
--- CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
--- CVTerm.           CmdValue ::= Term1;
--- CVLetBindings.    CmdValue ::= LetBindings;
--- CVContext.        CmdValue ::= Context;
--- CVVarSet.         CmdValue ::= VarSet;
--- CASmallVar.       CmdAssignee ::= Ident;
--- CABigVar.         CmdAssignee ::= CapitalIdent;
+CAValue.          CmdArgument ::= CmdValue;
+CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
+CVTermOrCtx.      CmdValue    ::= Term1;
+CVLetBindings.    CmdValue    ::= "let" LetBindings;
+CVVarSet.         CmdValue    ::= VarSet;
+CASmallVar.       CmdAssignee ::= Ident;
+CABigVar.         CmdAssignee ::= CapitalIdent;
 
--- ContextTerm.      Context ::= Term; -- Obs Temporary.
--- obs whole
+separator CmdArgument " ";
 
--- separator CmdArgument " ";
+DSubProof. SubProof ::= CommandName "{" [ProofStep] "}";
+separator SubProof "";
 
--- DSubProof. SubProof ::= CommandName "{" "}";
--- separator SubProof "";
+PSOn.          ProofStep ::= "on" SubTerm CommandName [CmdArgument];
+PSFirstTerm.   ProofStep ::= Term;
+PSTerm.        ProofStep ::= ImpRel Term;
+PSHereMarker.  ProofStep ::= "<==here";
+PSQed.         ProofStep ::= Qed;
+terminator ProofStep ".";
+
+STWhole. SubTerm ::= "whole";
+STTerm.  SubTerm ::= Term1;
+STGuess. SubTerm ::= "guess";

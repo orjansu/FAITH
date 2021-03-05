@@ -1,58 +1,58 @@
 bindings {
-G = {repeat =[0,0]= \x. let {ys = repeat x} in x:ys}.
+G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))}.
 }
 
-proposition: G |- let {xs = repeat x} in M |~> let {xs = x : xs} in M.
+proposition: G |- let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M).
 proof:
-  fix-point-induction "repeat"
-    base{
-      let {xs = repeat^0 x} in M.
-      on "repeat" def-unwindings base.
+  -fix-point-induction repeat
+    -base{
+      let {xs = repeat^0 x} in any(M).
+      on repeat -def-unwindings base.
       -- jag tror egentligen att första steget är bra, för då kan nästa rad autogenereras
-      =def=  let {xs = {repeat}d^¤ x} in M.
-      on "{repeat}d^¤" dummy-ref-algebra-8.
+      =def=  let {xs = {repeat}d^¤ x} in any(M).
+      on ({repeat}d^¤) -dummy-ref-algebra-8.
       -- tror att "on" är bra för att begränsa sökning av nästa steg (autocomplete)
-      |~> let {xs = ¤ x} in M.
-      on "¤ x" ¤-rules-3.
-      <~> let {xs = {x}d^¤} in M.
-      on "{x}d^¤" ¤-rules-1 M="x:xs".
-      |~> let {xs = x:xs} in M.
+      |~> let {xs = ¤ x} in any(M).
+      on (¤ x) -¤-rules-3.
+      <~> let {xs = {x}d^¤} in any(M).
+      on ({x}d^¤) -¤-rules-1 M=(x:xs).
+      |~> let {xs = x:xs} in any(M).
       qed.
     }
-    induction{
-      let {xs = repeat^(n+1) x} in M.
-      on whole def-unwindings induction-var="n". --vet ej om argumentet till def-unwindings behövs
-      =def= let {xs = [0]s^(\x. let {ys = repeat^n x
-                            } in x : ys
-                       ) x
-        } in M.
-      on "[0]s^(?)" spike-algebra-zero-stack-spike. --"?" är wildcard. Detta är coolt om det funkar. Jag hittade inte en passande regel i figur 7.
-      <~> let {xs = (\x. let {ys = repeat^n x
-                            } in x : ys
-                    ) x
-          } in M.
-      on "(\x . ?) x" reduction.
-      <~> let {xs = s^let {ys = repeat^n x
-                      } in x : ys
+    -induction{
+      let {xs = repeat^(n+1) x} in any(M).
+      on whole -def-unwindings n=n. --vet ej om argumentet till def-unwindings behövs
+      =def= let {xs = [0]s^((\x. (let {ys = repeat^n x}
+                                 in (x : ys))
+                            ) x)
+        } in any(M).
+      on ([0]s^(?)) -spike-algebra-zero-stack-spike. --"?" är wildcard. Detta är coolt om det funkar. Jag hittade inte en passande regel i figur 7.
+      <~> let {xs = ((\x. (let {ys = repeat^n x}
+                                 in (x : ys))
+                            ) x)
+        } in any(M).
+      on ((\x . ?) x) -reduction.
+      <~> let {xs = s^(let {ys = repeat^n x}
+                       in (x : ys))
 
-          } in M.
-      on "s^?" spike-algebra-13.
+          } in any(M).
+      on (s^?) -spike-algebra-13.
       |~> let {xs = let {ys = repeat^n x
-                    } in x : ys
+                    } in (x : ys)
 
-          } in M.
+          } in any(M).
       -- Detta är ju rätt najs ur ett checking-perspektiv. Vi kan parsea både
       -- expressionen innan och efter och enskilt kolla så att de uppfyller kraven.
-      on "let {ys = ?} in x : ys" ih.
+      on (let {ys = ?} in (x : ys)) -ih.
       -- jag skulle gärna vilja kunna ersätta "x : ys" med ?, men jag vet inte
       -- hur svårt det skulle vara.
       |~> let {xs = let {ys = x : ys
-                    } in x : ys
+                    } in (x : ys)
 
-          } in M.
-      on whole value-merge'.
+          } in any(M).
+      on whole -value-merge'.
       -- whole betyder hela termen. Det borde inte behövas fler parametrar.
-      |~> let {xs = x:xs} in M.
+      |~> let {xs = x:xs} in any(M).
       qed.
     }
   qed.

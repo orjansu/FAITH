@@ -15,7 +15,7 @@ Ott does notgenerate OCaml code for the definitions of judgments
 
 permutes kanske är bra för att hantera icke-ordningen på let:s?
 
-"Ott supports the definition ofsingle-hole contexts" - men nog ok iom att man nog kan applicera en regel en gång per hål. Men de kanske menar endast ett hål per produktion, och det har jag ju.
+"Ott supports the definition of single-hole contexts" - men nog ok iom att man nog kan applicera en regel en gång per hål. Men de kanske menar endast ett hål per produktion, och det har jag ju.
 
 p83: Ja, jag märker det att space improvement-språket är ambigous, så jag behöver göra om det.
 
@@ -28,7 +28,7 @@ Det skulle vara coolt att parsea till latex...
 
 Om man helt ska använda ott kan man också definiera start- och sluttermerna i Ott för att kunna använda dem i bevisen enkelt.
 
-"We give meaning to these binding specifications in two ways. The first semantics iswhat we term afully concreterepresentation. Perhaps surprisingly, a reasonably widerange of programming language definitions can be expressed satisfactorily withoutintroducing alpha equivalence (we discuss what can and cannot be expressed inSection 6). In typical CBV or call-by-name languages, there is no reduction underterm variable binders. The substitutions that arise therefore only substituteclosedterms,  so  there  is  no  danger  of  capture." (p88) - De menar att om man gör en substitution över en öppen term så finns det risk att man råkar göra en variable capture. Jag kanske vill göra det; vi får se.
+"We give meaning to these binding specifications in two ways. The first semantics iswhat we term afully concreterepresentation. Perhaps surprisingly, a reasonably wide range of programming language definitions can be expressed satisfactorily without introducing alpha equivalence (we discuss what can and cannot be expressed inSection 6). In typical CBV or call-by-name languages, there is no reduction under term variable binders. The substitutions that arise therefore only substitute closed terms,  so  there  is  no  danger  of  capture." (p88) - De menar att om man gör en substitution över en öppen term så finns det risk att man råkar göra en variable capture. Jag kanske vill göra det; vi får se.
 
 in de-brujin-variant där man använder 2 eller fler index? typ en för let:en och en för ordningen i let:en eller ngt?
 
