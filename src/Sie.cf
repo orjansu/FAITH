@@ -78,7 +78,7 @@ separator Var "";
 DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
 
 separator CaseStm ",";
-CaseStmConcrete. CaseStm ::= Constructor "->" Term;
+CSConcrete. CaseStm ::= Constructor "->" Term;
 
 --------------- Theorem --------------------
 
@@ -103,6 +103,7 @@ StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
 
 token CommandName ('-' (letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
+-- copied to SieLaws
 
 CAValue.          CmdArgument ::= CmdValue;
 CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;

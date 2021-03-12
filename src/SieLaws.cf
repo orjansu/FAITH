@@ -2,8 +2,11 @@ entrypoints LawList;
 
 DLawList. LawList ::= [Law];
 
-DLaw. Law ::= Name ":" Term ImpRel Term SideCond;
+DLaw. Law ::= CommandName ":" Term ImpRel Term SideCond;
 terminator Law ".";
+
+token CommandName ('-' (letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
+-- copied from Sie.cf
 
 DefinedEqual.        ImpRel ::= "=def=";
 StrongImprovementLR. ImpRel ::= "|~>";
@@ -12,7 +15,7 @@ StrongImprovementRL. ImpRel ::= "<~|";
 WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
-Reduction.           Imprel ::= "~~>";
+Reduction.           ImpRel ::= "~~>";
 
 token MVLetBindings      ('G' digit*);
 token MVValue            ('V');
@@ -25,10 +28,14 @@ token MVReduction        ('R');
 token MVVarSet           ('X');
 token MVTerm             ('M' | 'N');
 token MVPattern          ('p' 'a' 't');
+token MVCaseStm          ('a' 'l' 't' 's')
 token MVConstructorName  ('c');
 
 TValueMetaVar.    Term1 ::= MVValue;
 TGeneralMetaVar.  Term1 ::= MVTerm;
+TVar.             Term1 ::= Var;
+TAppCtx.          Term1 ::= MVContext "[" Term "]";
+TAppValCtx.       Term1 ::= MVValueContext "[" Term "]";
 TNonTerminating.  Term1 ::= "¤" ;
 TNum.             Term1 ::= Integer;
 TConstructor.     Term  ::= Constructor;
@@ -42,6 +49,7 @@ TDummyBinds.      Term  ::= VarSet "d^" Term1;
 TRedWeight.       Term  ::= RedWeight "(" Red ")";
 TRed.             Term  ::= Red;
 
+RMetaVar.    Red ::= MVReduction "[" Term "]";
 RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
 RApp.        Red ::= Term Var;
 RAppInd.     Red ::= Var "^" IndExpr Var;
@@ -52,11 +60,15 @@ RPlusWeight. Red  ::= Term "+" RedWeight Term1;
 RPlus.       Red  ::= Term "+" Term1;
 
 separator Var "";
-DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
+VSMetaVar.  VarSet ::= MVVarSet;
+VSConcrete. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
+_.          VarSet ::= "{" VarSet "}"
 DVar.    Var ::= MVVar;
 
-CaseStmAlts.     CaseStm ::= "alts";
-CaseStmConcrete. CaseStm ::= Constructor "->" Term;
+-- TODO indexing
+CSAlts.     CaseStm ::= MVCaseStm;
+CSPattern.  CaseStm ::= MVPattern "->" Term;
+CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 
 DConstructor. Constructor ::= MVConstructorName MVVarVect;
@@ -87,4 +99,15 @@ DRedWeight. RedWeight ::= "[" StackWeight "]";
 
 ---- if-statements ---
 NoSideCond. SideCond ::= ;
-WithSideCond. SideCond ::= "if" BoolStm;
+WithSideCond. SideCond ::= "if" BoolTerm;
+
+BTSizeEq.   BoolTerm ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
+BTSetEq.    BoolTerm ::= SetTerm "=" SetTerm;
+BTSubsetOf. BoolTerm ::= SetTerm "subsetof" SetTerm;
+BTIn.       BoolTerm ::= Var "in" SetTerm;
+
+
+STFreeVars. SetTerm1 ::= "FV" "(" Term ")";
+STDomain.   SetTerm1 ::= "dom" MVLetBindings;
+STUnion.    SetTerm  ::= SetTerm "union" SetTerm1;
+coercions SetTerm 1;
