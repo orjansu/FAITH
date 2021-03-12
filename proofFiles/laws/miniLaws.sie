@@ -1,0 +1,8 @@
+
+-transformational-rules{
+-unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
+}
+
+-proof-rules{
+-simple: -single{M ... N} |- M ... N;
+}

@@ -14,9 +14,13 @@ ev göra om så att man kan skriva [2] s^M, men jag gillar mer [2]s^M. se
 THeapSpikes t.ex.
 --------för att allt ska funka:
 Konstruktorer behöver vara stor bokstav och parentes runt argument
--commandonamn måste börja med '-'
+-commandonamn måste börja med '-' - byt till camelcase
+-lägg till minus.
+-ta bort extra typ för stach/heap weight?
+-Kolla Ident vs Var - Ha var hela tiden, så kan det skilja sig mellan
+laws och inte om det är metavar eller inte?
 
-Kolla varningar/ambiguitet!
+x Kolla varningar/ambiguitet!
 
 Language notes, laws:
 R, C, D, V, W, M, N måste nog vara reserverade.
@@ -55,6 +59,75 @@ t.ex.
 Eventuellt kan det vara okej att specificera mer nogrannt alla substitutionerna
 när man använder ih.
 
+Från beviset:
+-- whole betyder hela termen. Det borde inte behövas fler parametrar.
+-- jag skulle gärna vilja kunna ersätta "x : ys" med ?, men jag vet inte
+-- hur svårt det skulle vara.
+-- Detta är ju rätt najs ur ett checking-perspektiv. Vi kan parsea både
+-- expressionen innan och efter och enskilt kolla så att de uppfyller kraven.
+on ([0]s^(?)) -spike-algebra-zero-stack-spike; --"?" är wildcard. Detta är coolt om det funkar. Jag hittade inte en passande regel i figur 7.
+on whole -def-unwindings n=n; --vet ej om argumentet till def-unwindings behövs
+on ({repeat}d^¤) -dummy-ref-algebra-8;
+-- tror att "on" är bra för att begränsa sökning av nästa steg (autocomplete)
+let {xs = repeat^0 x} in any(M);
+on repeat -def-unwindings base;
+-- jag tror egentligen att första steget är bra, för då kan nästa rad autogenereras
+-- Detta börjar likna ott rätt så rejält.
+-- Testa att försöka uttrycka detta i Ott, och se vad det ger.
+-- Ott har bara konkret syntax för variabler, så det blir krångligt.
 
 Language notes, detailed:
 [.] som hole
+
+---- Ev senare utveckling
+-latex pretty print
+-snyggare vanlig pretty print
+-kolla Agda (men svårt tror jag)
+
+---Cake slice --
+kolla en expression mot en regel i laws.sie
+
+---- Att kolla i typecheckern ---
+Typecheck 1
+-Contexts används bara som argument
+-Bindingar i InContext är deklarerade i bindings
+-? används bara i on
+är deklarerade?
+   -alla variabler kan vara:
+      -deklarerade som fria i början
+        -bindningar i bindings får ej innehålla fria variabler
+      -bundna till en letbindning som binder till termen den nämns i
+         dvs M i (let G in M)
+      -bundna till en konstruktor i en case-sats
+      -bundna till en annan let-bindning i samma let-sats
+      -bindna till en lambda som är relevant
+   -any(M) -> M behöver vara deklarerad fri?
+   -stack weights:
+      -idents måste vara deklarerade fria?
+        -alternativt bundna i bindings, men det är nog överkurs.
+      -deklarera dessa fria innan bindings
+      -bindings får ha fria viktvariabler
+-Konstruktorer är deklarerade och fyllda
+   - syntax för att deklarera dem saknas. (ngt i Bindings)
+-> kolla bara bevis fram till <==here-symbolen.
+
+-Korrekthet av bevis
+  -Endast rätt relationssymbol får användas mellan varje term
+  -Transformationerna måste stämma gentemot regeln
+  -extra villkor om fria variabler osv måste respekteras
+  -induktion: börja och sluta rätt
+  -totalt sett: börja och sluta rätt
+  -on-termen måste matcha mot föregående term
+  -Senare: Regler:
+    -Metavariabler som refereras till i regler finns
+    -Regler finns deklarerade i laws.sie
+    -Regler ska ha en matchande relationssymbol (specificera detta i laws.hs?)
+    -Insättning av substitutionerna är korrekt
+
+--- Desugaring ---
+ingen vikt = [1,1]
+inContext: G |- M <~> N == let G in M <~> let G in N
+Reductions: show which term is the hole
+bara en alts i CaseStm - eller kanske ta bort alts?
+gör om variabler till ngn slags de brujin
+  -sortera termer i Let?

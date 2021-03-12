@@ -69,7 +69,7 @@ proof:
                     } in x : ys
 
           } in M.
-      on whole value-merge' G={}
+      on shown value-merge' G={}
                             x=xs
                             y=ys
                             V=(x:ys)

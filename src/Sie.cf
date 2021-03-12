@@ -5,7 +5,7 @@ entrypoints ProofScript;
 DProofScript. ProofScript ::= ProgBindings [Theorem];
 
 DProgBindings. ProgBindings ::= "bindings" "{" [ProgBinding] "}";
-terminator ProgBinding ".";
+terminator ProgBinding ";";
 
 DProgBinding. ProgBinding ::= CapitalIdent "=" LetBindings;
 
@@ -16,11 +16,13 @@ comment "{-" "-}";
 
 --------------- Terms ------------------------------
 
-LBVar.   LetBindings ::= CapitalIdent;
-LBSet.   LetBindings ::= "{" [LetBinding] "}";
+LBSAny.   LetBindings ::= "?";
+LBSVar.   LetBindings ::= CapitalIdent;
+LBSSet.   LetBindings ::= "{" [LetBinding] "}";
 separator LetBinding ",";
 
-DLetBinding. LetBinding ::= Ident BindSymbol Term;
+LBAny.      LetBinding ::= "?";
+LBConcrete. LetBinding ::= Ident BindSymbol Term;
 
 BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight. BindSymbol ::= "=";
@@ -28,6 +30,7 @@ BSNoWeight. BindSymbol ::= "=";
 StackWeightExpr. StackWeight ::= IntExpr;
 HeapWeightExpr.  HeapWeight ::= IntExpr;
 
+IEAny.   IntExpr1 ::= "?";
 IEVar.   IntExpr1 ::= Ident;
 IENum.   IntExpr1 ::= Integer;
 IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
@@ -47,7 +50,7 @@ TConstructor.     Term  ::= Constructor;
 TLam.             Term  ::= "\\" Ident "." Term1 ;
 TLet.             Term  ::= "let" LetBindings "in" Term1;
 TStackSpike.      Term  ::= "s^" Term1;
-TStackSpikes.     Term  ::= "["StackWeight "]s^" Term1;
+TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;
 THeapSpike.       Term  ::= "h^" Term1;
 THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
 TDummyBinds.      Term  ::= VarSet "d^" Term1;
@@ -70,25 +73,26 @@ CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
 CCons. Constructor ::= Ident ":" Ident;
 CTrue. Constructor ::= "true";
 CFalse. Constructor ::= "false";
--- Ev inte cons här, men vi gör så just nu.
 DVar. Var ::= Ident;
-separator Var " ";
+separator Var "";
 DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
 
 separator CaseStm ",";
-CaseStmAlts.     CaseStm ::= "alts";
 CaseStmConcrete. CaseStm ::= Constructor "->" Term;
 
 --------------- Theorem --------------------
 
 DTheorem.     Theorem ::= Proposition Proof;
 separator Theorem "";
-DProposition. Proposition ::= "proposition" ":" InContext Term ImpRel Term ".";
-DProof.       Proof ::= "proof" ":" CommandName [CmdArgument] [SubProof] Qed ".";
+DProposition. Proposition ::= "proposition" ":" InContext Forall Term ImpRel Term ";";
+DProof.       Proof ::= "proof" ":" CommandName [CmdArgument] [SubProof] Qed ";";
 DQed.         Qed ::= "qed";
 
 WithContext. InContext ::= CapitalIdent "|-";
 NoContext.   InContext ::= "|-";
+
+WithForall. Forall ::= "forall" [VarAnyType] "." ;
+NoForall.   Forall ::= ;
 
 DefinedEqual.        ImpRel ::= "=def=";
 StrongImprovementLR. ImpRel ::= "|~>";
@@ -105,8 +109,11 @@ CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
 CVTermOrCtx.      CmdValue    ::= Term1;
 CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
-CASmallVar.       CmdAssignee ::= Ident;
-CABigVar.         CmdAssignee ::= CapitalIdent;
+CASmallVar.       CmdAssignee ::= VarAnyType;
+
+BigVar.   VarAnyType ::= Ident;
+SmallVar. VarAnyType ::= CapitalIdent;
+separator VarAnyType " ";
 
 separator CmdArgument " ";
 
@@ -118,8 +125,9 @@ PSFirstTerm.   ProofStep ::= Term;
 PSTerm.        ProofStep ::= ImpRel Term;
 PSHereMarker.  ProofStep ::= "<==here";
 PSQed.         ProofStep ::= Qed;
-terminator ProofStep ".";
+terminator ProofStep ";";
 
-STWhole. SubTerm ::= "whole";
+STWholeWithCtx. SubTerm ::= "whole";
+STShown.        SubTerm ::= "shown";
 STTerm.  SubTerm ::= Term1;
 STGuess. SubTerm ::= "guess";

@@ -1,0 +1,36 @@
+name:                sie
+version:             0.1.0.0
+synopsis: Space Improvement Engine.
+description: mastersarbete.
+license:             MIT
+license-file:        LICENSE
+-- author:
+maintainer: no
+-- copyright:
+category: none
+build-type:          Simple
+extra-source-files:  stack.yaml
+cabal-version:       >=1.10
+
+executable sie
+  -- type:                exitcode-stdio-1.0
+  hs-source-dirs:      src,
+                       gen
+  other-modules:
+                       ParSie,
+                       ErrM,
+                       AbsSie,
+                       MiniTypedAST,
+                       MiniTypeChecker,
+                       LexSie
+
+  main-is:             Main.hs
+  -- other-modules:
+  build-depends:       base >= 4.10,
+                       mtl,
+                       array,
+                       process,
+                       directory,
+                       filepath,
+                       containers
+  default-language:    Haskell2010

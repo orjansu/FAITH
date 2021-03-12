@@ -1,0 +1,76 @@
+module MiniTypedAST where
+-- contains only the constructs needed for the POC proofs
+-- Does not contain datatypes for the proof rules.
+
+import Prelude (Char, Double, Integer, String, Maybe, Bool)
+import qualified Prelude as C (Eq, Ord, Show, Read)
+import qualified Data.String
+import Data.Map.Strict (Map)
+import Data.Set (Set)
+
+import qualified TypedLawAST as Law
+
+data ProofScript = DProofScript [ProgBinding] [Theorem]
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data ProgBinding = DProgBinding CapitalIdent LetBindings
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+newtype CapitalIdent = CapitalIdent String
+  deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
+
+type DistToLet = Integer
+type VarIndex = Integer
+
+-- De Bruijn indexing. Maybe combine Lambda, Free and Constructor.
+data DeBruijn = Lambda Integer | Let DistToLet VarIndex | Free Integer
+                | Constructor Integer
+type Name = String
+data Var = DVar Name (Maybe DeBruijn)
+
+type LetBindings = Map Var Term
+
+data Term
+    = TVar Var
+    | TNum Integer --A
+    | THole --Ctx
+    | TLet LetBindings Term --A
+    | TDummyBinds VarSet Term --A
+    | TRedWeight RedWeight Red --A
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type VarSet = Set Var
+
+data Red
+    = RApp Term Var
+    | RPlusWeight Term RedWeight Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type RedWeight = Integer --I will add expressions here later
+
+data Theorem = DTheorem Proposition Proof
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type HasContext = Bool -- desugar it to a let in the start and end term
+
+data Proposition = DProposition HasContext FreeVars Start ImpRel Goal
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data FreeVars = DFreeVars VarSet
+
+data Start = DStart Term
+data Goal  = DGoal  Term
+
+-- Just do simple proof method for now.
+data Proof = DProof [(ImpRel, Term, TransformationCommand)]
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+-- Just deals with these two right now.
+data ImpRel
+    = DefinedEqual
+    | StrongImprovementLR
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data TransformationCommand = DTransCommand TransformationLaw SubstitutionParameters
+
+data TransformationLaw = DTransLaw Law.Term

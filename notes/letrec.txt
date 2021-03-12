@@ -1,0 +1,129 @@
+let {
+even = \x. (if iszero x then true else odd (x-1)),
+odd  = \x. (if iszero x then false else even (x-1)),
+a = \x. x + b x,
+b = \x. x + a x
+} in M
+
+let G {x = let {y = V} in V} in M
+          |~> let G {x = V[x/y]} in M.
+
+ let {x = let {y = \a. x 1 + y 1}
+          in \a. x 1 + y 1}
+ in x 1
+
+ let {le0 = let {le0 = \la0. le(1,0) 1 + le(0,0) 1}
+            in         \la0. le(1,0) 1 + le(0,0) 1}
+ in le(0,0) 1
+|~> -value-merge'
+value-merge': let G {x = let {y = V} in V} in M
+          |~> let G {x = V[x/y]} in M.
+-- 1 rename y/x
+ let {le0 = let {le0 = \la0. le(1,0) 1 + le(1,0) 1}
+            in         \la0. le(1,0) 1 + le(1,0) 1}
+ in le(0,0) 1
+-- 2 remove inner let;
+-- let x = let y = V1 in V2
+-- i V2 (som är ==V1) så ska många index minskas
+let {y = let {z = 1} in (z + y)}  in (let z = 1 in z + y)
+
+let {x = let {y = let {z = 1} in (z + y)}
+         in (let {z = 1} in (z + y))}
+in x
+|~> -value-merge' G={} x=x y=y V=(let {z = 1} in (z + y)) M=x
+--rename
+let {x = let {y = (let {z = 1} in (z + y))[x/y]}
+         in (let {z = 1} in (z + y))[x/y]}
+in x
+--
+let {x = let {y = (let {z = 1} in (z + x))}
+         in (let {z = 1} in (z + x))}
+in x
+-- remove inner let
+let {x = (let {z = 1} in (z + x))}
+in x
+
+-- med de brujin
+let {let {let {1} in (l(0,0) + l(1,0))}
+     in (let {1} in (l(0,0) + l(1,0)))}
+in l(0,0)
+-- rename x/y
+let {let {let {1} in (l(0,0) + l(1,0))[]}
+     in (let {1} in (l(0,0) + l(1,0)))}
+in l(0,0)
+
+
+
+ let {le0 = \la0. le(0,0) 1 + le(0,0) 1} in le(0,0) 1
+
+-- de brujin
+(\x. (\y. (\ l2 1 + l1 1)),
+     (\y. (\ l2 1 + l1 1))),
+(\x. l0 1)
+-- rename-app
+(\ (\ (\ l2 1 + l1 1)[l2/l1]),
+     (\ (\ l2 1 + l1 1)[l2/l1])),
+(\ l0 1)
+-- rename-do
+(\ (\ (\ l2 1 + l2 1)),
+   (\ (\ l2 1 + l2 1))),
+(\ l0 1)
+-- remove un-needed let-clause
+(\ (\ (\ l2 1 + l2 1))),
+(\ l0 1)
+-- remove middle unused lambda - all
+-- in M = l2 1 + l2 1, all references li where i>1 should decrease by 1
+--                       --||--                i<1 should remain the same
+(\ (\ l1 1 + l1 1))),
+(\ l0 1)
+let x = \a. x 1 + x 1
+in x 1
+-> n-reduction = beta-reduction
+
+|~> unfold-1 G={}, x=l0, v=1 w=1 C=([.] 1)
+unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V].
+(\ (\ l1 1 + l1 1))),
+   (\ l0 1)
+
+let x1..xn = M1...Mn in N
+==
+let \(x1,...,xn). (M1,...,Mn) in \(x1,...,xn). N
+==
+let \x1. \x2. ... \xn . (M1, ..., Mn) in \x1. \x2. ... \xn. N
+==
+letrec(\x1. \x2. ... \xn . (M1, ..., Mn), \x1. \x2. ... \xn. N)
+--Givet att man kan sortera M1, ..., Mn, så borde denna representation funka.
+--Problem: När Mi ändras, behöver let:en potentiellt sett omsorteras,
+--och till och med skapa ekvivalenta värden, där ordningen är odefinierad.
+--När M1, ..., Mn behöver variabelnamnen i M1 ... Mn samt N bytas om de
+--refererar till xi
+--Substitutionen behöver vara en "byt plats på x och y" och inte
+--"ersätt x med y". Det borde kunna gå mha en map som appliceras på hela trädet.
+{-Jag borde kunna skriva en generell funktion som applicerar en sak på hela
+trädet, men jag vet inte om det blir jättesvårt.
+-}
+case M of {c x1...xn -> N}
+==
+case M of {c \x1 . \x2 ... \xn . N}
+==
+caseOf(M, c \x1 . \x2 ... \xn . N)
+-- Case-satser behöver sorteras för att man ska kunna bestämma alpha-ekvivalens
+-- mellan termer (denna och mål t.ex.) men inte för variabelnamn.
+
+-- jag borde kunna generera träd (och även knsk pretty-printa dem?) mha
+-- quickcheck och generators.
+
+-- Illustration av att om det finns fria variabler i en term, så kan det vara så att två subtermer har samma namn på variablerna, men är inte ekvivalenta eftersom den fria variabeln de refererar till är olika:
+let x = 1 in let y = x in x + y
+let x = 2 in let y = x in x + y
+let l0 = 1 in let l0 = l(1,0) in l(1,0) + l(0,0)
+let l0 = 2 in let l0 = l(1,0) in l(1,0) + l(0,0)
+let x = 1 in V1
+let x = 2 in V2
+-- även om V1 och V2 är syntaktiskt ekvivalenta, blir resultatet olika pga deras fria variabler. Lösning: när man stöter på fria variabler, kolla att dessa fria variabler också att lika? Kommer jag ens stöta på detta problemet?
+
+{- Om man inte vet: låt användaren annotera. Enda gången det kan hända är om det enda som skiljer två värden i expressionen är namnet på variabler som är rekursiva i expressionet.
+
+Använd SOP.
+
+-}

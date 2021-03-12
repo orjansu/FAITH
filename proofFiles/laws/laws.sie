@@ -1,0 +1,81 @@
+-reserved-letters{ -- not parsed
+G G1 G2 :: LetBindings,
+V :: Value,
+C, D :: Context,
+v, w, n, m, i, j :: Integer,
+x, y :: Var,
+xs, ys :: [Var],
+Vctx :: ValueContext,
+X :: DummyBindings, -- Set(Var)
+R :: Reduction,
+M, N :: Term,
+pat :: Pattern,
+c :: Constructor -- ?
+|- :: Implies
+}
+
+-relation-rules{
+M |~> N |- M |~~> N;
+M |~> N && N |~> M |- N <~> M
+-- etc
+}
+
+-transformational-rules{
+-unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V].
+-unfold-2: let G {x =[v,w]= V} in C[x]
+       <~| let G {x =[v,w]= V} in C[{x}d^[v]s^V].
+-unfold-3: let G {x =[v,w]= V} in C[x] <~> let G {x =[v,w]= V} in C[[v]s^V]
+                                                 if x in FV(V).
+-unfold-4: let G {x =[0,w]= V} in C[x] <~> let G {x =[0,w]= V} in C[{x}d^V].
+-unfold-5: let G {x =[0,0]= V} in C[x] <~> let G {x =[0,0]= V} in C[V].
+
+-R-case: [w]R[[v](case M of {pat_i -> N_i})]
+    <~> [w+v](case M of {pat_i -> [w]R[N_i]}).
+
+-value-merge: let G {x = V, y = V} in M |~> let G[x/v] {x = V[x/y]} in M[x/y].
+-value-merge': let G {x = let {y = V} in V} in M
+           |~> let G {x = V[x/y]} in M.
+-value-copy:  let G {x = V, y = V} in M
+          <~| let G[x/y] {x =[1,2]= V[x/y]} in M[x/y].
+
+-case-fold: let{x =[v,w]= M} in C[case x of {alts, c ys -> D[{x}d^[v]s^(c ys)]]
+       |~> let{x =[v,w]= M} in C[case x of {alts, c ys -> D[x]}].
+
+-def-unwindings-base: let {f =[w,v]= Vctx[f]} in C[f^0]
+               =def= let {f =[w,v]= Vctx[f]} in C[{f}d^¤].
+-def-unwindings-induction: let {f =[w,v]= Vctx[f]} in C[f^(n+1)]
+                    =def= let {f =[w,v]= Vctx[f]} in C[[w]s^Vctx[f^n]].
+
+-dummy-ref-algebra-8: {X}d^M |~> M.
+-¤-rules-1: {X}d^¤ |~> M            if FV(M) subsetof X.
+-¤-rules-3: R[¤] <~> {FV(R)}d^¤.
+-spike-algebra-zero-stack-spike: [0]s^M <~> M
+-spike-algebra-13: [w]s^M |~> M
+-reduction: [w]R[V] <~> [w]s^{X}d^N if (R[V] ~~> N) && (FV(R[V]) = FV({X}d^N)).
+
+-- For complex if-statements
+-gc: let G1 G2 in M <~> {X}d^(let G1 in M)
+      if FV(let G1 G2 in M) = FV({X}d^(let G1 in M)).
+-let-R: let G in [w]R[M] <~> [w]R[let G in M]
+      if dom G subsetof FV(M).
+-let-let: let G1 {x =[v,w]= let G2 in M} in N
+      <~> let G1 {x =[v,w]= let G2 in M} in N
+      if dom G1 union dom G2 subsetof FV(M) && |G1| = |G2|.
+-¤-rules-2: let G {x = {X}d^¤} in N |~> let G {x = M} in N
+      if FV(M) subsetof X union {x}
+
+-reduction-beta: (\x. M) y ~~> M[x/y].
+-reduction-case: case c_j ys of {c_i xs_i -> M_i} ~~> M_j[ys/xs_j].
+-reduction-seq: seq V M ~~> M.
+-reduction-plus: m + [w]N ~~> [w]add m N. --tog bort parentes för behövs nog ej.
+-reduction-add: add m n ~~> <m + n>.
+-reduction-iszero-true: iszero 0 ~~> true.
+-reduction-iszero-false: iszero n ~~> false if n != 0.
+
+}
+
+-proof-rules{
+-simple: -single{M ... N} |- M ... N;
+-fix-point-induction: -base{C[f^0] ... M} -induction{C[f^(n+1)] ... M}
+  |- C[f] ... M;
+}
