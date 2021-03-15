@@ -51,7 +51,7 @@ M |~> N && N |~> M |- N <~> M
 -spike-algebra-zero-stack-spike: [0]s^M <~> M;
 -spike-algebra-13: [w]s^M |~> M;
 
--- SieLaws currently parses all laws until here.
+-- SieLaws currently parses all transformational laws until here.
 -R-case: [w]R[[v](case M of {pat_i -> N_i})]
      <~> [w+v](case M of {pat_i -> [w]R[N_i]});
 
