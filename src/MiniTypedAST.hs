@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module MiniTypedAST where
 -- contains only the constructs needed for the POC proofs
 -- Does not contain datatypes for the proof rules.
@@ -23,12 +25,23 @@ type DistToLet = Integer
 type VarIndex = Integer
 
 -- De Bruijn indexing. Maybe combine Lambda, Free and Constructor.
-data DeBruijn = Lambda Integer | Let DistToLet VarIndex | Free Integer
-                | Constructor Integer
+data DeBruijn
+    = Lambda Integer
+    | Let DistToLet VarIndex
+    | Free Integer
+    | Constructor Integer
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+
 type Name = String
 data Var = DVar Name (Maybe DeBruijn)
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-type LetBindings = Map Var Term
+type LetBindings = [(Name, StackWeight, HeapWeight, Term)]
+
+type StackWeight = Integer
+
+type HeapWeight = Integer
 
 data Term
     = TVar Var
@@ -57,12 +70,16 @@ data Proposition = DProposition HasContext FreeVars Start ImpRel Goal
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data FreeVars = DFreeVars VarSet
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data Start = DStart Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
 data Goal  = DGoal  Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 -- Just do simple proof method for now.
-data Proof = DProof [(ImpRel, Term, TransformationCommand)]
+data Proof = DProof [(ImpRel, Term, Law.AppliedLaw)]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 -- Just deals with these two right now.
@@ -70,7 +87,3 @@ data ImpRel
     = DefinedEqual
     | StrongImprovementLR
   deriving (C.Eq, C.Ord, C.Show, C.Read)
-
-data TransformationCommand = DTransCommand TransformationLaw SubstitutionParameters
-
-data TransformationLaw = DTransLaw Law.Term

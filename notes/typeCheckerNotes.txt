@@ -92,7 +92,7 @@ Typecheck 1
 -Contexts används bara som argument
 -Bindingar i InContext är deklarerade i bindings
 -? används bara i on
-är deklarerade?
+variabler är deklarerade
    -alla variabler kan vara:
       -deklarerade som fria i början
         -bindningar i bindings får ej innehålla fria variabler
@@ -108,8 +108,9 @@ Typecheck 1
       -deklarera dessa fria innan bindings
       -bindings får ha fria viktvariabler
 -Konstruktorer är deklarerade och fyllda
-   - syntax för att deklarera dem saknas. (ngt i Bindings)
+   -syntax för att deklarera dem saknas. (ngt i Bindings)
 -> kolla bara bevis fram till <==here-symbolen.
+-alla bindande variabler är unika
 
 -Korrekthet av bevis
   -Endast rätt relationssymbol får användas mellan varje term
@@ -123,6 +124,7 @@ Typecheck 1
     -Regler finns deklarerade i laws.sie
     -Regler ska ha en matchande relationssymbol (specificera detta i laws.hs?)
     -Insättning av substitutionerna är korrekt
+-typning av variabler? nej, inte nu.
 
 --- Desugaring ---
 ingen vikt = [1,1]

@@ -2,9 +2,11 @@
 
 module TypedLawAST where
 
-import qualified AbsSie as UT
+import Prelude (Char, Double, Integer, String, Maybe, Bool)
+import qualified Prelude as C (Eq, Ord, Show, Read)
 import Data.Map
 
+import qualified AbsSie as UT
 {-
 type LawName = String
 
@@ -27,8 +29,47 @@ data ParameterValue where
   DParameterValue :: ParameterName t -> t -> ParameterValue
 -}
 
-data AppliedLaw = DAppliedLaw [(UT.VarAnyType, Term)] Term ImpRel Term
-
-data Term = Ts
+data AppliedLaw = DAppliedLaw [(UT.VarAnyType, UT.Term)] UT.Term ImpRel UT.Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type ImpRel = UT.ImpRel
+{-
+-unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
+
+data Term
+    = TValueMetaVar MVValue
+    | TAppCtx MVContext Term
+    | TLet LetBindings Term
+    | TDummyBinds VarSet Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data LetBindings
+    = LBSBoth [MetaBindSet] [LetBinding]
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data MetaBindSet
+    = MBSMetaVar MVLetBindings | MBSSubstitution MVLetBindings Var Var
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data LetBinding = DLetBinding Var BindSymbol Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data LetBinding = DLetBinding Var BindSymbol Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data BindSymbol = BSWeights UT.StackWeight UT.HeapWeight | BSNoWeight
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type StackWeight = IntExpr
+
+type HeapWeight = IntExpr
+
+data IntExpr
+  = IEVar IntegerVar
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type IntegerVar = MVIntegerVar
+
+newtype MVIntegerVar = MVIntegerVar String
+  deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
+-}
