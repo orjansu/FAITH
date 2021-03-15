@@ -137,3 +137,6 @@ index _i _j etc får endast användas på plats TODO fortsätt.
  -case A of B
  -case A of {B -> C}
  -case A of {alts, D -> E
+tillåt inte
+let in x
+eller låt det bara vara ekvivalent med let {} in x

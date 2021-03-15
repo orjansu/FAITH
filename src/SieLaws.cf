@@ -2,9 +2,11 @@ entrypoints LawList;
 
 DLawList. LawList ::= [Law];
 
-DLaw. Law ::= CommandName ":" Term ImpRel Term SideCond;
-terminator Law ".";
+comment "--";
+comment "{-" "-}";
 
+DLaw. Law ::= CommandName ":" Term ImpRel Term SideCond;
+terminator Law ";";
 token CommandName ('-' (letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
 -- copied from Sie.cf
 
@@ -21,14 +23,14 @@ token MVLetBindings      ('G' digit*);
 token MVValue            ('V');
 token MVContext          ('C' | 'D');
 token MVIntegerVar       ('v' | 'w' | 'n' | 'm' | 'i' | 'j');
-token MVVar              ('x' | 'y');
+token MVVar              ('x' | 'y' | 'f');
 token MVVarVect          ('x' 's' | 'y' 's');
 token MVValueContext     ('V' 'c' 't' 'x');
 token MVReduction        ('R');
 token MVVarSet           ('X');
 token MVTerm             ('M' | 'N');
 token MVPattern          ('p' 'a' 't');
-token MVCaseStm          ('a' 'l' 't' 's')
+token MVCaseStm          ('a' 'l' 't' 's');
 token MVConstructorName  ('c');
 
 TValueMetaVar.    Term1 ::= MVValue;
@@ -38,6 +40,7 @@ TAppCtx.          Term1 ::= MVContext "[" Term "]";
 TAppValCtx.       Term1 ::= MVValueContext "[" Term "]";
 TNonTerminating.  Term1 ::= "¤" ;
 TNum.             Term1 ::= Integer;
+TIndVar.          Term  ::= Var "^" IndExpr;
 TConstructor.     Term  ::= Constructor;
 TLam.             Term  ::= "\\" Var "." Term1 ;
 TLet.             Term  ::= "let" LetBindings "in" Term1;
@@ -47,12 +50,15 @@ THeapSpike.       Term  ::= "h^" Term1;
 THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
 TDummyBinds.      Term  ::= VarSet "d^" Term1;
 TRedWeight.       Term  ::= RedWeight "(" Red ")";
+TRedWeightMetaVar. Term ::= RedWeight MVReduction "[" Term "]";
 TRed.             Term  ::= Red;
+TSubstitution.    Term  ::= Term "[" Var "/" Var "]";
+
+coercions Term 1;
 
 RMetaVar.    Red ::= MVReduction "[" Term "]";
 RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
 RApp.        Red ::= Term Var;
-RAppInd.     Red ::= Var "^" IndExpr Var;
 RAddConst.   Red ::= "add" Integer Term1;
 RIsZero.     Red ::= "iszero" Term1;
 RSeq.        Red  ::= "seq" Term1 Term1 ;
@@ -62,8 +68,15 @@ RPlus.       Red  ::= Term "+" Term1;
 separator Var "";
 VSMetaVar.  VarSet ::= MVVarSet;
 VSConcrete. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
-_.          VarSet ::= "{" VarSet "}"
+_.          VarSet ::= "{" VarSet "}";
+VSFreeVars. VarSet ::= "FV" "(" VarContainer ")";
+VSDomain.   VarSet ::= "dom" MVLetBindings;
 DVar.    Var ::= MVVar;
+
+VCTerm.           VarContainer ::= Term;
+VCMetaVarContext. VarContainer ::= MVContext;
+VCMetaVarRed.     VarContainer ::= MVReduction;
+VCValueContext.   VarContainer ::= MVValueContext;
 
 -- TODO indexing
 CSAlts.     CaseStm ::= MVCaseStm;
@@ -72,14 +85,20 @@ CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 
 DConstructor. Constructor ::= MVConstructorName MVVarVect;
+
 CTrue.        Constructor ::= "true";
+
 CFalse.       Constructor ::= "false";
 
-LBMetaVar.  LetBindings ::= MVLetBindings;
-LBSet.      LetBindings ::= "{" [LetBinding] "}";
-separator LetBinding ",";
+LBSOnlyMeta. LetBindings ::= [MetaBindSet];
+LBSBoth.     LetBindings ::= [MetaBindSet] "{" [LetBinding] "}";
+
+MBSMetaVar.  MetaBindSet ::= MVLetBindings;
+MBSSubstitution. MetaBindSet ::= MVLetBindings "[" Var "/" Var "]";
+separator MetaBindSet "";
 
 DLetBinding. LetBinding ::= Var BindSymbol Term;
+separator LetBinding ",";
 BSWeights.   BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight.  BindSymbol ::= "=";
 
@@ -106,8 +125,7 @@ BTSetEq.    BoolTerm ::= SetTerm "=" SetTerm;
 BTSubsetOf. BoolTerm ::= SetTerm "subsetof" SetTerm;
 BTIn.       BoolTerm ::= Var "in" SetTerm;
 
-
-STFreeVars. SetTerm1 ::= "FV" "(" Term ")";
-STDomain.   SetTerm1 ::= "dom" MVLetBindings;
-STUnion.    SetTerm  ::= SetTerm "union" SetTerm1;
+STMetaBindSet.  SetTerm1 ::= MetaBindSet;
+STVarSet.       SetTerm1 ::= VarSet;
+STUnion.        SetTerm ::= SetTerm "union" SetTerm1;
 coercions SetTerm 1;

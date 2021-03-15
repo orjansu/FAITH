@@ -43,6 +43,7 @@ TAny.             Term1 ::= "?";
 TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
 TNonTerminating.  Term1 ::= "¤" ;
 TVar.             Term1 ::= Ident;
+TIndVar.          Term  ::= Var "^" IndExpr;
 TNum.             Term1 ::= Integer;
 THole.            Term1  ::= "[.]";
 -- Temporary. Might want to do separate grammar for contexts.
@@ -59,7 +60,6 @@ TRed.             Term  ::= Red;
 
 RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
 RApp.        Red ::= Term Var;
-RAppInd.     Red ::= Var "^" IndExpr Var;
 RAddConst.   Red ::= "add" Integer Term1;
 RIsZero.     Red ::= "iszero" Term1;
 RSeq.        Red  ::= "seq" Term1 Term1 ;
