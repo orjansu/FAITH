@@ -29,10 +29,17 @@ data ParameterValue where
   DParameterValue :: ParameterName t -> t -> ParameterValue
 -}
 
-data AppliedLaw = DAppliedLaw [(UT.VarAnyType, UT.Term)] UT.Term ImpRel UT.Term
+-- Vänd på lagar när man går från höger till vänster
+data AppliedLaw = DAppliedLaw Substitutions From ImpRel To
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type ImpRel = UT.ImpRel
+
+type From = UT.Term
+type To = UT.Term
+type Term = UT.Term
+
+type Substitutions = [(UT.VarAnyType, UT.Term)]
 {-
 -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 

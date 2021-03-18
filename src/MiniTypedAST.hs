@@ -12,6 +12,9 @@ import Data.Set (Set)
 
 import qualified TypedLawAST as Law
 
+type Var = Name
+type Name = String
+
 data ProofScript = DProofScript [ProgBinding] [Theorem]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -21,31 +24,18 @@ data ProgBinding = DProgBinding CapitalIdent LetBindings
 newtype CapitalIdent = CapitalIdent String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
 
-type DistToLet = Integer
-type VarIndex = Integer
-
--- De Bruijn indexing. Maybe combine Lambda, Free and Constructor.
-data DeBruijn
-    = Lambda Integer
-    | Let DistToLet VarIndex
-    | Free Integer
-    | Constructor Integer
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
-
-
-type Name = String
-data Var = DVar Name (Maybe DeBruijn)
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
-
 type LetBindings = [(Name, StackWeight, HeapWeight, Term)]
 
 type StackWeight = Integer
 
 type HeapWeight = Integer
 
+type SubTerm = Term
+
 data Term
     = TVar Var
     | TNum Integer --A
+    | TLam Var Term
     | THole --Ctx
     | TLet LetBindings Term --A
     | TDummyBinds VarSet Term --A

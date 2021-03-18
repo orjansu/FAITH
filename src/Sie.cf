@@ -22,7 +22,7 @@ LBSSet.   LetBindings ::= "{" [LetBinding] "}";
 separator LetBinding ",";
 
 LBAny.      LetBinding ::= "?";
-LBConcrete. LetBinding ::= Ident BindSymbol Term;
+LBConcrete. LetBinding ::= Var BindSymbol Term;
 
 BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight. BindSymbol ::= "=";
@@ -42,13 +42,13 @@ DRedWeight. RedWeight ::= "[" StackWeight "]";
 TAny.             Term1 ::= "?";
 TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
 TNonTerminating.  Term1 ::= "¤" ;
-TVar.             Term1 ::= Ident;
+TVar.             Term1 ::= Var;
 TIndVar.          Term  ::= Var "^" IndExpr;
 TNum.             Term1 ::= Integer;
 THole.            Term1  ::= "[.]";
 -- Temporary. Might want to do separate grammar for contexts.
 TConstructor.     Term  ::= Constructor;
-TLam.             Term  ::= "\\" Ident "." Term1 ;
+TLam.             Term  ::= "\\" Var "." Term1 ;
 TLet.             Term  ::= "let" LetBindings "in" Term1;
 TStackSpike.      Term  ::= "s^" Term1;
 TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;
@@ -70,7 +70,7 @@ coercions Term 3;
 
 DIndExpr. IndExpr ::= IntExpr1;
 CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
-CCons. Constructor ::= Ident ":" Ident;
+CCons. Constructor ::= Var ":" Var;
 CTrue. Constructor ::= "true";
 CFalse. Constructor ::= "false";
 DVar. Var ::= Ident;

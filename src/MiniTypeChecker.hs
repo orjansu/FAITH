@@ -54,7 +54,7 @@ checkTheorem (UT.DTheorem (UT.DProposition UT.NoContext
   tStart <- checkTerm start
   tGoal <- checkTerm goal
   tProof <- checkProof proof
-  let freeVars = DFreeVars (Set.fromList [])
+  -- let freeVars = DFreeVars (Set.fromList [])
   --let prop = T.DProposition False
   return undefined
 checkTheorem _ = fail "not implemented yet"
