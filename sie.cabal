@@ -15,7 +15,9 @@ cabal-version:       >=1.10
 executable sie
   -- type:                exitcode-stdio-1.0
   hs-source-dirs:      src,
-                       gen
+                       gen,
+                       src/proofChecking,
+                       src/typeChecking
   other-modules:
                        ParSie,
                        ErrM,
