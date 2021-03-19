@@ -30,8 +30,8 @@ token MVReduction        ('R');
 token MVVarSet           ('X');
 token MVTerm             ('M' | 'N');
 token MVPattern          ('p' 'a' 't');
-token MVCaseStm          ('a' 'l' 't' 's');
-token MVConstructorName  ('c');
+token MVCaseStm          ('a' 'l' 't' 's' digit*);
+token MVConstructorName  ('c' digit*);
 
 TValueMetaVar.    Term1 ::= MVValue;
 TGeneralMetaVar.  Term1 ::= MVTerm;

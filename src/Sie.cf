@@ -84,15 +84,15 @@ CSConcrete. CaseStm ::= Constructor "->" Term;
 
 DTheorem.     Theorem ::= Proposition Proof;
 separator Theorem "";
-DProposition. Proposition ::= "proposition" ":" InContext Forall Term ImpRel Term ";";
+DProposition. Proposition ::= "proposition" ":" InContext Free "|-" Term ImpRel Term ";";
 DProof.       Proof ::= "proof" ":" CommandName [CmdArgument] [SubProof] Qed ";";
 DQed.         Qed ::= "qed";
 
-WithContext. InContext ::= CapitalIdent "|-";
-NoContext.   InContext ::= "|-";
+WithContext. InContext ::= CapitalIdent;
+NoContext.   InContext ::= ;
 
-WithForall. Forall ::= "forall" [VarAnyType] "." ;
-NoForall.   Forall ::= ;
+WithFree. Free ::= "free" "(" [VarAnyType] ")" ;
+NoFree.   Free ::= ;
 
 DefinedEqual.        ImpRel ::= "=def=";
 StrongImprovementLR. ImpRel ::= "|~>";

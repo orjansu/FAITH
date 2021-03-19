@@ -101,7 +101,7 @@ variabler är deklarerade
       -bundna till en konstruktor i en case-sats
       -bundna till en annan let-bindning i samma let-sats
       -bindna till en lambda som är relevant
-   -any(M) -> M behöver vara deklarerad fri?
+   -any(M) -> M behöver vara deklarerad fri? - ja
    -stack weights:
       -idents måste vara deklarerade fria?
         -alternativt bundna i bindings, men det är nog överkurs.

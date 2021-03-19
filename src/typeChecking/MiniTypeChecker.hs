@@ -47,7 +47,7 @@ checkScript _ = fail "not implemented yet"
 
 checkTheorem :: UT.Theorem -> CheckM T.Theorem
 checkTheorem (UT.DTheorem (UT.DProposition UT.NoContext
-                          (UT.WithForall [(UT.SmallVar y)])
+                          (UT.WithFree [(UT.SmallVar y)])
                                      start
                                      UT.StrongImprovementLR
                                      goal) proof) = do
@@ -55,7 +55,7 @@ checkTheorem (UT.DTheorem (UT.DProposition UT.NoContext
   tGoal <- checkTerm goal
   tProof <- checkProof proof
   -- let freeVars = DFreeVars (Set.fromList [])
-  --let prop = T.DProposition False
+  -- let prop = T.DProposition False
   return undefined
 checkTheorem _ = fail "not implemented yet"
 

@@ -10,7 +10,8 @@ X :: DummyBindings, -- Set(Var)
 R :: Reduction,
 M, N :: Term,
 pat :: Pattern,
-c :: Constructor -- ?
+alts, alts1, alts2 :: CaseAlternatives,
+c, c1, c2, c3 :: Constructor,
 |- :: Implies
 }
 
@@ -18,6 +19,18 @@ c :: Constructor -- ?
 M |~> N |- M |~~> N;
 M |~> N && N |~> M |- N <~> M
 -- etc
+}
+
+-special-rules{
+-- These are rules that are not parsed, but implemented as functions
+-alpha-equiv: M =def= N if M is alpha-equivalent to N;
+  arguments: none, but specify terms before and after
+-reorder-let: let G in M =def= let G1 in M
+  if G1 is a permutation of the bindings in G;
+  arguments: a list (ex (x z y)) of the order of bindings in G1
+-reorder-case: case M of alts1 =def= case M of alts2
+  if alts2 is a permutation of the alternatives in alts1
+  arguments: a list (ex (c1 c3 c2)) of the order of constructors in alts2
 }
 
 -transformational-rules{

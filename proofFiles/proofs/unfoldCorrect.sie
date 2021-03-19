@@ -1,7 +1,7 @@
 bindings{}
 
 --correct proof
-proposition: |- forall y. let {f = \a.y}
+proposition: free(y) |- let {f = \a.y}
                           in (let {y = 1} in ((f y) + y))
                       |~> let {f = \a.y}
                           in (let {z = 1} in ({f}d^(\a.y) z + z));

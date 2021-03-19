@@ -2,7 +2,7 @@ bindings {
 G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))};
 }
 
-proposition: G |- forall xs x M. let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M);
+proposition: G free(xs x M) |- let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M);
 proof:
   -fix-point-induction repeat
     -base{
