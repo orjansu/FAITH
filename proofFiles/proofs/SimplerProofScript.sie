@@ -1,5 +1,5 @@
 bindings {
-G = {repeat =[0,0]= \x. let {ys = repeat x} in x:ys}.
+G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))};
 }
 
 -- kommentarer tillåtna.
@@ -11,23 +11,23 @@ Det kan göra bevisen mer svårlästa. Dock, om man bara skriver
 denna filen helt själv är detta nog ungefär så mycket som man
 skulle vilja skriva.
 -}
-proposition: G |- let {xs = repeat x} in M |~> let {xs = x : xs} in M.
+proposition: G |- let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M);
 proof:
-  fix-point-induction "repeat"
-    base{
-      on "repeat" def-unwindings base.
-      on "{repeat}d^¤" dummy-ref-algebra-8.
-      on "¤ x" ¤-rules-3.
-      on "{x}d^¤" ¤-rules-1 M="x:xs".
-      qed.
+  -fix-point-induction repeat
+    -base{
+      on repeat -def-unwindings base;
+      on ({repeat}d^@) -dummy-ref-algebra-8;
+      on (@ x) -@-rules-3;
+      on ({x}d^@) -@-rules-1 M=(x:xs);
+      qed;
     }
-    induction{
-      on whole def-unwindings induction-var="n".
-      on "[0]s^(?)" spike-algebra-zero-stack-spike.
-      on "(\x . ?) x" reduction.
-      on "s^?" spike-algebra-13.
-      on "let {ys = ?} in x : ys" ih.
-      on whole value-merge'.
-      qed.
+    -induction{
+      on whole -def-unwindings n=n;
+      on ([0]s^(?)) -spike-algebra-zero-stack-spike;
+      on ((\x . ?) x) -reduction;
+      on (s^?) -spike-algebra-13;
+      on (let {ys = ?} in (x : ys)) -ih;
+      on whole -value-merge';
+      qed;
     }
-  qed.
+  qed;

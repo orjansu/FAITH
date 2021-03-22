@@ -42,8 +42,9 @@ instance MonadFail LNLMonad where
 -- | Converts the term to a locally nameless representation, as specified
 -- by the data structure in LocallyNameless.hs . Assumes that all named
 -- variables in the input term are distinct. Throws errors if there is an
--- internal error in its implementation or the input data.
-toLocallyNameless :: T.Term -> Either String LNL.Term
+-- internal error in its implementation or the input data. Also returns the
+-- set of free variables found in the expression.
+toLocallyNameless :: T.Term -> Either String (LNL.Term, Set.Set VarName)
 toLocallyNameless term =
   let (res, state) = runIdentity (
                        runStateT (
@@ -54,7 +55,9 @@ toLocallyNameless term =
                          )
                        ) initLNLSt
                      )
-  in res
+  in case res of
+    Left errorMsg -> Left errorMsg
+    Right lnlTerm -> Right (lnlTerm, freeVars state)
 
 computeLNLTerm :: T.Term -> LNLMonad LNL.Term
 computeLNLTerm (T.TVar varName) = do

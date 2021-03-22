@@ -23,6 +23,7 @@ M |~> N && N |~> M |- N <~> M
 
 -special-rules{
 -- These are rules that are not parsed, but implemented as functions
+-- The parsing etc is found in Sie.cf.
 -alpha-equiv: M =def= N if M is alpha-equivalent to N;
   arguments: none, but specify terms before and after
 -reorder-let: let G in M =def= let G1 in M
@@ -54,13 +55,13 @@ M |~> N && N |~> M |- N <~> M
        |~> let{x =[v,w]= M} in C[case x of {alts, c ys -> D[x]}];
 
 -def-unwindings-base: let {f =[w,v]= Vctx[f]} in C[f^0]
-               =def= let {f =[w,v]= Vctx[f]} in C[{f}d^¤];
+               =def= let {f =[w,v]= Vctx[f]} in C[{f}d^@];
 -def-unwindings-induction: let {f =[w,v]= Vctx[f]} in C[f^(n+1)]
                     =def= let {f =[w,v]= Vctx[f]} in C[[w]s^Vctx[f^n]];
 
 -dummy-ref-algebra-8: {X}d^M |~> M;
--¤-rules-1: {X}d^¤ |~> M            if FV(M) subsetof X;
--¤-rules-3: R[¤] <~> {FV(R)}d^¤;
+-@-rules-1: {X}d^@ |~> M            if FV(M) subsetof X;
+-@-rules-3: R[@] <~> {FV(R)}d^@;
 -spike-algebra-zero-stack-spike: [0]s^M <~> M;
 -spike-algebra-13: [w]s^M |~> M;
 
@@ -79,7 +80,7 @@ M |~> N && N |~> M |- N <~> M
 -let-let: let G1 {x =[v,w]= let G2 in M} in N
       <~> let G1 {x =[v,w]= let G2 in M} in N
       if dom G1 union dom G2 subsetof FV(M) && |G1| = |G2|;
--¤-rules-2: let G {x = {X}d^¤} in N |~> let G {x = M} in N
+-@-rules-2: let G {x = {X}d^@} in N |~> let G {x = M} in N
       if FV(M) subsetof X union {x};
 
 -reduction-beta: (\x. M) y ~~> M[x/y];
@@ -93,6 +94,7 @@ M |~> N && N |~> M |- N <~> M
 }
 
 -proof-rules{
+-- These are currently defined in Sie.cf, and not parsed.
 -simple: -single{M ... N} |- M ... N;
 -fix-point-induction: -base{C[f^0] ... M} -induction{C[f^(n+1)] ... M}
   |- C[f] ... M;

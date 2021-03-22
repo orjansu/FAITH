@@ -12,6 +12,7 @@ import qualified TypedLawAST as Law
 
 --checkSubstitution :: Law.Term -> Law.Substitutions ->
 
+{-
 applySubstitution :: (MonadFail m) => Law.Term -> Law.Substitutions -> m T.Term
 applySubstitution = undefined
 
@@ -22,7 +23,6 @@ class AlphaEquivalentCheckable a where
                             => ContextInfo a -> a -> a -> m ()
   -- A () means that they are alpha equivalent. Otherwise an error
   -- should be thrown.
-{-
 instance AlphaEquivalentCheckable T.Term where
   type ContextInfo T.Term = () -- Ett record med nivå på Lambda, Let, och CaseConstructor.
   -- | Assumes that all relevant De Bruijn indexes are calculated and correct,

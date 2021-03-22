@@ -68,9 +68,14 @@ data Start = DStart Term
 data Goal  = DGoal  Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
--- Just do simple proof method for now.
-data Proof = DProof [(ImpRel, Term, Law.AppliedLaw)]
+-- Endast alpha-equiv just nu.
+data Proof
+  = Simple SubProof
+  -- | Induction SubProof SubProof
+  -- | Custom ...?
   deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type SubProof = [(Term, SubTerm, Law.Command, ImpRel)]
 
 -- Just deals with these two right now.
 data ImpRel

@@ -20,12 +20,12 @@
        |~> let{x =[v,w]= M} in C[case x of {alts, c ys -> D[x]}];
 
 -def-unwindings-base: let {f =[w,v]= Vctx[f]} in C[f^0]
-               =def= let {f =[w,v]= Vctx[f]} in C[{f}d^¤];
+               =def= let {f =[w,v]= Vctx[f]} in C[{f}d^@];
 -def-unwindings-induction: let {f =[w,v]= Vctx[f]} in C[f^(n+1)]
                     =def= let {f =[w,v]= Vctx[f]} in C[[w]s^Vctx[f^n]];
 
 -dummy-ref-algebra-8: {X}d^M |~> M;
--¤-rules-1: {X}d^¤ |~> M            if FV(M) subsetof X;
--¤-rules-3: R[¤] <~> {FV(R)}d^¤;
+-@-rules-1: {X}d^@ |~> M            if FV(M) subsetof X;
+-@-rules-3: R[@] <~> {FV(R)}d^@;
 -spike-algebra-zero-stack-spike: [0]s^M <~> M;
 -spike-algebra-13: [w]s^M |~> M;

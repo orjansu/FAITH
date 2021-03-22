@@ -19,6 +19,7 @@ Konstruktorer behöver vara stor bokstav och parentes runt argument
 -ta bort extra typ för stach/heap weight?
 -Kolla Ident vs Var - Ha var hela tiden, så kan det skilja sig mellan
 laws och inte om det är metavar eller inte?
+? eller _
 
 x Kolla varningar/ambiguitet!
 

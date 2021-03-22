@@ -7,7 +7,7 @@ comment "{-" "-}";
 
 DLaw. Law ::= CommandName ":" Term ImpRel Term SideCond;
 terminator Law ";";
-token CommandName ('-' (letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
+token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 -- copied from Sie.cf
 
 DefinedEqual.        ImpRel ::= "=def=";
@@ -38,7 +38,7 @@ TGeneralMetaVar.  Term1 ::= MVTerm;
 TVar.             Term1 ::= Var;
 TAppCtx.          Term1 ::= MVContext "[" Term "]";
 TAppValCtx.       Term1 ::= MVValueContext "[" Term "]";
-TNonTerminating.  Term1 ::= "¤" ;
+TNonTerminating.  Term1 ::= "@" ;
 TNum.             Term1 ::= Integer;
 TIndVar.          Term  ::= Var "^" IndExpr;
 TConstructor.     Term  ::= Constructor;

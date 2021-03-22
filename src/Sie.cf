@@ -41,7 +41,7 @@ DRedWeight. RedWeight ::= "[" StackWeight "]";
 
 TAny.             Term1 ::= "?";
 TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
-TNonTerminating.  Term1 ::= "¤" ;
+TNonTerminating.  Term1 ::= "@" ;
 TVar.             Term1 ::= Var;
 TIndVar.          Term  ::= Var "^" IndExpr;
 TNum.             Term1 ::= Integer;
@@ -62,9 +62,9 @@ RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
 RApp.        Red ::= Term Var;
 RAddConst.   Red ::= "add" Integer Term1;
 RIsZero.     Red ::= "iszero" Term1;
-RSeq.        Red  ::= "seq" Term1 Term1 ;
-RPlusWeight. Red  ::= Term "+" RedWeight Term1;
-RPlus.       Red  ::= Term "+" Term1;
+RSeq.        Red ::= "seq" Term1 Term1 ;
+RPlusWeight. Red ::= Term "+" RedWeight Term1;
+RPlus.       Red ::= Term "+" Term1;
 
 coercions Term 3;
 
@@ -85,8 +85,15 @@ CSConcrete. CaseStm ::= Constructor "->" Term;
 DTheorem.     Theorem ::= Proposition Proof;
 separator Theorem "";
 DProposition. Proposition ::= "proposition" ":" InContext Free "|-" Term ImpRel Term ";";
-DProof.       Proof ::= "proof" ":" CommandName [CmdArgument] [SubProof] Qed ";";
 DQed.         Qed ::= "qed";
+
+PByFPInduction.   Proof ::= "proof" ":" "-fix-point-induction" Var
+                            "-base" "{" [ProofStep] "}"
+                            "-induction" "{" [ProofStep] "}" Qed ";" ;
+PStraightForward. Proof ::= "proof" ":" "-simple"
+                            "-single" "{" [ProofStep] "}" Qed ";" ;
+PGeneral.         Proof ::= "proof" ":" CommandName [CmdArgument]
+                            [SubProof] Qed ";";
 
 WithContext. InContext ::= CapitalIdent;
 NoContext.   InContext ::= ;
@@ -102,7 +109,7 @@ WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
 
-token CommandName ('-' (letter | '¤' ) (letter | '-' | '¤' | digit| '\'')*);
+token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 -- copied to SieLaws
 
 CAValue.          CmdArgument ::= CmdValue;
@@ -111,6 +118,7 @@ CVTermOrCtx.      CmdValue    ::= Term1;
 CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
+CADummySet.       CmdAssignee ::= "{" CapitalIdent "}";
 
 BigVar.   VarAnyType ::= Ident;
 SmallVar. VarAnyType ::= CapitalIdent;
@@ -121,14 +129,21 @@ separator CmdArgument " ";
 DSubProof. SubProof ::= CommandName "{" [ProofStep] "}";
 separator SubProof "";
 
-PSOn.          ProofStep ::= "on" SubTerm CommandName [CmdArgument];
+PSCmd.         ProofStep ::= "on" SubTerm TransCmd;
 PSFirstTerm.   ProofStep ::= Term;
 PSTerm.        ProofStep ::= ImpRel Term;
-PSHereMarker.  ProofStep ::= "<==here";
+PSHereMarker.  ProofStep ::= "$";
 PSQed.         ProofStep ::= Qed;
 terminator ProofStep ";";
+
+CmdSpecial. TransCmd ::= SpecialTransCmd;
+CmdGeneral. TransCmd ::= CommandName [CmdArgument];
 
 STWholeWithCtx. SubTerm ::= "whole";
 STShown.        SubTerm ::= "shown";
 STTerm.  SubTerm ::= Term1;
 STGuess. SubTerm ::= "guess";
+
+STCAlphaEquiv.  SpecialTransCmd ::= "-alpha-equiv";
+STCReorderCase. SpecialTransCmd ::= "-reorder-case" "(" [Var] ")";
+STCReorderLet.  SpecialTransCmd ::= "-reorder-let" "(" [Var] ")";
