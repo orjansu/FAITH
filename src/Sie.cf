@@ -18,7 +18,7 @@ comment "{-" "-}";
 
 LBSAny.   LetBindings ::= "?";
 LBSVar.   LetBindings ::= CapitalIdent;
-LBSSet.   LetBindings ::= "{" [LetBinding] "}";
+LBSSet.   LetBindings ::= "<" [LetBinding] ">";
 separator LetBinding ",";
 
 LBAny.      LetBinding ::= "?";
@@ -58,7 +58,7 @@ TDummyBinds.      Term  ::= VarSet "d^" Term1;
 TRedWeight.       Term  ::= RedWeight "(" Red ")";
 TRed.             Term  ::= Red;
 
-RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
+RCase.       Red ::= "case" Term "of" "<" [CaseStm] ">";
 RApp.        Red ::= Term Var;
 RAddConst.   Red ::= "add" Integer Term1;
 RIsZero.     Red ::= "iszero" Term1;
@@ -75,7 +75,7 @@ CTrue. Constructor ::= "true";
 CFalse. Constructor ::= "false";
 DVar. Var ::= Ident;
 separator Var "";
-DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
+DVarSet. VarSet ::= "<" [Var] ">"; -- variables are separated by space.
 
 separator CaseStm ",";
 CSConcrete. CaseStm ::= Constructor "->" Term;
@@ -118,7 +118,7 @@ CVTermOrCtx.      CmdValue    ::= Term1;
 CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
-CADummySet.       CmdAssignee ::= "{" CapitalIdent "}";
+CADummySet.       CmdAssignee ::= "<" CapitalIdent ">";
 
 BigVar.   VarAnyType ::= Ident;
 SmallVar. VarAnyType ::= CapitalIdent;

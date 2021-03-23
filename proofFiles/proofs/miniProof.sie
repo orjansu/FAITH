@@ -1,5 +1,5 @@
 bindings {
-G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))};
+G = <repeat =[0,0]= \x. (let <ys = repeat x> in (x:ys))>;
 }
 
 -- kommentarer tillåtna.
@@ -11,14 +11,14 @@ Det kan göra bevisen mer svårlästa. Dock, om man bara skriver
 denna filen helt själv är detta nog ungefär så mycket som man
 skulle vilja skriva.
 -}
-proposition: G |- let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M);
+proposition: G |- let <xs = repeat x> in any(M) |~> let <xs = x : xs> in any(M);
 proof:
   -fix-point-induction repeat
     -base{
       on whole -def-unwindings base;
-      on ({repeat}d^@) -dummy-ref-algebra-8;
+      on (<repeat>d^@) -dummy-ref-algebra-8;
       on (@ x) -@-rules-3;
-      on ({x}d^@) -@-rules-1 M=(x:xs);
+      on (<x>d^@) -@-rules-1 M=(x:xs);
       qed;
     }
     -induction{
@@ -26,7 +26,7 @@ proof:
       on ([0]s^(?)) -spike-algebra-zero-stack-spike;
       on ((\x . ?) x) -reduction;
       on (s^?) -spike-algebra-13;
-      on (let {ys = ?} in (x : ys)) -ih;
+      on (let <ys = ?> in (x : ys)) -ih;
       on shown -value-merge';
       qed;
     }
