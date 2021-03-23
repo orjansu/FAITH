@@ -17,7 +17,7 @@ import Data.Functor.Identity
 data MySt = MkSt {letContext :: Maybe T.LetBindings}
 
 initSt :: MySt
-initSt = MkSt {}
+initSt = MkSt {letContext = error "should have been initialized before use"}
 
 newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
   deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String)
@@ -189,24 +189,69 @@ instance Checkable UT.Proof where
     tSteps <- checkSteps1 steps
     return $ T.Simple tSteps
     where
+      -- | Note: The steps after the HereMarker ($) are not processed.
+      -- TODO: if first term is not specified, sunstitute for the goal. note
+      -- that this doesn't work in the inductive case.
       checkSteps1 :: [UT.ProofStep] -> CheckM T.SubProof
+      checkSteps1 [] = return []
+      checkSteps1 (UT.PSHereMarker:cmds) = return []
       checkSteps1 ((UT.PSFirstTerm term1)
                      :(UT.PSCmd subterm transCmd)
                      :(UT.PSTerm imprel term2)
                      :cmds) = do
+        proofStep <- checkProofStep term1 subterm transCmd imprel
+        proofSteps <- checkSteps2 $ (UT.PSTerm imprel term2):cmds
+        return $ proofStep:proofSteps
+      checkSteps1 _ = fail $ "Terms and commands in first two steps "
+                             ++"are not specified or wrongly formatted"
+
+      -- TODO: What happens when HereMarker is in the second or third term?
+      checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
+      checkSteps2 [] = return []
+      checkSteps2 (UT.PSHereMarker:cmds)= return []
+      checkSteps2 (_:UT.PSHereMarker:cmds) = undefined
+      checkSteps2 ((UT.PSTerm _imprel1 term1)
+                   :(UT.PSCmd subterm transCmd)
+                   :(UT.PSTerm imprel2 term2)
+                   :cmds) = do
+        proofStep <- checkProofStep term1 subterm transCmd imprel2
+        proofSteps <- checkSteps2 $ (UT.PSTerm imprel2 term2):cmds
+        return $ proofStep:proofSteps
+      checkSteps2
+
+      checkProofStep :: UT.Term -> UT.SubTerm -> UT.TransCmd -> UT.ImpRel
+                        -> CheckM (T.Term, T.SubTerm, Law.Command, T.ImpRel)
+      checkProofStep term1 subterm transCmd imprel = do
         tTerm1 <- check term1
+        tTerm1withCtx <- withLetContext tTerm1
         command <- check transCmd
-        return undefined
+        tSubTerm <- getSubTerm subterm tTerm1
+        tImprel <- check imprel
+        let proofStep = (tTerm1withCtx, tSubTerm, command, tImprel)
+        return proofStep
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
     fail "not implemented yet"
 
+-- | Takes an expression (or command) for a subterm and the term it expresses
+-- a subterm of, and returns the corresponding typed subterm if exactly one
+-- such subterm exists. Throws an error otherwise.
+-- Parameters: subterm-expression, term (without let-context)
+-- returns: the term expressed by the subterm-expression.
+getSubTerm :: UT.SubTerm -> T.Term -> CheckM T.Term
+getSubTerm UT.STWholeWithCtx term = withLetContext term
+getSubTerm UT.STShown term = return term
+getSubTerm (UT.STTerm subtermExpr) term = fail "not implemented yet"
+getSubTerm UT.STGuess term = fail "not implemented yet"
 
-checkSubtermInTerm :: UT.SubTerm -> T.Term -> CheckM T.Term
-checkSubtermInTerm UT.STWholeWithCtx term = withLetContext term
-checkSubtermInTerm UT.STShown term = return term
-checkSubtermInTerm (UT.STTerm subtermExpr) term = fail "not implemented yet"
-checkSubtermInTerm UT.STGuess term = fail "not implemented yet"
-
+instance Checkable UT.ImpRel where
+  type TypedVersion UT.ImpRel = T.ImpRel
+  check UT.DefinedEqual        = return T.DefinedEqual
+  check UT.StrongImprovementLR = return T.StrongImprovementLR
+  check UT.WeakImprovementLR   = fail "not implemented yet"
+  check UT.StrongImprovementRL = fail "not implemented yet"
+  check UT.WeakImprovementRL   = fail "not implemented yet"
+  check UT.StrongCostEquiv     = fail "not implemented yet"
+  check UT.WeakCostEquiv       = fail "not implemented yet"
 
 instance Checkable UT.TransCmd where
   type TypedVersion UT.TransCmd = Law.Command
