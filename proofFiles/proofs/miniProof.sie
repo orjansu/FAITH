@@ -11,7 +11,7 @@ Det kan göra bevisen mer svårlästa. Dock, om man bara skriver
 denna filen helt själv är detta nog ungefär så mycket som man
 skulle vilja skriva.
 -}
-proposition: G |- let {xs = repeat x} in any(M) |~} let {xs = x : xs} in any(M);
+proposition: G |- let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M);
 proof:
   -fix-point-induction repeat
     -base{
