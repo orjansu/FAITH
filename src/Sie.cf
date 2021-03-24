@@ -15,6 +15,7 @@ comment "--";
 comment "{-" "-}";
 
 --------------- Terms ------------------------------
+-- Test
 
 LBSAny.   LetBindings ::= "?";
 LBSVar.   LetBindings ::= CapitalIdent;
