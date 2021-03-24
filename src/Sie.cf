@@ -19,7 +19,7 @@ comment "{-" "-}";
 LBSAny.   LetBindings ::= "?";
 LBSVar.   LetBindings ::= CapitalIdent;
 LBSSet.   LetBindings ::= "{" [LetBinding] "}";
-separator LetBinding ";";
+separator LetBinding ",";
 
 LBAny.      LetBinding ::= "?";
 LBConcrete. LetBinding ::= Var BindSymbol Term;
@@ -80,7 +80,7 @@ DVar. Var ::= Ident;
 separator Var "";
 DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
 
-separator CaseStm ";";
+separator CaseStm ",";
 CSConcrete. CaseStm ::= Constructor "->" Term;
 
 --------------- Theorem --------------------
