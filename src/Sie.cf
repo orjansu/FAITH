@@ -7,7 +7,7 @@ DProofScript. ProofScript ::= ProgBindings [Theorem];
 DProgBindings. ProgBindings ::= "bindings" "{" [ProgBinding] "}";
 terminator ProgBinding ";";
 
-DProgBinding. ProgBinding ::= CapitalIdent "=" LetBindings;
+DProgBinding. ProgBinding ::= CapitalIdent "=" "<" LetBindings ">" ;
 
 token CapitalIdent (upper letter*);
 
@@ -18,8 +18,8 @@ comment "{-" "-}";
 
 LBSAny.   LetBindings ::= "?";
 LBSVar.   LetBindings ::= CapitalIdent;
-LBSSet.   LetBindings ::= "{" [LetBinding] "}";
-separator LetBinding ",";
+LBSSet.   LetBindings ::= [LetBinding];
+separator LetBinding ";";
 
 LBAny.      LetBinding ::= "?";
 LBConcrete. LetBinding ::= Var BindSymbol Term;
@@ -38,6 +38,9 @@ IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
 coercions IntExpr 1;
 
 DRedWeight. RedWeight ::= "[" StackWeight "]";
+
+layout "let","case";
+layout stop "in";
 
 TAny.             Term1 ::= "?";
 TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
@@ -77,7 +80,7 @@ DVar. Var ::= Ident;
 separator Var "";
 DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
 
-separator CaseStm ",";
+separator CaseStm ";";
 CSConcrete. CaseStm ::= Constructor "->" Term;
 
 --------------- Theorem --------------------
@@ -114,7 +117,7 @@ token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 
 CAValue.          CmdArgument ::= CmdValue;
 CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
-CVTermOrCtx.      CmdValue    ::= Term1;
+CVTermOrCtx.      CmdValue    ::= "<" Term1 ">";
 CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
@@ -130,8 +133,8 @@ DSubProof. SubProof ::= CommandName "{" [ProofStep] "}";
 separator SubProof "";
 
 PSCmd.         ProofStep ::= "on" SubTerm TransCmd;
-PSFirstTerm.   ProofStep ::= Term;
-PSTerm.        ProofStep ::= ImpRel Term;
+PSFirstTerm.   ProofStep ::= "<" Term ">";
+PSTerm.        ProofStep ::= ImpRel "<" Term ">";
 PSHereMarker.  ProofStep ::= "$";
 PSQed.         ProofStep ::= Qed;
 terminator ProofStep ";";
@@ -141,7 +144,7 @@ CmdGeneral. TransCmd ::= CommandName [CmdArgument];
 
 STWholeWithCtx. SubTerm ::= "whole";
 STShown.        SubTerm ::= "shown";
-STTerm.  SubTerm ::= Term1;
+STTerm.  SubTerm ::= "<" Term1 ">" ;
 STGuess. SubTerm ::= "guess";
 
 STCAlphaEquiv.  SpecialTransCmd ::= "-alpha-equiv";
