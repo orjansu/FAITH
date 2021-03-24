@@ -208,8 +208,9 @@ instance Checkable UT.Proof where
       -- TODO: What happens when HereMarker is in the second or third term?
       checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
       checkSteps2 [] = return []
-      checkSteps2 (UT.PSHereMarker:cmds)= return []
-      checkSteps2 (_:UT.PSHereMarker:cmds) = undefined
+      checkSteps2 (UT.PSHereMarker:cmds) = return []
+      checkSteps2 (_:UT.PSHereMarker:cmds) = fail $ "placement of here-marker "
+        ++ "$ not supported yet. Please move it one step up or down."
       checkSteps2 ((UT.PSTerm _imprel1 term1)
                    :(UT.PSCmd subterm transCmd)
                    :(UT.PSTerm imprel2 term2)
@@ -217,17 +218,24 @@ instance Checkable UT.Proof where
         proofStep <- checkProofStep term1 subterm transCmd imprel2
         proofSteps <- checkSteps2 $ (UT.PSTerm imprel2 term2):cmds
         return $ proofStep:proofSteps
-      checkSteps2
+      checkSteps2 ((UT.PSTerm _imprel term)
+                   :(UT.PSQed UT.DQed)
+                   :[]) = do
+        tTerm <- check term
+        return $ [T.PSEnd tTerm]
+      checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
+                           ++"step must be a term and every other a "
+                           ++"transformational command."
 
       checkProofStep :: UT.Term -> UT.SubTerm -> UT.TransCmd -> UT.ImpRel
-                        -> CheckM (T.Term, T.SubTerm, Law.Command, T.ImpRel)
+                        -> CheckM T.ProofStep
       checkProofStep term1 subterm transCmd imprel = do
         tTerm1 <- check term1
         tTerm1withCtx <- withLetContext tTerm1
         command <- check transCmd
         tSubTerm <- getSubTerm subterm tTerm1
         tImprel <- check imprel
-        let proofStep = (tTerm1withCtx, tSubTerm, command, tImprel)
+        let proofStep = T.PSMiddle tTerm1withCtx tSubTerm command tImprel
         return proofStep
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
     fail "not implemented yet"
@@ -261,8 +269,9 @@ instance Checkable UT.TransCmd where
      fail "not implemented yet"
   check (UT.CmdGeneral cmdName args)  = fail "not implemented yet"
 
-
-addFreeVars = undefined
+-- | TODO add the free variables to the context
+addFreeVars :: UT.Free -> CheckM ()
+addFreeVars _ = return ()
 
 -- | Checks if a weight expression is correct.
 -- - if it contains variables, the variables must be declared to be free

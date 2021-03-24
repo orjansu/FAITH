@@ -1,8 +1,13 @@
-.PHONY : all clean testLaws testProof laws
+.PHONY : all clean testLaws testProof laws proof
 
 # Default goal.
 
-all : src/Sie.cf
+all : src/Main.hs
+	bnfc --makefile --outputdir=gen/ src/Sie.cf
+	make --directory=gen
+	stack build --copy-bins --local-bin-path="."
+
+proof : src/Sie.cf
 	bnfc --makefile --outputdir=gen/ src/Sie.cf
 	make --directory=gen
 	./gen/TestSie < proofFiles/proofs/miniProof.sie

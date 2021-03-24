@@ -75,7 +75,12 @@ data Proof
   -- | Custom ...?
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-type SubProof = [(Term, SubTerm, Law.Command, ImpRel)]
+type SubProof = [ProofStep]
+
+data ProofStep
+  = PSMiddle Term SubTerm Law.Command ImpRel
+  | PSEnd Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 -- Just deals with these two right now.
 data ImpRel

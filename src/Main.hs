@@ -7,6 +7,7 @@ import System.IO (hPutStrLn, stderr, hGetLine, stdin, hGetContents, hPutStr,
                   stdout)
 
 import ParSie                   (pProofScript, myLexer)
+import PrintSie                 ( printTree )
 import ErrM                     (Err)
 import qualified AbsSie         as UT (ProofScript)
 import qualified MiniTypedAST       as A (ProofScript)
@@ -16,7 +17,8 @@ import MiniTypeChecker              (typecheck)
 main :: IO ()
 main = do
   input <- hGetContents stdin
-  parse input >>= check
+  tree <- parse input
+  putStrLn $ printTree tree
   return ()
 
 -- | Parse file contents into AST.

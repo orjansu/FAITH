@@ -2,7 +2,7 @@ konvertera när det inte finns viktnotation till att det är vikt 1,1
 se till att bara reductions kan ha viktnotation - fixat tror jag
 Se till att det är rätt uttryck som får ha wildcard och M
 Kolla om man enkelt kan ändra pretty-printern. Annars ändra språket
-så att det kan pretty-printas snyggt.
+så att det kan pretty-printas snyggt. ==> Gör detta på en separat branch. Testa om det räcker hyfsat att bara ta bort alla {} från term-språket.
 
 Language notes:
 {} versus : qed.
@@ -20,6 +20,9 @@ Konstruktorer behöver vara stor bokstav och parentes runt argument
 -Kolla Ident vs Var - Ha var hela tiden, så kan det skilja sig mellan
 laws och inte om det är metavar eller inte?
 ? eller _
+--> I ett bevis, slutar saker processas efter HereMarker ($).
+  effektivt sett blir det som att ha {- -} från HereMarker till
+  slutet av det sub-beviset.
 
 x Kolla varningar/ambiguitet!
 
@@ -127,6 +130,15 @@ variabler är deklarerade
     -Insättning av substitutionerna är korrekt
 -typning av variabler? nej, inte nu.
 -I och med att man har en metod som skapar en LNL-representation och den används endast för att jämföra, kommer hela representationen endast räknas ut om de två termerna är lika, pga lazyness. Detta borde man kunna testa genom att jämföra två oändliga termer som är olika efter ett ändligt antal steg.
+
+--- checking detailed proof: ---
+substitutions, alpha equivalence, check subterm in main term
+-apply the substitutions to the left side of the law
+-check that the result is $\alpha$-equivalent to the subterm
+-check that the subterm is a proper subterm of the main term
+-apply the substitutions to the right side of the law
+-check that if the result of this substitution replaces the subterm in the first term, the result is alpha-equivalent to the second term
+
 
 --- Desugaring ---
 ingen vikt = [1,1]
