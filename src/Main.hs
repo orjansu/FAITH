@@ -18,7 +18,7 @@ main :: IO ()
 main = do
   input <- hGetContents stdin
   tree <- parse input
-  putStrLn $ printTree tree
+  checked <- check tree
   return ()
 
 -- | Parse file contents into AST.
