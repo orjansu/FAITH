@@ -61,7 +61,7 @@ checkScript :: UT.ProofScript -> CheckM T.ProofScript
 checkScript (UT.DProofScript (UT.DProgBindings []) [t]) = do
   tTheorem <- checkTheorem t
   return $ T.DProofScript [] [tTheorem]
-checkScript _ = fail "not implemented yet"
+checkScript _ = fail "not implemented yet 1"
 
 checkTheorem :: UT.Theorem -> CheckM T.Theorem
 checkTheorem (UT.DTheorem (UT.DProposition UT.NoContext
@@ -76,7 +76,7 @@ checkTheorem (UT.DTheorem (UT.DProposition UT.NoContext
   tProof <- check proof
   -- let prop = T.DProposition False
   return undefined
-checkTheorem _ = fail "not implemented yet"
+checkTheorem _ = fail "not implemented yet 2"
 
 class Checkable a where
   type TypedVersion a
@@ -92,16 +92,16 @@ instance Checkable UT.Term where
   -- - General terms, i.e. any(M) are declare free (TODO)
   -- - Stack weight expressions: See checkWeightExpr
   check :: UT.Term -> CheckM T.Term
-  check (UT.TAny)                          = fail "not implemented yet"
-  check (UT.TTermVar capitalIdent)         = fail "not implemented yet"
-  check (UT.TNonTerminating)               = fail "not implemented yet"
+  check (UT.TAny)                          = fail "not implemented yet 3"
+  check (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
+  check (UT.TNonTerminating)               = fail "not implemented yet 5"
   check (UT.TVar var)                      = do
     tVar <- checkMentionedVar var
     return $ T.TVar tVar
-  check (UT.TIndVar var indExpr)           = fail "not implemented yet"
+  check (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
   check (UT.TNum integer)                  = return $ T.TNum integer
   check (UT.THole)                         = return T.THole
-  check (UT.TConstructor constructor)      = fail "not implemented yet"
+  check (UT.TConstructor constructor)      = fail "not implemented yet 7"
   check (UT.TLam var term)                 = do
     tVar <- checkBindingVarUnique var
     -- TODO add the var to the binding list for lambdas
@@ -111,10 +111,10 @@ instance Checkable UT.Term where
     tLetBindings <- check letBindings
     tTerm <- check term
     return $ T.TLet tLetBindings tTerm
-  check (UT.TStackSpike term)              = fail "not implemented yet"
-  check (UT.TStackSpikes stackWeight term) = fail "not implemented yet"
-  check (UT.THeapSpike term)               = fail "not implemented yet"
-  check (UT.THeapSpikes heapWeight term)   = fail "not implemented yet"
+  check (UT.TStackSpike term)              = fail "not implemented yet 8"
+  check (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
+  check (UT.THeapSpike term)               = fail "not implemented yet 10"
+  check (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
   check (UT.TDummyBinds varSet term)       = do
     tVarSet <- check varSet
     tTerm <- check term
@@ -131,7 +131,7 @@ instance Checkable UT.Term where
 
 instance Checkable UT.LetBindings where
   type TypedVersion UT.LetBindings = T.LetBindings
-  check UT.LBSAny = fail "not implemented yet"
+  check UT.LBSAny = fail "not implemented yet 12"
   check (UT.LBSVar capitalIdent) = fail "not implemented yet"
   check (UT.LBSSet bindingSetList) = do
     tLetBindings <- mapM checkSingle bindingSetList
@@ -139,14 +139,14 @@ instance Checkable UT.LetBindings where
     where
       checkSingle :: UT.LetBinding
                      -> CheckM (T.Name, T.StackWeight, T.HeapWeight, T.Term)
-      checkSingle UT.LBAny = fail "not implemented yet"
+      checkSingle UT.LBAny = fail "not implemented yet 13"
       checkSingle (UT.LBConcrete var UT.BSNoWeight term) = do
         tVar <- checkBindingVarUnique var
         -- TODO add var to let binding list
         tTerm <- check term
         return (tVar, 1,1, tTerm)
       checkSingle (UT.LBConcrete var withWeight term) =
-        fail "not implemented yet"
+        fail "not implemented yet 14"
 
 
 instance Checkable UT.VarSet where
@@ -157,15 +157,15 @@ instance Checkable UT.VarSet where
 
 instance Checkable UT.Red where
   type TypedVersion UT.Red = T.Red
-  check (UT.RCase term caseStms)               = fail "not implemented yet"
+  check (UT.RCase term caseStms)               = fail "not implemented yet 15"
   check (UT.RApp term var)                     = do
     tTerm <- check term
     tVar <- checkMentionedVar var
     return $ T.RApp tTerm tVar
-  check (UT.RAddConst integer term)            = fail "not implemented yet"
-  check (UT.RIsZero term)                      = fail "not implemented yet"
-  check (UT.RSeq term1 term2)                  = fail "not implemented yet"
-  check (UT.RPlusWeight term1 redWeight term2) = fail "not implemented yet"
+  check (UT.RAddConst integer term)            = fail "not implemented yet 16"
+  check (UT.RIsZero term)                      = fail "not implemented yet 17"
+  check (UT.RSeq term1 term2)                  = fail "not implemented yet 18"
+  check (UT.RPlusWeight term1 redWeight term2) = fail "not implemented yet 19"
   check (UT.RPlus term1 term2)                 = do
     tTerm1 <- check term1
     tTerm2 <- check term2
@@ -238,7 +238,7 @@ instance Checkable UT.Proof where
         let proofStep = T.PSMiddle tTerm1withCtx tSubTerm command tImprel
         return proofStep
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
-    fail "not implemented yet"
+    fail "not implemented yet 20"
 
 -- | Takes an expression (or command) for a subterm and the term it expresses
 -- a subterm of, and returns the corresponding typed subterm if exactly one
@@ -248,26 +248,27 @@ instance Checkable UT.Proof where
 getSubTerm :: UT.SubTerm -> T.Term -> CheckM T.Term
 getSubTerm UT.STWholeWithCtx term = withLetContext term
 getSubTerm UT.STShown term = return term
-getSubTerm (UT.STTerm subtermExpr) term = fail "not implemented yet"
-getSubTerm UT.STGuess term = fail "not implemented yet"
+getSubTerm (UT.STTerm subtermExpr) term = fail "not implemented yet 21"
+getSubTerm UT.STGuess term = fail "not implemented yet 22"
 
 instance Checkable UT.ImpRel where
   type TypedVersion UT.ImpRel = T.ImpRel
   check UT.DefinedEqual        = return T.DefinedEqual
   check UT.StrongImprovementLR = return T.StrongImprovementLR
-  check UT.WeakImprovementLR   = fail "not implemented yet"
-  check UT.StrongImprovementRL = fail "not implemented yet"
-  check UT.WeakImprovementRL   = fail "not implemented yet"
-  check UT.StrongCostEquiv     = fail "not implemented yet"
-  check UT.WeakCostEquiv       = fail "not implemented yet"
+  check UT.WeakImprovementLR   = fail "not implemented yet 23"
+  check UT.StrongImprovementRL = fail "not implemented yet 24"
+  check UT.WeakImprovementRL   = fail "not implemented yet 25"
+  check UT.StrongCostEquiv     = fail "not implemented yet 26"
+  check UT.WeakCostEquiv       = fail "not implemented yet 27"
 
 instance Checkable UT.TransCmd where
   type TypedVersion UT.TransCmd = Law.Command
   check (UT.CmdSpecial UT.STCAlphaEquiv) = return Law.AlphaEquiv
-  check (UT.CmdSpecial (UT.STCReorderLet varOrder)) = fail "not implemented yet"
+  check (UT.CmdSpecial (UT.STCReorderLet varOrder)) =
+    fail "not implemented yet 28"
   check (UT.CmdSpecial (UT.STCReorderCase varOrder)) =
-     fail "not implemented yet"
-  check (UT.CmdGeneral cmdName args)  = fail "not implemented yet"
+    fail "not implemented yet 29"
+  check (UT.CmdGeneral cmdName args)  = fail "not implemented yet 30"
 
 -- | TODO add the free variables to the context
 addFreeVars :: UT.Free -> CheckM ()
