@@ -25,7 +25,7 @@ LBAny.      LetBinding ::= "?";
 LBConcrete. LetBinding ::= Var BindSymbol Term;
 
 BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
-BSNoWeight. BindSymbol ::= "="; 
+BSNoWeight. BindSymbol ::= "=";
 
 StackWeightExpr. StackWeight ::= IntExpr;
 HeapWeightExpr.  HeapWeight ::= IntExpr;

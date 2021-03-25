@@ -1,23 +1,21 @@
-entrypoints LawList, Law;
+entrypoints Term, LawList;
 
 DLawList. LawList ::= [Law];
 
 comment "--";
 comment "{-" "-}";
 
-DLaw. Law ::= CommandName ":" Term ImpRel Term SideCond;
+DLaw. Law ::= Term ImpRel Term SideCond;
 terminator Law ";";
-token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
--- copied from Sie.cf
 
-DefinedEqual.        ImpRel ::= "=def=";
-StrongImprovementLR. ImpRel ::= "|~>";
-WeakImprovementLR.   ImpRel ::= "|~~>";
-StrongImprovementRL. ImpRel ::= "<~|";
-WeakImprovementRL.   ImpRel ::= "<~~|";
-StrongCostEquiv.     ImpRel ::= "<~>";
-WeakCostEquiv.       ImpRel ::= "<~~>";
-Reduction.           ImpRel ::= "~~>";
+DefinedEqual.        ImpRel ::= "\\equiv";
+StrongImprovementLR. ImpRel ::= "\\imp";
+WeakImprovementLR.   ImpRel ::= "\\kimp";
+StrongImprovementRL. ImpRel ::= "\\impl";
+WeakImprovementRL.   ImpRel ::= "\\kimpl";
+StrongCostEquiv.     ImpRel ::= "\\costeq";
+WeakCostEquiv.       ImpRel ::= "\\weakEquiv";
+Reduction.           ImpRel ::= "\\to";
 
 token MVLetBindings      ('G' digit*);
 token MVValue            ('V');
@@ -36,41 +34,40 @@ token MVConstructorName  ('c' digit*);
 TValueMetaVar.    Term1 ::= MVValue;
 TGeneralMetaVar.  Term1 ::= MVTerm;
 TVar.             Term1 ::= Var;
-TAppCtx.          Term1 ::= MVContext "[" Term "]";
-TAppValCtx.       Term1 ::= MVValueContext "[" Term "]";
-TNonTerminating.  Term1 ::= "@" ;
+TAppCtx.          Term1 ::= "\\context<" MVContext ">" "[" Term "]";
+TAppValCtx.       Term1 ::= "\\context<" MVValueContext ">" "[" Term "]";
+TNonTerminating.  Term1 ::= "\\Omega" ;
 TNum.             Term1 ::= Integer;
-TIndVar.          Term  ::= Var "^" IndExpr;
+TIndVar.          Term  ::= Var "^" "<"IndExpr">";
 TConstructor.     Term  ::= Constructor;
-TLam.             Term  ::= "\\" Var "." Term1 ;
-TLet.             Term  ::= "let" LetBindings "in" Term1;
-TStackSpike.      Term  ::= "s^" Term1;
-TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;
-THeapSpike.       Term  ::= "h^" Term1;
-THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
-TDummyBinds.      Term  ::= VarSet "d^" Term1;
-TRedWeight.       Term  ::= RedWeight "(" Red ")";
-TRedWeightMetaVar. Term ::= RedWeight MVReduction "[" Term "]";
+TLam.             Term  ::= "\\lambda" Var "." Term1 ;
+TLet.             Term  ::= "\\letrec<" LetBindings "><" Term1">";
+TStackSpike.      Term  ::= "\\stackSpike<><"Term1">";
+TStackSpikes.     Term  ::= "\\stackSpike<"StackWeight"><" Term1">";
+THeapSpike.       Term  ::= "\\heapSpike<" Term1">";
+THeapSpikes.      Term  ::= "\\heapSpike<"HeapWeight"><" Term1">";
+TDummyBinds.      Term  ::= "\\dummyRef<"VarSet "><" Term1">";
+TRedWeight.       Term  ::= "\\weightSH<"RedWeight"><><(" Red ")>";
+TRedWeightMetaVar. Term ::= "\\weightSH<"RedWeight"><><"MVReduction "[" Term "]>";
 TRed.             Term  ::= Red;
-TSubstitution.    Term  ::= Term "[" Var "/" Var "]";
+TSubstitution.    Term  ::= Term "\\Sub<"Var"><" Var ">";
 
 coercions Term 1;
 
 RMetaVar.    Red ::= MVReduction "[" Term "]";
-RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
-RApp.        Red ::= Term Var;
-RAddConst.   Red ::= "add" Integer Term1;
-RIsZero.     Red ::= "iszero" Term1;
-RSeq.        Red  ::= "seq" Term1 Term1 ;
-RPlusWeight. Red  ::= Term "+" RedWeight Term1;
+RCase.       Red ::= "\\caseSimple<" Term "><"[CaseStm] ">";
+RApp.        Red ::= Term "\\," Var;
+RAddConst.   Red ::= "\\add<"Integer"><" Term1">";
+RIsZero.     Red ::= "\\iszero<" Term1">";
+RSeq.        Red  ::= "\\seq<" Term1"><" Term1">";
+RPlusWeight. Red  ::= Term "+" "\\weightSH<"RedWeight"><><" Term1">";
 RPlus.       Red  ::= Term "+" Term1;
 
 separator Var "";
 VSMetaVar.  VarSet ::= MVVarSet;
-VSConcrete. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
-_.          VarSet ::= "{" VarSet "}";
+VSConcrete. VarSet ::= "\\set<" [Var] ">"; -- variables are separated by space.
 VSFreeVars. VarSet ::= "FV" "(" VarContainer ")";
-VSDomain.   VarSet ::= "dom" MVLetBindings;
+VSDomain.   VarSet ::= "\\dom<" MVLetBindings">";
 DVar.    Var ::= MVVar;
 
 VCTerm.           VarContainer ::= Term;
@@ -80,26 +77,25 @@ VCValueContext.   VarContainer ::= MVValueContext;
 
 -- TODO indexing
 CSAlts.     CaseStm ::= MVCaseStm;
-CSPattern.  CaseStm ::= MVPattern "->" Term;
-CSConcrete. CaseStm ::= Constructor "->" Term;
+CSPattern.  CaseStm ::= MVPattern "\\to" Term;
+CSConcrete. CaseStm ::= Constructor "\\to" Term;
 separator CaseStm ",";
 
 DConstructor. Constructor ::= MVConstructorName MVVarVect;
 
-CTrue.        Constructor ::= "true";
+CTrue.        Constructor ::= "\\true";
 
-CFalse.       Constructor ::= "false";
+CFalse.       Constructor ::= "\\false";
 
 LBSOnlyMeta. LetBindings ::= [MetaBindSet];
-LBSBoth.     LetBindings ::= [MetaBindSet] "{" [LetBinding] "}";
+LBSBoth.     LetBindings ::= [MetaBindSet] "\\set<" [LetBinding] ">";
 
 MBSMetaVar.  MetaBindSet ::= MVLetBindings;
-MBSSubstitution. MetaBindSet ::= MVLetBindings "[" Var "/" Var "]";
+MBSSubstitution. MetaBindSet ::= MVLetBindings "\\Sub<"Var"><" Var ">";
 separator MetaBindSet "";
 
 DLetBinding. LetBinding ::= Var BindSymbol Term;
 separator LetBinding ",";
-BSWeights.   BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight.  BindSymbol ::= "=";
 
 DStackWeight. StackWeight ::= IntExpr;
@@ -114,7 +110,7 @@ IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
 IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
 coercions IntExpr 1;
 
-DRedWeight. RedWeight ::= "[" StackWeight "]";
+DRedWeight. RedWeight ::= StackWeight;
 
 ---- if-statements ---
 NoSideCond. SideCond ::= ;
@@ -122,10 +118,10 @@ WithSideCond. SideCond ::= "if" BoolTerm;
 
 BTSizeEq.   BoolTerm ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
 BTSetEq.    BoolTerm ::= SetTerm "=" SetTerm;
-BTSubsetOf. BoolTerm ::= SetTerm "subsetof" SetTerm;
-BTIn.       BoolTerm ::= Var "in" SetTerm;
+BTSubsetOf. BoolTerm ::= SetTerm "\\subseteq" SetTerm;
+BTIn.       BoolTerm ::= Var "\\in" SetTerm;
 
 STMetaBindSet.  SetTerm1 ::= MetaBindSet;
 STVarSet.       SetTerm1 ::= VarSet;
-STUnion.        SetTerm ::= SetTerm "union" SetTerm1;
+STUnion.        SetTerm ::= SetTerm "\\cup" SetTerm1;
 coercions SetTerm 1;

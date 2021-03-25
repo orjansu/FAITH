@@ -1,4 +1,4 @@
-.PHONY : all clean testLaws testProof laws
+.PHONY : all clean testLaws testProof laws latex
 
 haskell := $(wildcard src/*.hs)
 
@@ -19,6 +19,15 @@ laws : src/SieLaws.cf
 	bnfc --makefile --outputdir=gen/ src/SieLaws.cf
 	make --directory=gen
 	./gen/TestSieLaws < proofFiles/laws/miniLaws.sie
+
+latex : src/GenLatex.cf
+	bnfc --makefile --outputdir=gen/ src/GenLatex.cf
+
+latexLaws : src/GenLatexLaws.cf
+	bnfc --makefile --outputdir=gen/ src/GenLatexLaws.cf
+	make --directory=gen
+
+
 
 clean :
 	-rm gen/*

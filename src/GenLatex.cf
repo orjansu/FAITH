@@ -1,0 +1,65 @@
+entrypoints Term;
+
+token CapitalIdent (upper letter*);
+
+LBSVar.   LetBindings ::= CapitalIdent;
+LBSSet.   LetBindings ::= "{" [LetBinding] "}";
+separator LetBinding ",";
+
+LBConcrete. LetBinding ::= Var BindSymbol Term;
+
+BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
+BSNoWeight. BindSymbol ::= "=";
+
+StackWeightExpr. StackWeight ::= IntExpr;
+HeapWeightExpr.  HeapWeight ::= IntExpr;
+
+IEAny.   IntExpr1 ::= "?";
+IEVar.   IntExpr1 ::= Ident;
+IENum.   IntExpr1 ::= Integer;
+IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
+IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
+coercions IntExpr 1;
+
+DRedWeight. RedWeight ::= "[" StackWeight "]";
+
+TAny.             Term1 ::= "?";
+TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
+TNonTerminating.  Term1 ::= "@" ;
+TVar.             Term1 ::= Var;
+TIndVar.          Term  ::= Var "^" IndExpr;
+TNum.             Term1 ::= Integer;
+THole.            Term1  ::= "[.]";
+-- Temporary. Might want to do separate grammar for contexts.
+TConstructor.     Term  ::= Constructor;
+TLam.             Term  ::= "\\" Var "." Term1 ;
+TLet.             Term  ::= "let" LetBindings "in" Term1;
+TStackSpike.      Term  ::= "s^" Term1;
+TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;
+THeapSpike.       Term  ::= "h^" Term1;
+THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
+TDummyBinds.      Term  ::= VarSet "d^" Term1;
+TRedWeight.       Term  ::= RedWeight "(" Red ")";
+TRed.             Term  ::= Red;
+
+RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
+RApp.        Red ::= Term Var;
+RAddConst.   Red ::= "add" Integer Term1;
+RIsZero.     Red ::= "iszero" Term1;
+RSeq.        Red ::= "seq" Term1 Term1 ;
+RPlusWeight. Red ::= Term "+" RedWeight Term1;
+RPlus.       Red ::= Term "+" Term1;
+
+coercions Term 3;
+
+DIndExpr. IndExpr ::= IntExpr1;
+CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
+CCons. Constructor ::= Var ":" Var;
+CTrue. Constructor ::= "true";
+CFalse. Constructor ::= "false";
+DVar. Var ::= Ident;
+separator Var "";
+DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
+
+separator CaseStm ",";
+CSConcrete. CaseStm ::= Constructor "->" Term;
