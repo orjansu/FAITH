@@ -8,8 +8,8 @@ TVar. Term ::= Var;
 TNum. Term ::= Integer;
 THole. Term ::= "[.]";
 TLam. Term ::= "\\" Term;
-TLet. Term ::= "let" "<" [LetBinding] ">" "in" Term;
-TDummyBinds. Term ::= "<" [Var] ">d^" Term;
+TLet. Term ::= "let" "{" [LetBinding] "}" "in" Term;
+TDummyBinds. Term ::= "{" [Var] "}d^" Term;
 TRedWeight. Term ::= "[" Integer "]" Red;
 TRed. Term ::= Red;
 

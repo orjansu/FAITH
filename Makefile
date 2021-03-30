@@ -1,9 +1,9 @@
 .PHONY : all clean testLaws testProof laws
 
 mainfiles := $(wildcard src/*.hs)
-#typechecking := $(wildcard src/typeChecking/*.hs)
-#proofchecking := $(wildcard src/proofChecking/*.hs)
-underFiles := $(wildcard src/*/*.hs)
+typeChecking := $(wildcard src/typeChecking/*.hs)
+proofChecking := $(wildcard src/proofChecking/*.hs)
+prettyPrinting := $(wildcard src/prettyPrinting/*.hs)
 
 all : sie
 
@@ -11,7 +11,7 @@ gen/AbsSie.hs : src/Sie.cf
 	bnfc --makefile --outputdir=gen/ src/Sie.cf
 	make --directory=gen
 
-sie : gen/AbsSie.hs gen/AbsLNL.hs $(mainfiles) $(underfiles)
+sie : gen/AbsSie.hs gen/AbsLNL.hs $(mainfiles) $(typeChecking) $(proofChecking) $(prettyPrinting)
 	stack build --copy-bins --local-bin-path="."
 
 testLaws : proofFiles/laws/miniLaws.sie gen/TestSie

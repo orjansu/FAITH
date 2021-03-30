@@ -9,7 +9,10 @@ import qualified AbsLNL as P
 import PrintLNL (printTree)
 
 showLNL :: LNL.Term -> String
-showLNL = printTree . toPrintable
+showLNL = filterNoise . printTree . toPrintable
+
+filterNoise :: String -> String
+filterNoise = filter (\c -> c /='\"' && c /= '\n')
 
 class Convertible a where
   type PrintVersion a

@@ -21,6 +21,7 @@ import qualified LanguageLogic as Lang
 import ToLocallyNameless (toLocallyNameless, LNLSt)
 import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
+import ShowTypedTerm (showTypedTerm)
 
 newtype CheckM a = MkM {getM :: (ExceptT String
                                   (Log.WriterLoggingT Identity) a)}
@@ -46,7 +47,7 @@ runCheckM monadComputation =
                     monadComputation
   in case r of
     (Right (), logs) -> Nothing
-    (Left errorMsg, logs) -> Just $errorMsg:(map toLine logs)
+    (Left errorMsg, logs) -> Just $(map toLine logs) ++ [errorMsg]
 
 toLine :: Log.LogLine -> String
 toLine (loc, logsource, loglevel, logstr) =
@@ -83,9 +84,10 @@ checkProofSteps (T.Simple proofSteps) start globalImpRel goal = do
 -- issue. Could maybe use the globally free variables to speed things up later.
 checkStep :: GlobalImpRel -> T.ProofStep -> CheckM ()
 checkStep globalImpRel (T.PSMiddle term1 subterm command localImpRel term2) = do
-  Log.logInfoN . pack $ "checking that\n"++show term1++"\n"
-    ++show localImpRel++"\n"++show term2++"\nby transforming\n"
-    ++show subterm++"\nusing the law "++show command++" with the global "
+  Log.logInfoN . pack $ "checking that "++showTypedTerm term1++" "
+    ++show localImpRel++" "++showTypedTerm term2++" by transforming "
+    ++showTypedTerm subterm++" using the law "++show command
+    ++" with the global "
     ++"improvement relation being "++show globalImpRel
   assert (localImpRel `Lang.impRelImplies` globalImpRel)
     $ show localImpRel ++ " should imply "++ show globalImpRel
@@ -96,10 +98,10 @@ checkAlphaEquiv :: T.Term -> T.Term -> CheckM ()
 checkAlphaEquiv term1 term2 = do
   (lnlTerm1, _) <- runToLocallyNameless term1
   (lnlTerm2, _) <- runToLocallyNameless term2
-  Log.logInfoN . pack $ "Locally nameless representation of first term is\n"
+  Log.logInfoN . pack $ "Locally nameless representation of first term is "
     ++showLNL lnlTerm1
   Log.logInfoN . pack $ "Locally nameless representation of second term "
-    ++"is\n" ++ showLNL lnlTerm2
+    ++"is" ++ showLNL lnlTerm2
   assert (lnlTerm1 == lnlTerm2) $ "The locally-nameless representation of "
     ++"the terms should be equal."
 

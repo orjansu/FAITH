@@ -34,7 +34,8 @@ executable sie
                        LanguageLogic,
                        PrintLNL,
                        AbsLNL,
-                       ToPrettyLNL
+                       ToPrettyLNL,
+                       ShowTypedTerm
 
   main-is:             Main.hs
   -- other-modules:
