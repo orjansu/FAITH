@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Functor.Identity
 
+import Debug.Trace (trace)
 
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
@@ -91,8 +92,8 @@ instance Checkable UT.Theorem where
     -- TODO add freeVars to ctx
     tStart <- check start
     tGoal <- check goal
-    tProof <- check proof
     modify (\st -> st{start = tStart, goal = tGoal})
+    tProof <- check proof
     let prop = T.DProposition tFreeVars tStart T.DefinedEqual tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
@@ -232,6 +233,15 @@ instance Checkable UT.Proof where
       -- make sure that t2 and t2' point to the same values.
       -- TODO: HereMarker ($)
       checkSteps1 :: [UT.ProofStep] -> CheckM T.SubProof
+      checkSteps1 ((UT.PSCmd subterm transCmd):(UT.PSImpRel imprel):[]) = do
+        -- Replace first term with start and last term with goal.
+        tStart <- gets start
+        shownStart <- removeImplicitLet tStart
+        tSubTerm <- getSubTerm subterm shownStart
+        tTransCmd <- check transCmd
+        tImprel <- check imprel
+        tEnd <- gets goal
+        return $ [T.PSMiddle tStart tSubTerm tTransCmd tImprel tEnd]
       checkSteps1 ((UT.PSCmd subterm transCmd)
                    :(UT.PSImpRel imprel)
                    :(UT.PSTerm term2)
