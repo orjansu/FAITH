@@ -225,12 +225,16 @@ instance Checkable UT.Proof where
     tSteps <- checkSteps1 steps
     return $ T.Simple tSteps
     where
-      -- | Note: The steps after the HereMarker ($) are not processed.
+      -- TODO: What happens when HereMarker is in the second or third term?
+      -- TODO: maybe do something smarter, so that term2 isn't typechecked
+      -- twice and since if a proof is t1 t2 t3, the returning list will
+      -- be (t1, t2), (t2', t3), (t3', t4)
+      -- make sure that t2 and t2' point to the same values.
+      -- TODO: HereMarker ($)
       checkSteps1 :: [UT.ProofStep] -> CheckM T.SubProof
-      checkSteps1 [] = return []
-      checkSteps1 (UT.PSHereMarker:cmds) = return []
       checkSteps1 ((UT.PSCmd subterm transCmd)
-                   :(UT.PSTerm imprel term2)
+                   :(UT.PSImpRel imprel)
+                   :(UT.PSTerm term2)
                    :cmds) = do
         -- If first term is not specified, substitute for the start term. note
         -- that this doesn't work in the inductive case.
@@ -241,42 +245,46 @@ instance Checkable UT.Proof where
         tImprel <- check imprel
         tTerm2 <- withLetContext =<< check term2
         let proofStep = T.PSMiddle startTerm tSubterm tTransCmd tImprel tTerm2
-        proofSteps <- checkSteps2 $ (UT.PSTerm imprel term2):cmds
+        proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
         return $ proofStep:proofSteps
-      checkSteps1 ((UT.PSFirstTerm term1)
-                     :(UT.PSCmd subterm transCmd)
-                     :(UT.PSTerm imprel term2)
-                     :cmds) = do
-        proofStep <- checkProofStep term1 subterm transCmd imprel term2
-        proofSteps <- checkSteps2 $ (UT.PSTerm imprel term2):cmds
-        return $ proofStep:proofSteps
-      checkSteps1 _ = fail $ "Terms and commands in first two steps "
-                             ++"are not specified or wrongly formatted"
+      checkSteps1 steps = checkSteps2 steps
 
-      -- TODO: What happens when HereMarker is in the second or third term?
-      -- TODO: maybe do something smarter, so that term2 isn't typechecked
-      -- twice and since if a proof is t1 t2 t3, the returning list will
-      -- be (t1, t2), (t2', t3), (t3', t4)
-      -- make sure that t2 and t2' point to the same values.
       checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
       checkSteps2 [] = return []
-      checkSteps2 (UT.PSHereMarker:cmds) = return []
-      checkSteps2 (_:UT.PSHereMarker:cmds) = fail $ "placement of here-marker "
-        ++ "$ not supported yet. Please move it one step up or down."
-      checkSteps2 ((UT.PSTerm _imprel1 term1)
-                   :(UT.PSCmd subterm transCmd)
-                   :(UT.PSTerm imprel2 term2)
-                   :cmds) = do
-        proofStep <- checkProofStep term1 subterm transCmd imprel2 term2
-        proofSteps <- checkSteps2 $ (UT.PSTerm imprel2 term2):cmds
+      checkSteps2 ((UT.PSTerm term1)
+                     :(UT.PSCmd subterm transCmd)
+                     :(UT.PSImpRel imprel)
+                     :(UT.PSTerm term2)
+                     :cmds) = do
+        proofStep <- checkProofStep term1 subterm transCmd imprel term2
+        proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
         return $ proofStep:proofSteps
-      checkSteps2 ((UT.PSTerm _ _):(UT.PSQed UT.DQed)
-                   :[]) = return []
+      checkSteps2 ((UT.PSTerm term1)
+                   :(UT.PSCmd subterm transCmd)
+                   :(UT.PSImpRel impRel)
+                   :[]) = do
+        -- If the last term is skipped, the last term is implicitly the goal,
+        -- so we put it after. Note that the last improvement relation is
+        -- still needed (at least at this stage)
+        tTerm1 <- check term1
+        tTerm1wCtx <- withLetContext tTerm1
+        tSubterm <- getSubTerm subterm tTerm1
+        tTransCmd <- check transCmd
+        tImpRel <- check impRel
+        tTerm2wCtx <- gets goal
+        let proofStep = T.PSMiddle tTerm1wCtx
+                                   tSubterm
+                                   tTransCmd
+                                   tImpRel
+                                   tTerm2wCtx
+        return [proofStep]
+      checkSteps2 ((UT.PSTerm _ ):[]) = return []
                    --The last term is in the next-to-last proof step too, so
                    --it is not lost.
       checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
-                           ++"step must be a term and every other a "
-                           ++"transformational command."
+        ++"step must be a term and every other a transformational command "
+        ++"and an improvement relation. Note that the HereMarker $ is not "
+        ++"supported yet."
 
       checkProofStep :: UT.Term -> UT.SubTerm -> UT.TransCmd -> UT.ImpRel
                         -> UT.Term -> CheckM T.ProofStep
