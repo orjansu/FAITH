@@ -10,14 +10,13 @@ proof: -simple
       let {xs = repeat^0 x} in any(M);
       on repeat -def-unwindings base;
       -- jag tror egentligen att första steget är bra, för då kan nästa rad autogenereras
-      =def=  let {xs = {repeat}d^¤ x} in any(M);
-      on ({repeat}d^¤) -dummy-ref-algebra-8;
+      =def=  let {xs = {repeat}d^@ x} in any(M);
+      on ({repeat}d^@) -dummy-ref-algebra-8;
       -- tror att "on" är bra för att begränsa sökning av nästa steg (autocomplete)
-      |~> let {xs = ¤ x} in any(M);
-      on (¤ x) -¤-rules-3;
-      <~> let {xs = {x}d^¤} in any(M);
-      on ({x}d^¤) -¤-rules-1 M=(x:xs);
+      |~> let {xs = @ x} in any(M);
+      on (@ x) -@-rules-3;
+      <~> let {xs = {x}d^@} in any(M);
+      on ({x}d^@) -@-rules-1 M=(x:xs);
       |~> let {xs = x:xs} in any(M);
-      qed;
     }
   qed;

@@ -17,7 +17,6 @@ proof:
       <~> let {xs = {x}d^@} in any(M);
       on ({x}d^@) -@-rules-1 M=(x:xs);
       |~> let {xs = x:xs} in any(M);
-      qed;
     }
     -induction{
       let {xs = repeat^(n+1) x} in any(M);
@@ -53,6 +52,5 @@ proof:
       on whole -value-merge';
       -- whole betyder hela termen. Det borde inte behövas fler parametrar.
       |~> let {xs = x:xs} in any(M);
-      qed;
     }
   qed;

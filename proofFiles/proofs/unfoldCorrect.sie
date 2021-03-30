@@ -13,6 +13,5 @@ proof: -simple
                              C=(let {y = 1} in (([.] y) + y));
           |~> let {f = \a.y}
               in (let {b = 1} in (({f}d^(\a.y) b) + b));
-          qed;
          }
          qed;

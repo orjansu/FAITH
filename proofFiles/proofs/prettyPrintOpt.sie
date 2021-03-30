@@ -13,7 +13,6 @@ proof : -fix-point-induction repeat -base {
   on ({repeat}d^ @) -dummy-ref-algebra-8;
   on (@ x) -@-rules-3;
   on ({x}d^ @) -@-rules-1 M = (x : xs) ;
-  qed;
   }
 -induction {
   on whole -def-unwindings n = n ;
@@ -22,6 +21,5 @@ proof : -fix-point-induction repeat -base {
   on (s^ ?) -spike-algebra-13;
   on (let {ys = ?} in (x : ys)) -ih;
   on shown -value-merge';
-  qed;
   }
 qed;

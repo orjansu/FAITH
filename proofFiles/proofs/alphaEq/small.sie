@@ -6,6 +6,5 @@ proof: -simple
   let {x = 1} in x;
   on whole -alpha-equiv;
   =def= let {y = 1} in y;
-  qed;
   }
   qed;

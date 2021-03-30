@@ -38,6 +38,5 @@ proof: -simple
              in (p + r + 0 + (let {h4 = 1 + h4}
                               in (let {i = 5} in (i + h4)))) +
                  ((((\s. (\o. (\l. s + (\m . m) o))) p) r) f));
-         qed;
        }
       qed;

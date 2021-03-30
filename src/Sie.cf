@@ -132,12 +132,11 @@ separator CmdArgument " ";
 DSubProof. SubProof ::= CommandName "{" [ProofStep] "}";
 separator SubProof "";
 
-PSCmd.         ProofStep ::= "on" SubTerm TransCmd;
-PSFirstTerm.   ProofStep ::=  Term ;
-PSTerm.        ProofStep ::= ImpRel  Term ;
+PSCmd.         ProofStep ::= "on" SubTerm TransCmd ";";
+PSImpRel.      ProofStep ::= ImpRel;
+PSTerm.        ProofStep ::= Term ";";
 PSHereMarker.  ProofStep ::= "$";
-PSQed.         ProofStep ::= Qed;
-terminator ProofStep ";";
+terminator ProofStep "";
 
 CmdSpecial. TransCmd ::= SpecialTransCmd;
 CmdGeneral. TransCmd ::= CommandName [CmdArgument];

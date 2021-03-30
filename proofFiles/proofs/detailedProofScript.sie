@@ -23,7 +23,6 @@ proof:
       on ({x}d^@) -@-rules-1 {X}={x}
                             M=(x:xs);
       |~> let {xs = x:xs} in any(M);
-      qed;
     }
     -induction{
       let {xs = repeat^(n+1) x} in any(M);
@@ -76,6 +75,5 @@ proof:
                              V=(x:ys)
                              M=any(M);
       |~> let {xs = x:xs} in any(M);
-      qed;
     }
   qed;
