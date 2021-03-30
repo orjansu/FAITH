@@ -17,7 +17,8 @@ executable sie
   hs-source-dirs:      src,
                        gen,
                        src/proofChecking,
-                       src/typeChecking
+                       src/typeChecking,
+                       src/prettyPrinting
   other-modules:
                        ParSie,
                        ErrM,
@@ -30,7 +31,10 @@ executable sie
                        LocallyNameless,
                        ToLocallyNameless,
                        PrintSie,
-                       LanguageLogic
+                       LanguageLogic,
+                       PrintLNL,
+                       AbsLNL,
+                       ToPrettyLNL
 
   main-is:             Main.hs
   -- other-modules:

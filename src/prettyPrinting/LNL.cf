@@ -1,0 +1,28 @@
+-- Grammar file used for pretty-printing Locally Nameless representations of
+-- the language. Uses the same name for constructors as LocallyNameless.hs
+-- Not intended for parsing
+
+entrypoints Term;
+
+TVar. Term ::= Var;
+TNum. Term ::= Integer;
+THole. Term ::= "[.]";
+TLam. Term ::= "\\" Term;
+TLet. Term ::= "let" "<" [LetBinding] ">" "in" Term;
+TDummyBinds. Term ::= "<" [Var] ">d^" Term;
+TRedWeight. Term ::= "[" Integer "]" Red;
+TRed. Term ::= Red;
+
+LambdaVar.          Var ::= "a(" Integer ")";
+LetVar.             Var ::= "e("Integer "," Integer")";
+CaseConstructorVar. Var ::= "c(" Integer "," Integer")";
+FreeVar.            Var ::= String;
+separator Var ",";
+
+LBWeight. LetBinding ::= "[" Integer","Integer "]=" Term;
+LBNoWeight. LetBinding ::= Term;
+separator LetBinding ",";
+
+RApp. Red ::= Term Var;
+RPlusWeight. Red ::= Term "+" "[" Integer"]" Term;
+RPlus. Red ::= Term "+" Term;

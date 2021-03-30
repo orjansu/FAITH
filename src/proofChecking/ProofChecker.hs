@@ -20,6 +20,7 @@ import qualified TypedLawAST as Law
 import qualified LanguageLogic as Lang
 import ToLocallyNameless (toLocallyNameless, LNLSt)
 import qualified LocallyNameless as LNL
+import ToPrettyLNL (showLNL)
 
 newtype CheckM a = MkM {getM :: (ExceptT String
                                   (Log.WriterLoggingT Identity) a)}
@@ -96,9 +97,9 @@ checkAlphaEquiv term1 term2 = do
   (lnlTerm1, _) <- runToLocallyNameless term1
   (lnlTerm2, _) <- runToLocallyNameless term2
   Log.logInfoN . pack $ "Locally nameless representation of first term is\n"
-    ++show lnlTerm1
+    ++showLNL lnlTerm1
   Log.logInfoN . pack $ "Locally nameless representation of second term "
-    ++"is\n" ++ show lnlTerm2
+    ++"is\n" ++ showLNL lnlTerm2
   assert (lnlTerm1 == lnlTerm2) $ "The locally-nameless representation of "
     ++"the terms should be equal."
 

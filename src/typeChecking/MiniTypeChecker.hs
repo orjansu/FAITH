@@ -20,7 +20,7 @@ data MySt = MkSt {letContext :: Maybe T.LetBindings
                  }
 
 initSt :: MySt
-initSt = MkSt {}
+initSt = MkSt {letContext = undefined, start= undefined, goal = undefined}
 
 newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
   deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String)
