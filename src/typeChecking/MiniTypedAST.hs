@@ -15,10 +15,9 @@ import qualified TypedLawAST as Law
 type Var = Name
 type Name = String
 
-data ProofScript = DProofScript [ProgBinding] [Theorem]
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
-
-data ProgBinding = DProgBinding CapitalIdent LetBindings
+-- letBindings are put into each term instead
+-- later maybe put the set of laws here
+data ProofScript = DProofScript [Theorem]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 newtype CapitalIdent = CapitalIdent String
@@ -54,19 +53,17 @@ type RedWeight = Integer --I will add expressions here later
 data Theorem = DTheorem Proposition Proof
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-type HasContext = Bool -- desugar it to a let in the start and end term
-
-data Proposition = DProposition HasContext FreeVars Start ImpRel Goal
+data Proposition = DProposition FreeVars Start ImpRel Goal
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-data FreeVars = DFreeVars VarSet
+type TermVars = Set String
+type VarVars = Set String
+
+data FreeVars = DFreeVars TermVars VarVars
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-data Start = DStart Term
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
-
-data Goal  = DGoal  Term
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
+type Start = Term
+type Goal  = Term
 
 -- Endast alpha-equiv just nu.
 data Proof
@@ -78,12 +75,10 @@ data Proof
 type SubProof = [ProofStep]
 
 data ProofStep
-  = PSMiddle Term SubTerm Law.Command ImpRel
-  | PSEnd Term
+  = PSMiddle Term SubTerm Law.Command ImpRel Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 -- Just deals with these two right now.
 data ImpRel
     = DefinedEqual
-    | StrongImprovementLR
   deriving (C.Eq, C.Ord, C.Show, C.Read)

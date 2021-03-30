@@ -41,6 +41,7 @@ executable sie
                        filepath,
                        containers,
                        monad-logger,
-                       text
+                       text,
+                       transformers
 
   default-language:    Haskell2010

@@ -9,7 +9,7 @@ proposition: free(u f) |-
                   in (g + e + 0 + (let {h = 1 + h}
                                    in (let {i = 5} in (i + h)))) +
                       ((((\j. (\k. (\l. j + (\m . m) k))) g) e) f))
-              <~>
+              =def=
               let {y = \x. y + x + (let {z1 = 5, ar = \b . (\c. b)}
                                     in (u + z1 + (ar u) z)),
                    r = u + f + y,

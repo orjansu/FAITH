@@ -123,8 +123,8 @@ CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
 CADummySet.       CmdAssignee ::= "{" CapitalIdent "}";
 
-BigVar.   VarAnyType ::= Ident;
-SmallVar. VarAnyType ::= CapitalIdent;
+BigVar.   VarAnyType ::= CapitalIdent;
+SmallVar. VarAnyType ::= Ident;
 separator VarAnyType " ";
 
 separator CmdArgument " ";

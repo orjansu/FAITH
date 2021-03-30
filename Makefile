@@ -1,12 +1,16 @@
 .PHONY : all clean testLaws testProof laws
 
-haskell := $(wildcard src/*.hs)
+mainfiles := $(wildcard src/*.hs)
+typechecking := $(wildcard src/typeChecking/*.hs)
+proofchecking := $(wildcard src/proofChecking/*.hs)
+
+all : sie
 
 gen/AbsSie.hs : src/Sie.cf
 	bnfc --makefile --outputdir=gen/ src/Sie.cf
 	make --directory=gen
 
-sie : gen/AbsSie.hs $(haskell)
+sie : gen/AbsSie.hs $(mainfiles) $(typechecking) $(proofchecking)
 	stack build --copy-bins --local-bin-path="."
 
 testLaws : proofFiles/laws/miniLaws.sie gen/TestSie

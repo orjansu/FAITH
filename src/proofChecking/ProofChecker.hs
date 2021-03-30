@@ -1,84 +1,88 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+
 
 module ProofChecker where
 
 import qualified Control.Monad.Logger as Log
+import Data.Functor.Identity (Identity, runIdentity)
+import Control.Monad.State (StateT, MonadState, runStateT, gets, modify)
+import Control.Monad.Trans.Maybe
 import Data.Text (pack)
+import Data.Maybe
+import qualified Data.Set as Set
 
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
 
+data CheckSt = MkSt { start :: T.Term
+                    , globalImpRel :: T.ImpRel
+                    , goal :: T.Term
+                    , freeTermVars :: Set.Set String
+                    , freeVars :: Set.Set String
+                    }
 
---checkSubstitution :: Law.Term -> Law.Substitutions ->
+initSt = MkSt {}
 
-{-
-applySubstitution :: (MonadFail m) => Law.Term -> Law.Substitutions -> m T.Term
-applySubstitution = undefined
+newtype CheckM a = MkM {getM :: (MaybeT
+                                 (StateT CheckSt
+                                  (Log.WriterLoggingT Identity)) a)}
+  deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadFail,
+            MonadState CheckSt)
 
+throwError :: String -> CheckM ()
+throwError str = do
+  Log.logErrorN $ pack str
+  fail ""
 
-class AlphaEquivalentCheckable a where
-  type ContextInfo a
-  checkAlphaEq :: (MonadFail m, Log.MonadLogger m)
-                            => ContextInfo a -> a -> a -> m ()
-  -- A () means that they are alpha equivalent. Otherwise an error
-  -- should be thrown.
-instance AlphaEquivalentCheckable T.Term where
-  type ContextInfo T.Term = () -- Ett record med nivå på Lambda, Let, och CaseConstructor.
-  -- | Assumes that all relevant De Bruijn indexes are calculated and correct,
-  -- and that all variables refers to unique bind sites - i.e. new names must
-  -- be unique with respect to the whole term.
-  checkAlphaEq fv (T.TVar var1) (T.TVar var2) = undefined
-  checkAlphaEq fv (T.TNum i1) (T.TNum i2) = undefined
-  checkAlphaEq fv (T.THole) (T.THole) = undefined
-  checkAlphaEq fv (T.TLet letBindings1 t1) (T.TLet letBindings2 t2) = undefined
-  checkAlphaEq fv (T.TDummyBinds varset1 t1)
-                  (T.TDummyBinds varset2 t2) = undefined
-  checkAlphaEq fv (T.TRedWeight weight1 reduction1)
-                  (T.TRedWeight weight2 reduction2) = undefined
+-- | Checks whether a detailed proof script is correct. Returns a [String],
+-- containing a log and error message if it is incorrect, and Nothing
+-- if it is correct.
+--
+-- Assumes that the incoming proof script is typechecked.
+checkDetailedProof :: T.ProofScript -> Maybe [String]
+checkDetailedProof proofScript =
+  let r = runIdentity $
+            Log.runWriterLoggingT $
+              (flip runStateT) initSt $
+                runMaybeT $
+                  getM $
+                    check proofScript
+  in case r of
+    ((Just (), st), logs) -> Nothing
+    ((Nothing, st), logs) -> Just $ map toLine logs
 
-type AreFree = Bool
-instance AlphaEquivalentCheckable T.Var where
-  type ContextInfo T.Var = AreFree
-  -- | Checks if two variables are alpha equivalent. It does this by checking
-  -- if the names are equivalent if the variables are free, and if they are
-  -- bound, it checks if the de Bruijn representation is the same. The function
-  -- therefore assumes that every variable name refers to a unique bind site
-  -- and that the variables are either both subterms of the same term or that
-  -- equivalence is checked between the start and goal. This function does not
-  -- behave correctly for checking alpha equivalence between subterms of
-  -- different terms, since two separate terms may have the same name for
-  -- different bind sites.
-  --
-  -- The reason that the return type is () rather than a proof is that a proof
-  -- type would require type-level Strings (and Integers), which is too much
-  -- for the current scope of the project.
-  checkAlphaEq :: (MonadFail m, Log.MonadLogger m)
-                            => AreFree -> T.Var -> T.Var -> m ()
-  checkAlphaEq True (T.DVar name1 _) (T.DVar name2 _)
-    | name1 == name2 = return ()
-    | name1 /= name2 = fail $ "variables "++name1++" and "++name2++" "
-        ++"are both free and not equivalent because they have different names."
-  checkAlphaEq False (T.DVar name1 deBruijn1)
-                             (T.DVar name2 deBruijn2) = do
-    Log.logInfoN . pack $ "variables "++name1++" and "++name2++" are bound. "
-      ++ "Checking alpha equivalence."
-    case (deBruijn1, deBruijn2) of
-      (T.Lambda i1, T.Lambda i2)
-        | i1 == i2 -> return ()
-        | i1 /= i2 -> fail "bound to lambdas at different levels."
-      (T.Let dist1 index1, T.Let dist2 index2)
-        | dist1 == dist2 && index1 == index2 -> return ()
-        | dist1 /= dist2 -> fail "bound to let:s at different levels."
-        | index1 /= index2 -> fail $ "bound to different expressions within "
-          ++"same order let:s. Might help to reorder the expressions in the " ++"let."
-      (T.CaseConstructor dist1 index1, T.CaseConstructor dist2 index2)
-        | dist1 == dist2 && index1 == index2 -> return ()
-        | dist1 /= dist2 -> fail $ "bound to case-constructors at different "
-          ++ "levels"
-        | index1 /= index2 -> fail $ "bound to different variables in similar "
-          ++ "case-constructor."
-      (T.NoDeBruijn, T.NoDeBruijn) -> fail $ "internal error. Variables are "
-        ++"bound but do not contain De Bruijn indexing."
-      _ -> fail "bound to different kinds of constructs."
--}
+toLine :: Log.LogLine -> String
+toLine (loc, logsource, loglevel, logstr) = 
+  (show logsource)++":2"++(show loglevel)++":3"++(show logstr)
+
+class Checkable a where
+  check :: a -> CheckM ()
+
+instance Checkable T.ProofScript where
+  check (T.DProofScript theorems) = mapM check theorems >> return ()
+
+instance Checkable T.Theorem where
+  check (T.DTheorem proposition proof) = do
+    check proposition
+    check proof
+
+instance Checkable T.Proposition where
+  check (T.DProposition (T.DFreeVars termVars vars) start imprel goal) = do
+    modify (\st -> st{ start = start
+                     , globalImpRel = imprel
+                     , goal = goal
+                     , freeTermVars = termVars
+                     , freeVars = vars
+                      })
+
+instance Checkable T.Proof where
+  check (T.Simple proofsteps) = undefined
+
+type GlobalImpRel = T.ImpRel
+checkStep :: T.ProofStep -> GlobalImpRel -> Bool -- TODO
+checkStep = undefined

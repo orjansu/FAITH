@@ -31,9 +31,10 @@ data ParameterValue where
 
 data Command
   = AlphaEquiv
-  -- | Law Term Substitutions
+--  | Law LawTerm LawTerm Substitutions
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 -- Lägg till fler senare
+
 
 {- Något sånthär för substitutions.
 -- Vänd på lagar när man går från höger till vänster

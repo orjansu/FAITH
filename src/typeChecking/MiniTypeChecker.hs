@@ -30,7 +30,7 @@ typecheck untypedProofScript = do
   let res = runIdentity (
               runExceptT (
                 runStateT
-                  (getM (checkScript untypedProofScript))
+                  (getM (check untypedProofScript))
                   initSt
                 )
               )
@@ -55,32 +55,54 @@ withLetContext startTerm = do
     Nothing -> return startTerm
     Just letBindings -> return $ T.TLet letBindings startTerm
 
--- Main
-
-checkScript :: UT.ProofScript -> CheckM T.ProofScript
-checkScript (UT.DProofScript (UT.DProgBindings []) [t]) = do
-  tTheorem <- checkTheorem t
-  return $ T.DProofScript [] [tTheorem]
-checkScript _ = fail "not implemented yet 1"
-
-checkTheorem :: UT.Theorem -> CheckM T.Theorem
-checkTheorem (UT.DTheorem (UT.DProposition UT.NoContext
-                                     freeVars
-                                     start
-                                     UT.WeakCostEquiv
-                                     goal) proof) = do
-  modify (\st -> st{letContext = Nothing})
-  addFreeVars freeVars
-  tStart <- check start
-  tGoal <- check goal
-  tProof <- check proof
-  -- let prop = T.DProposition False
-  return undefined
-checkTheorem _ = fail "not implemented yet 2"
-
 class Checkable a where
   type TypedVersion a
   check :: a -> CheckM (TypedVersion a)
+
+instance Checkable UT.ProofScript where
+  type TypedVersion UT.ProofScript = T.ProofScript
+  check (UT.DProofScript (UT.DProgBindings []) [t]) = do
+    tTheorem <- check t
+    return $ T.DProofScript [tTheorem]
+  check _ = fail "not implemented yet 1"
+
+instance Checkable UT.Theorem where
+  type TypedVersion UT.Theorem = T.Theorem
+  check (UT.DTheorem (UT.DProposition UT.NoContext
+                                       freeVars
+                                       start
+                                       UT.DefinedEqual
+                                       goal) proof) = do
+    modify (\st -> st{letContext = Nothing})
+    tFreeVars <- check freeVars
+    -- TODO add freeVars to ctx
+    tStart <- check start
+    tGoal <- check goal
+    tProof <- check proof
+    let prop = T.DProposition tFreeVars tStart T.DefinedEqual tGoal
+    return $ T.DTheorem prop tProof
+  check _ = fail "not implemented yet 2"
+
+
+instance Checkable UT.Free where
+  type TypedVersion UT.Free = T.FreeVars
+  check (UT.WithFree freeVars) =
+    let
+      termVarList = filter isTermVar freeVars
+      termVarStrings = map getString termVarList
+      termVarSet = Set.fromList termVarStrings
+      varList = filter (not . isTermVar) freeVars
+      varListStrings = map getString varList
+      varSet = Set.fromList varListStrings
+    in return $ T.DFreeVars termVarSet varSet
+    where
+      isTermVar :: UT.VarAnyType -> Bool
+      isTermVar (UT.BigVar _) = True
+      isTermVar (UT.SmallVar _) = False
+      getString :: UT.VarAnyType -> String
+      getString (UT.BigVar (UT.CapitalIdent name)) = name
+      getString (UT.SmallVar (UT.Ident name)) = name
+  check UT.NoFree = return $ T.DFreeVars Set.empty Set.empty
 
 instance Checkable UT.Term where
   type TypedVersion UT.Term = T.Term
@@ -199,13 +221,17 @@ instance Checkable UT.Proof where
                      :(UT.PSCmd subterm transCmd)
                      :(UT.PSTerm imprel term2)
                      :cmds) = do
-        proofStep <- checkProofStep term1 subterm transCmd imprel
+        proofStep <- checkProofStep term1 subterm transCmd imprel term2
         proofSteps <- checkSteps2 $ (UT.PSTerm imprel term2):cmds
         return $ proofStep:proofSteps
       checkSteps1 _ = fail $ "Terms and commands in first two steps "
                              ++"are not specified or wrongly formatted"
 
       -- TODO: What happens when HereMarker is in the second or third term?
+      -- TODO: maybe do something smarter, so that term2 isn't typechecked
+      -- twice and since if a proof is t1 t2 t3, the returning list will
+      -- be (t1, t2), (t2', t3), (t3', t4)
+      -- make sure that t2 and t2' point to the same values.
       checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
       checkSteps2 [] = return []
       checkSteps2 (UT.PSHereMarker:cmds) = return []
@@ -215,27 +241,30 @@ instance Checkable UT.Proof where
                    :(UT.PSCmd subterm transCmd)
                    :(UT.PSTerm imprel2 term2)
                    :cmds) = do
-        proofStep <- checkProofStep term1 subterm transCmd imprel2
+        proofStep <- checkProofStep term1 subterm transCmd imprel2 term2
         proofSteps <- checkSteps2 $ (UT.PSTerm imprel2 term2):cmds
         return $ proofStep:proofSteps
-      checkSteps2 ((UT.PSTerm _imprel term)
-                   :(UT.PSQed UT.DQed)
-                   :[]) = do
-        tTerm <- check term
-        return $ [T.PSEnd tTerm]
+      checkSteps2 ((UT.PSQed UT.DQed)
+                   :[]) = return []
       checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
                            ++"step must be a term and every other a "
                            ++"transformational command."
 
       checkProofStep :: UT.Term -> UT.SubTerm -> UT.TransCmd -> UT.ImpRel
-                        -> CheckM T.ProofStep
-      checkProofStep term1 subterm transCmd imprel = do
+                        -> UT.Term -> CheckM T.ProofStep
+      checkProofStep term1 subterm transCmd imprel term2 = do
         tTerm1 <- check term1
         tTerm1withCtx <- withLetContext tTerm1
         command <- check transCmd
         tSubTerm <- getSubTerm subterm tTerm1
         tImprel <- check imprel
-        let proofStep = T.PSMiddle tTerm1withCtx tSubTerm command tImprel
+        tTerm2 <- check term2
+        tTerm2withCtx <- withLetContext tTerm2
+        let proofStep = T.PSMiddle tTerm1withCtx
+                                   tSubTerm
+                                   command
+                                   tImprel
+                                   tTerm2withCtx
         return proofStep
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
     fail "not implemented yet 20"
@@ -254,7 +283,7 @@ getSubTerm UT.STGuess term = fail "not implemented yet 22"
 instance Checkable UT.ImpRel where
   type TypedVersion UT.ImpRel = T.ImpRel
   check UT.DefinedEqual        = return T.DefinedEqual
-  check UT.StrongImprovementLR = return T.StrongImprovementLR
+  check UT.StrongImprovementLR = fail "not implemented yet 22.1"
   check UT.WeakImprovementLR   = fail "not implemented yet 23"
   check UT.StrongImprovementRL = fail "not implemented yet 24"
   check UT.WeakImprovementRL   = fail "not implemented yet 25"
@@ -269,11 +298,3 @@ instance Checkable UT.TransCmd where
   check (UT.CmdSpecial (UT.STCReorderCase varOrder)) =
     fail "not implemented yet 29"
   check (UT.CmdGeneral cmdName args)  = fail "not implemented yet 30"
-
--- | TODO add the free variables to the context
-addFreeVars :: UT.Free -> CheckM ()
-addFreeVars _ = return ()
-
--- | Checks if a weight expression is correct.
--- - if it contains variables, the variables must be declared to be free
-checkWeightExpr = undefined

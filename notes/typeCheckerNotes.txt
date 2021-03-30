@@ -156,3 +156,15 @@ index _i _j etc får endast användas på plats TODO fortsätt.
 tillåt inte
 let in x
 eller låt det bara vara ekvivalent med let {} in x
+
+---------- Correctness properties (för Quickcheck) --------------------------
+-Jag kommer göra en funktion som ger fräsha variabelnamn till en term, givet
+ett set av redan tagna namn.
+prop_rename_equiv :: T.Term -> Prop
+prop_rename_equiv term1 =
+  let vars = getVars term1
+      term2 = withFreshVars term1 vars
+  term `alphaEquiv` term2
+  (Om jag gör en som renamear bara de som behövs, så borde jag kunna göra
+  en variant när bara ett subset av variabler renameas)
+-även om ex \x\y\z(x+y+z) =def= \a\b\c(a+b+c) så x+y+z !=def= a+b+c
