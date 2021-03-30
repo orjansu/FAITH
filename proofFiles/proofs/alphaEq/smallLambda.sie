@@ -1,0 +1,11 @@
+bindings {}
+
+proposition: |- let {a = 1} in (\x.x) =def= let {a=1} in (\y.y);
+proof: -simple
+  -single{
+   let {a = 1} in (\x.x);
+  on whole -alpha-equiv;
+  =def=  let {a = 1} in (\y.y);
+  qed;
+  }
+  qed;

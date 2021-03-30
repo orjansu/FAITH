@@ -39,6 +39,7 @@ data Term
     | TDummyBinds VarSet Term --A
     | TRedWeight RedWeight Red --A
   deriving (C.Eq, C.Ord, C.Show, C.Read)
+-- TODO implement a better show using pretty-print
 
 type VarSet = Set Var
 

@@ -3,7 +3,8 @@
 
 module ToLocallyNameless
     (
-    toLocallyNameless
+    toLocallyNameless,
+    LNLSt
     ) where
 
 import qualified Data.Set as Set
@@ -44,7 +45,8 @@ instance MonadFail LNLMonad where
 -- variables in the input term are distinct. Throws errors if there is an
 -- internal error in its implementation or the input data. Also returns the
 -- set of free variables found in the expression.
-toLocallyNameless :: T.Term -> Either String (LNL.Term, Set.Set VarName)
+toLocallyNameless :: T.Term -> Either String
+                               (LNL.Term, LNLSt)
 toLocallyNameless term =
   let (res, state) = runIdentity (
                        runStateT (
@@ -57,7 +59,7 @@ toLocallyNameless term =
                      )
   in case res of
     Left errorMsg -> Left errorMsg
-    Right lnlTerm -> Right (lnlTerm, freeVars state)
+    Right lnlTerm -> Right (lnlTerm, state)
 
 computeLNLTerm :: T.Term -> LNLMonad LNL.Term
 computeLNLTerm (T.TVar varName) = do
@@ -115,7 +117,7 @@ computeLNLTerm (T.TLet letBinds mainTerm) = do
   -- 4. Decrease distance on all current let-variables
   letVars4 <- gets letVars
   let decreaseDistance = (\(distance, varIndex) -> (distance-1, varIndex))
-  let letVars5 = Map.map increaseDistance letVars4
+  let letVars5 = Map.map decreaseDistance letVars4
   modify (\st -> st{letVars = letVars5})
   -- 5. Remove all variables with negative distance. We should now arrive at the
   -- same bindings as before the let-term

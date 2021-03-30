@@ -30,7 +30,7 @@ parse s =
   case pProofScript (myLexer s) of
     Left err  -> do
       hPutStrLn stderr "ERROR"
-      hPutStrLn stderr $ "Lexing error" ++ err
+      hPutStrLn stderr $ "Lexing error: " ++ err
       exitFailure
     Right  tree -> return tree
 
@@ -40,7 +40,7 @@ runTypecheck tree =
   case typecheck tree of
     Left err -> do
       hPutStrLn stderr "ERROR"
-      hPutStrLn stderr $ "Type error " ++ err
+      hPutStrLn stderr $ "Type error: " ++ err
       exitFailure
     Right tree' -> do
         hPutStrLn stderr "No type errors"

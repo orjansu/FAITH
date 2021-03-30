@@ -5,7 +5,7 @@ module MiniTypedAST where
 -- Does not contain datatypes for the proof rules.
 
 import Prelude (Char, Double, Integer, String, Maybe, Bool)
-import qualified Prelude as C (Eq, Ord, Show, Read)
+import qualified Prelude as C (Eq, Ord, Show, Read, show)
 import qualified Data.String
 import Data.Map.Strict (Map)
 import Data.Set (Set)
@@ -40,6 +40,8 @@ data Term
     | TDummyBinds VarSet Term --A
     | TRedWeight RedWeight Red --A
   deriving (C.Eq, C.Ord, C.Show, C.Read)
+-- TODO derive a better show function that converts to AbsSie and then uses
+-- the pretty-printer (showTree)
 
 type VarSet = Set Var
 
@@ -78,7 +80,11 @@ data ProofStep
   = PSMiddle Term SubTerm Law.Command ImpRel Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
--- Just deals with these two right now.
+-- Just deals with this one right now.
+-- TODO as this is expanded, add clauses to LanguageLogic.hs
 data ImpRel
     = DefinedEqual
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
+  deriving (C.Eq, C.Ord, C.Read)
+
+instance C.Show ImpRel where
+  show DefinedEqual = "=def="

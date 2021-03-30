@@ -3,7 +3,7 @@
 module TypedLawAST where
 
 import Prelude (Char, Double, Integer, String, Maybe, Bool)
-import qualified Prelude as C (Eq, Ord, Show, Read)
+import qualified Prelude as C (Eq, Ord, Show, Read, show)
 import Data.Map
 
 import qualified AbsSie as UT
@@ -31,10 +31,13 @@ data ParameterValue where
 
 data Command
   = AlphaEquiv
+  deriving (C.Eq, C.Ord, C.Read)
 --  | Law LawTerm LawTerm Substitutions
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
 -- Lägg till fler senare
 
+-- TODO add show in law later.
+instance C.Show Command where
+  show AlphaEquiv = "-alpha-equiv"
 
 {- Något sånthär för substitutions.
 -- Vänd på lagar när man går från höger till vänster

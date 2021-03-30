@@ -29,7 +29,8 @@ executable sie
                        TypedLawAST,
                        LocallyNameless,
                        ToLocallyNameless,
-                       PrintSie
+                       PrintSie,
+                       LanguageLogic
 
   main-is:             Main.hs
   -- other-modules:

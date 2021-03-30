@@ -14,10 +14,13 @@ import Control.Monad.State
 import Data.Functor.Identity
 
 
-data MySt = MkSt {letContext :: Maybe T.LetBindings}
+data MySt = MkSt {letContext :: Maybe T.LetBindings
+                 , start :: T.Term
+                 , goal :: T.Term
+                 }
 
 initSt :: MySt
-initSt = MkSt {letContext = error "should have been initialized before use"}
+initSt = MkSt {}
 
 newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
   deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String)
@@ -55,6 +58,16 @@ withLetContext startTerm = do
     Nothing -> return startTerm
     Just letBindings -> return $ T.TLet letBindings startTerm
 
+-- | the inverse of withLetContext
+removeImplicitLet :: T.Term -> CheckM T.Term
+removeImplicitLet startTerm = do
+  context <- gets letContext
+  case context of
+    Nothing -> return startTerm
+    Just _ -> case startTerm of
+      T.TLet _ inner -> return inner
+      _ -> fail "internal: Tried to remove implicit let but there is none."
+
 class Checkable a where
   type TypedVersion a
   check :: a -> CheckM (TypedVersion a)
@@ -79,6 +92,7 @@ instance Checkable UT.Theorem where
     tStart <- check start
     tGoal <- check goal
     tProof <- check proof
+    modify (\st -> st{start = tStart, goal = tGoal})
     let prop = T.DProposition tFreeVars tStart T.DefinedEqual tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
@@ -212,11 +226,23 @@ instance Checkable UT.Proof where
     return $ T.Simple tSteps
     where
       -- | Note: The steps after the HereMarker ($) are not processed.
-      -- TODO: if first term is not specified, sunstitute for the goal. note
-      -- that this doesn't work in the inductive case.
       checkSteps1 :: [UT.ProofStep] -> CheckM T.SubProof
       checkSteps1 [] = return []
       checkSteps1 (UT.PSHereMarker:cmds) = return []
+      checkSteps1 ((UT.PSCmd subterm transCmd)
+                   :(UT.PSTerm imprel term2)
+                   :cmds) = do
+        -- If first term is not specified, substitute for the start term. note
+        -- that this doesn't work in the inductive case.
+        startTerm <- gets start
+        startTermRaw <- removeImplicitLet startTerm
+        tTransCmd <- check transCmd
+        tSubterm <- getSubTerm subterm startTermRaw
+        tImprel <- check imprel
+        tTerm2 <- withLetContext =<< check term2
+        let proofStep = T.PSMiddle startTerm tSubterm tTransCmd tImprel tTerm2
+        proofSteps <- checkSteps2 $ (UT.PSTerm imprel term2):cmds
+        return $ proofStep:proofSteps
       checkSteps1 ((UT.PSFirstTerm term1)
                      :(UT.PSCmd subterm transCmd)
                      :(UT.PSTerm imprel term2)
@@ -244,8 +270,10 @@ instance Checkable UT.Proof where
         proofStep <- checkProofStep term1 subterm transCmd imprel2 term2
         proofSteps <- checkSteps2 $ (UT.PSTerm imprel2 term2):cmds
         return $ proofStep:proofSteps
-      checkSteps2 ((UT.PSQed UT.DQed)
+      checkSteps2 ((UT.PSTerm _ _):(UT.PSQed UT.DQed)
                    :[]) = return []
+                   --The last term is in the next-to-last proof step too, so
+                   --it is not lost.
       checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
                            ++"step must be a term and every other a "
                            ++"transformational command."
