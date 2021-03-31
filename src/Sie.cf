@@ -51,7 +51,7 @@ TNum.             Term1 ::= Integer;
 THole.            Term1  ::= "[.]";
 -- Temporary. Might want to do separate grammar for contexts.
 TConstructor.     Term  ::= Constructor;
-TLam.             Term  ::= "\\" Var "." Term1 ;
+TLam.             Term  ::= "\\" Var "." Term ;
 TLet.             Term  ::= "let" LetBindings "in" Term1;
 TStackSpike.      Term  ::= "s^" Term1;
 TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;

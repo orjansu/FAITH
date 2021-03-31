@@ -18,7 +18,7 @@ import qualified Data.Set as Set
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
 import qualified LanguageLogic as Lang
-import ToLocallyNameless (toLocallyNameless, LNLSt)
+import ToLocallyNameless (toLocallyNameless)
 import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
@@ -51,7 +51,7 @@ runCheckM monadComputation =
 
 toLine :: Log.LogLine -> String
 toLine (loc, logsource, loglevel, logstr) =
-  (show logsource)++":2"++(show loglevel)++":3"++(show logstr)
+  (show logstr)
 
 class Checkable a where
   check :: a -> CheckM ()
@@ -85,10 +85,12 @@ checkProofSteps (T.Simple proofSteps) start globalImpRel goal = do
 checkStep :: GlobalImpRel -> T.ProofStep -> CheckM ()
 checkStep globalImpRel (T.PSMiddle term1 subterm command localImpRel term2) = do
   Log.logInfoN . pack $ "checking that "++showTypedTerm term1++" "
-    ++show localImpRel++" "++showTypedTerm term2++" by transforming "
-    ++showTypedTerm subterm++" using the law "++show command
-    ++" with the global "
-    ++"improvement relation being "++show globalImpRel
+  Log.logInfoN . pack $ show localImpRel
+  Log.logInfoN . pack $ showTypedTerm term2
+  Log.logInfoN . pack $ "by transforming "++showTypedTerm subterm
+  Log.logInfoN . pack $ "using the law "++show command
+  Log.logInfoN . pack $ "with the global improvement relation being "
+    ++show globalImpRel
   assert (localImpRel `Lang.impRelImplies` globalImpRel)
     $ show localImpRel ++ " should imply "++ show globalImpRel
   case command of
@@ -106,7 +108,7 @@ checkAlphaEquiv term1 term2 = do
     ++"the terms should be equal."
 
 
-runToLocallyNameless :: T.Term -> CheckM (LNL.Term, LNLSt)
+runToLocallyNameless :: T.Term -> CheckM (LNL.Term, Set.Set String)
 runToLocallyNameless = liftEither . toLocallyNameless
 
 liftEither :: Either String a -> CheckM a

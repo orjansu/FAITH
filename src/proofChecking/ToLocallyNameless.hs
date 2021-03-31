@@ -3,8 +3,7 @@
 
 module ToLocallyNameless
     (
-    toLocallyNameless,
-    LNLSt
+    toLocallyNameless
     ) where
 
 import qualified Data.Set as Set
@@ -16,7 +15,6 @@ import Data.List (zip, unzip4)
 
 import qualified MiniTypedAST as T
 import qualified LocallyNameless as LNL
-
 
 type VarName = String
 type Distance = Integer
@@ -46,7 +44,7 @@ instance MonadFail LNLMonad where
 -- internal error in its implementation or the input data. Also returns the
 -- set of free variables found in the expression.
 toLocallyNameless :: T.Term -> Either String
-                               (LNL.Term, LNLSt)
+                               (LNL.Term, Set.Set String)
 toLocallyNameless term =
   let (res, state) = runIdentity (
                        runStateT (
@@ -59,7 +57,7 @@ toLocallyNameless term =
                      )
   in case res of
     Left errorMsg -> Left errorMsg
-    Right lnlTerm -> Right (lnlTerm, state)
+    Right lnlTerm -> Right (lnlTerm, freeVars state)
 
 computeLNLTerm :: T.Term -> LNLMonad LNL.Term
 computeLNLTerm (T.TVar varName) = do

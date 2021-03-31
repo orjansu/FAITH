@@ -4,3 +4,4 @@ stack.yaml.lock
 proofFiles/proofs/miniProof.sie
 proofFiles/laws/miniLaws.sie
 sie
+proofLog.txt

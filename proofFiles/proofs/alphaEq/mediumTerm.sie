@@ -1,14 +1,14 @@
 bindings{}
 
 proposition: free(u f) |-
-              let {x = \y. x + y + (let {z = 5, a = \b . (\c. b)}
-                                    in (u + z + (a u) z)),
+              let {x = \y. x + y + (let {z2 = 5, ab = \b . (\c. b)}
+                                    in (u + z2 + (ab u) z)),
                    e = u + f + x,
                   }
               in (let {g = 5}
-                  in (g + e + 0 + (let {h = 1 + h}
-                                   in (let {i = 5} in (i + h)))) +
-                      ((((\j. (\k. (\l. j + (\m . m) k))) g) e) f))
+                  in (g + e + 0 + (let {h1 = 1 + h1}
+                                   in (let {i = 5} in (i + h1))) +
+                      ((((\j. (\k. (\l. j + (\m . m) k))) g) e) f)))
               =def=
               let {y = \x. y + x + (let {z1 = 5, ar = \b . (\c. b)}
                                     in (u + z1 + (ar u) z)),
@@ -16,8 +16,8 @@ proposition: free(u f) |-
                   }
               in (let {p = 5}
                   in (p + r + 0 + (let {h4 = 1 + h4}
-                                   in (let {i = 5} in (i + h4)))) +
-                      ((((\s. (\o. (\l. s + (\m . m) o))) p) r) f));
+                                   in (let {i = 5} in (i + h4))) +
+                      ((((\s. (\o. (\l. s + (\m . m) o))) p) r) f)));
 proof: -simple
   -single{
          on whole -alpha-equiv;
