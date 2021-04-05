@@ -3,8 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-
 
 module ProofChecker where
 
@@ -18,6 +16,7 @@ import qualified Data.Set as Set
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
 import qualified LanguageLogic as Lang
+import qualified Common as Com (ImpRel(..))
 import ToLocallyNameless (toLocallyNameless)
 import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
@@ -67,7 +66,7 @@ instance Checkable T.Theorem where
       getInfo (T.DProposition (T.DFreeVars termVars vars) start imprel goal) =
         (termVars, vars, start, imprel, goal)
 
-type GlobalImpRel = T.ImpRel
+type GlobalImpRel = Com.ImpRel
 type Start = T.Term
 type Goal = T.Term
 

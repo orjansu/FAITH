@@ -1,17 +1,19 @@
+
 module TypedLawAST where
 
 import Prelude (Char, Double, Integer, String, Maybe, Bool)
-import qualified Prelude as C (Eq, Ord, Show, Read, show)
+import qualified Prelude as C (Eq, Ord, Show, Read)
 import Data.Map
 
 import qualified AbsSieLaws as UTLaw
+import Common (ImpRel)
 
 type LawName = String
 
 type LawMap = Map LawName Law
 
-data Law = DLaw Term UTLaw.ImpRel Term
--- TODO ImpRel
+data Law = DLaw LawName Term ImpRel Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 -- -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 
 data Term

@@ -7,6 +7,7 @@ module MiniTypeChecker where
 import qualified AbsSie as UT
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
+import qualified Common as Com (ImpRel(..))
 
 import qualified Data.Set as Set
 import Control.Monad.Except
@@ -94,7 +95,7 @@ instance Checkable UT.Theorem where
     tGoal <- check goal
     modify (\st -> st{start = tStart, goal = tGoal})
     tProof <- check proof
-    let prop = T.DProposition tFreeVars tStart T.DefinedEqual tGoal
+    let prop = T.DProposition tFreeVars tStart Com.DefinedEqual tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
 
@@ -327,8 +328,8 @@ getSubTerm (UT.STTerm subtermExpr) term = fail "not implemented yet 21"
 getSubTerm UT.STGuess term = fail "not implemented yet 22"
 
 instance Checkable UT.ImpRel where
-  type TypedVersion UT.ImpRel = T.ImpRel
-  check UT.DefinedEqual        = return T.DefinedEqual
+  type TypedVersion UT.ImpRel = Com.ImpRel
+  check UT.DefinedEqual        = return Com.DefinedEqual
   check UT.StrongImprovementLR = fail "not implemented yet 22.1"
   check UT.WeakImprovementLR   = fail "not implemented yet 23"
   check UT.StrongImprovementRL = fail "not implemented yet 24"

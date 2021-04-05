@@ -37,7 +37,8 @@ executable sie
                        AbsLNL,
                        ToPrettyLNL,
                        ShowTypedTerm,
-                       AbsSieLaws
+                       AbsSieLaws,
+                       Common
 
   main-is:             Main.hs
   -- other-modules:

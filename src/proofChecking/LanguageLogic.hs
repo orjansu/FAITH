@@ -6,7 +6,7 @@ other files. It might be that these functions might be implemented as parsed
 in the laws file later.
 -}
 
-import qualified MiniTypedAST as T
+import qualified Common as Com
 import qualified AbsSie as UT
 
 class ImpRelRepresentation a where
@@ -16,7 +16,7 @@ class ImpRelRepresentation a where
   impRelImplies :: a -> a -> Bool
 
 -- TODO expand as T.ImpRel adds more relations
-instance ImpRelRepresentation T.ImpRel where
+instance ImpRelRepresentation Com.ImpRel where
   impRelImplies i1 i2 | i1 == i2 = True
 
 instance ImpRelRepresentation UT.ImpRel where

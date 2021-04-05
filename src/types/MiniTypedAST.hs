@@ -11,6 +11,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 
 import qualified TypedLawAST as Law
+import Common (ImpRel)
 
 type Var = Name
 type Name = String
@@ -90,16 +91,6 @@ data Command
 data Substitutions = Set (String, Term)
   deriving (C.Eq, C.Ord, C.Read)
 
-
 -- TODO add show in law later.
 instance C.Show Command where
   show AlphaEquiv = "-alpha-equiv"
-
--- Just deals with this one right now.
--- TODO as this is expanded, add clauses to LanguageLogic.hs
-data ImpRel
-    = DefinedEqual
-  deriving (C.Eq, C.Ord, C.Read)
-
-instance C.Show ImpRel where
-  show DefinedEqual = "=def="

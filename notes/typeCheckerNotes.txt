@@ -168,3 +168,10 @@ prop_rename_equiv term1 =
   (Om jag gör en som renamear bara de som behövs, så borde jag kunna göra
   en variant när bara ett subset av variabler renameas)
 -även om ex \x\y\z(x+y+z) =def= \a\b\c(a+b+c) så x+y+z !=def= a+b+c
+
+------------ Övriga idéer --------------
+-Istället för att göra separata bevisregler som jobbar på enskilda bevis, gör bevisregler som jobbar mellan bevis som är i samma fil. Ge bevisen namn och ha sen en regel för induktion som är
+Grund -> M
+IH |- Induktion -> M
+eller en bevisprincip som går på case-satserna
+-Skriv explicit vilka regler som beviset använder genom att ge namnet på lagfilen de ligger i. Då kan man även lägga till egna regler, t.ex. induktiva hypotesen
