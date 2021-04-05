@@ -10,8 +10,8 @@ type LawName = String
 
 type LawMap = Map LawName Law
 
-data Law = DLaw Term ImpRel Term
-
+data Law = DLaw Term UTLaw.ImpRel Term
+-- TODO ImpRel
 -- -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 
 data Term

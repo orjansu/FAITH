@@ -18,7 +18,8 @@ executable sie
                        gen,
                        src/proofChecking,
                        src/typeChecking,
-                       src/prettyPrinting
+                       src/prettyPrinting,
+                       src/types
   other-modules:
                        ParSie,
                        ErrM,
@@ -35,7 +36,8 @@ executable sie
                        PrintLNL,
                        AbsLNL,
                        ToPrettyLNL,
-                       ShowTypedTerm
+                       ShowTypedTerm,
+                       AbsSieLaws
 
   main-is:             Main.hs
   -- other-modules:
