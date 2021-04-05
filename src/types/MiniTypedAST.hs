@@ -84,7 +84,7 @@ data ProofStep
 
 data Command
   = AlphaEquiv
-  | Law Law.Term Law.Term Substitutions
+  | Law Law.Law Substitutions
   deriving (C.Eq, C.Ord, C.Read)
 -- Lägg till fler senare
 

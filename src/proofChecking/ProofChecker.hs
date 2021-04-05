@@ -3,6 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module ProofChecker where
 
@@ -59,30 +60,33 @@ instance Checkable T.ProofScript where
   check (T.DProofScript theorems) = mapM check theorems >> return ()
 
 instance Checkable T.Theorem where
-  check (T.DTheorem proposition proof) = do
-    let (_termVars, _freeVars, start, imprel, goal) = getInfo proposition
-    checkProofSteps proof start imprel goal
-    where
-      getInfo (T.DProposition (T.DFreeVars termVars vars) start imprel goal) =
-        (termVars, vars, start, imprel, goal)
+  check (T.DTheorem (T.DProposition freeVars start imprel goal) proof) = do
+    checkProofSteps proof start imprel freeVars goal
 
 type GlobalImpRel = Com.ImpRel
 type Start = T.Term
 type Goal = T.Term
 
-checkProofSteps :: T.Proof -> Start -> GlobalImpRel -> Goal -> CheckM ()
-checkProofSteps (T.Simple proofSteps) start globalImpRel goal = do
+checkProofSteps :: T.Proof
+                   -> Start
+                   -> GlobalImpRel
+                   -> T.FreeVars
+                   -> Goal
+                   -> CheckM ()
+checkProofSteps (T.Simple proofSteps) start globalImpRel freeVars goal = do
   let (T.PSMiddle startTerm _ _ _ _) = head proofSteps
   checkAlphaEquiv start startTerm
-  mapM (checkStep globalImpRel) proofSteps
+  mapM (checkStep globalImpRel freeVars) proofSteps
   let (T.PSMiddle _ _ _ _ endTerm) = last proofSteps
   checkAlphaEquiv goal endTerm
 
 -- | Checks if a single step is valid. This computation may be run
 -- independently in parallel for each step to speed things up if that is an
 -- issue. Could maybe use the globally free variables to speed things up later.
-checkStep :: GlobalImpRel -> T.ProofStep -> CheckM ()
-checkStep globalImpRel (T.PSMiddle term1 subterm command localImpRel term2) = do
+checkStep :: GlobalImpRel -> T.FreeVars -> T.ProofStep -> CheckM ()
+checkStep globalImpRel
+          freeVars
+          (T.PSMiddle term1 subterm command localImpRel term2) = do
   Log.logInfoN . pack $ "checking that "++showTypedTerm term1++" "
   Log.logInfoN . pack $ show localImpRel
   Log.logInfoN . pack $ showTypedTerm term2
@@ -94,6 +98,70 @@ checkStep globalImpRel (T.PSMiddle term1 subterm command localImpRel term2) = do
     $ show localImpRel ++ " should imply "++ show globalImpRel
   case command of
     T.AlphaEquiv -> checkAlphaEquiv term1 term2
+    T.Law (Law.DLaw lawName lawLHS lawImpRel lawRHS)
+          substitutions -> do
+      assert (lawImpRel == localImpRel) "The improvement relation of the law must be the same as the improvement relation in the proof"
+      context <- getContext subterm term1
+      let contextVars = getAllVars context
+      Log.logInfoN . pack $ "applying substitution from subterm to law"
+      -- TODO log messages
+      substToLHS <- applySubstitution lawLHS substitutions contextVars
+      checkAlphaEquiv subterm substToLHS
+      substToRHS <- applySubstitution lawLHS substitutions contextVars
+      fvOrig <- getFreeVars subterm
+      fvTransformed <- getFreeVars substToRHS
+      assert (fvOrig == fvTransformed) "The transformation should not make bound variables free."
+      rhsTerm <- applyContext context substToRHS
+
+      -- This shows that we could generate the next term ourselves instead.
+      -- However, it is more important to typecheck rhsTerm if we generate it.
+      checkAlphaEquiv rhsTerm term2
+
+      -- This check below should not be needed. Quickcheck it later and maybe
+      -- remove if it impedes performance.
+      Log.logInfoN . pack $ "Checking that the resulting term of the transformation typechecks."
+      typeCheck rhsTerm freeVars
+      return undefined
+
+-- | Given the subtermterm M and the whole term N, this function returns the
+-- context C such that C[M] = N
+--
+-- Fails if M is not a subterm of N
+getContext :: T.Term -> T.Term -> CheckM T.Term
+getContext = undefined
+
+-- | Given C and M, where C is a context and M is a term, returns C[M].
+-- TODO Currently only supports contexts with a single hole
+applyContext :: T.Term -> T.Term -> CheckM T.Term
+applyContext = undefined
+
+-- | Given a term, returns the set of all variable names used in that term,
+-- regardless of if the variables are free or bound
+getAllVars :: T.Term -> Set.Set String
+getAllVars = undefined
+
+-- | Given M, sigma and S, where M is a law term with meta-
+-- variables, sigma is a substitution that substitutes all meta-
+-- variables for concrete variables and S is a set of variable names,
+-- this function returns sigma applied to M, such that the names of the bound
+-- variables in the result are unique, both with respect to the result term
+-- and the variable names in S.
+--
+-- Fails if sigma doesn't contain substitutions for all meta-variables in M.
+applySubstitution :: Law.Term
+                  -> T.Substitutions
+                  -> Set.Set String
+                  -> CheckM T.Term
+applySubstitution = undefined
+
+-- | Finds the names of the free variables of the term
+getFreeVars :: T.Term -> CheckM (Set.Set String)
+getFreeVars = undefined
+
+-- | Checks whether the term type-checks, i.e. if all variables are bound or
+-- declared free.
+typeCheck :: T.Term -> T.FreeVars -> CheckM ()
+typeCheck = undefined
 
 checkAlphaEquiv :: T.Term -> T.Term -> CheckM ()
 checkAlphaEquiv term1 term2 = do
@@ -105,7 +173,6 @@ checkAlphaEquiv term1 term2 = do
     ++"is " ++ showLNL lnlTerm2
   assert (lnlTerm1 == lnlTerm2) $ "The locally-nameless representation of "
     ++"the terms should be equal."
-
 
 runToLocallyNameless :: T.Term -> CheckM (LNL.Term, Set.Set String)
 runToLocallyNameless = liftEither . toLocallyNameless
