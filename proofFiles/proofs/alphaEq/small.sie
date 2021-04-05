@@ -1,4 +1,4 @@
-bindings {}
+bindings{}
 
 proposition: |- let {x = 1} in x =def= let {y = 1} in y;
 proof: -simple

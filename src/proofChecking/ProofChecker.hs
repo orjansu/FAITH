@@ -94,16 +94,16 @@ checkStep globalImpRel (T.PSMiddle term1 subterm command localImpRel term2) = do
   assert (localImpRel `Lang.impRelImplies` globalImpRel)
     $ show localImpRel ++ " should imply "++ show globalImpRel
   case command of
-    Law.AlphaEquiv -> checkAlphaEquiv term1 term2
+    T.AlphaEquiv -> checkAlphaEquiv term1 term2
 
 checkAlphaEquiv :: T.Term -> T.Term -> CheckM ()
 checkAlphaEquiv term1 term2 = do
   (lnlTerm1, _) <- runToLocallyNameless term1
   (lnlTerm2, _) <- runToLocallyNameless term2
-  Log.logInfoN . pack $ "Locally nameless representation of first term is "
+  Log.logInfoN . pack $ "Locally nameless representation of first term is  "
     ++showLNL lnlTerm1
   Log.logInfoN . pack $ "Locally nameless representation of second term "
-    ++"is" ++ showLNL lnlTerm2
+    ++"is " ++ showLNL lnlTerm2
   assert (lnlTerm1 == lnlTerm2) $ "The locally-nameless representation of "
     ++"the terms should be equal."
 

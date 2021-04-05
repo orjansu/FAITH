@@ -337,8 +337,8 @@ instance Checkable UT.ImpRel where
   check UT.WeakCostEquiv       = fail "not implemented yet 27"
 
 instance Checkable UT.TransCmd where
-  type TypedVersion UT.TransCmd = Law.Command
-  check (UT.CmdSpecial UT.STCAlphaEquiv) = return Law.AlphaEquiv
+  type TypedVersion UT.TransCmd = T.Command
+  check (UT.CmdSpecial UT.STCAlphaEquiv) = return T.AlphaEquiv
   check (UT.CmdSpecial (UT.STCReorderLet varOrder)) =
     fail "not implemented yet 28"
   check (UT.CmdSpecial (UT.STCReorderCase varOrder)) =

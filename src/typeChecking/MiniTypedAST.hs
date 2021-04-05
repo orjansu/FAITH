@@ -77,8 +77,23 @@ data Proof
 type SubProof = [ProofStep]
 
 data ProofStep
-  = PSMiddle Term SubTerm Law.Command ImpRel Term
+  = PSMiddle Term SubTerm Command ImpRel Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+
+data Command
+  = AlphaEquiv
+  | Law Law.Term Law.Term Substitutions
+  deriving (C.Eq, C.Ord, C.Read)
+-- Lägg till fler senare
+
+data Substitutions = Set (String, Term)
+  deriving (C.Eq, C.Ord, C.Read)
+
+
+-- TODO add show in law later.
+instance C.Show Command where
+  show AlphaEquiv = "-alpha-equiv"
 
 -- Just deals with this one right now.
 -- TODO as this is expanded, add clauses to LanguageLogic.hs
