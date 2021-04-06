@@ -122,6 +122,9 @@ CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
 CADummySet.       CmdAssignee ::= "{" CapitalIdent "}";
+CASubTerm.        CmdAssignee ::= "subterm";
+CAContext.        CmdAssignee ::= "ctx";
+
 
 BigVar.   VarAnyType ::= CapitalIdent;
 SmallVar. VarAnyType ::= Ident;
@@ -132,7 +135,7 @@ separator CmdArgument " ";
 DSubProof. SubProof ::= CommandName "{" [ProofStep] "}";
 separator SubProof "";
 
-PSCmd.         ProofStep ::= "on" SubTerm TransCmd ";";
+PSCmd.         ProofStep ::= TransCmd ";";
 PSImpRel.      ProofStep ::= ImpRel;
 PSTerm.        ProofStep ::= Term ";";
 PSHereMarker.  ProofStep ::= "$";
@@ -147,5 +150,5 @@ STTerm.  SubTerm ::=  Term1  ;
 STGuess. SubTerm ::= "guess";
 
 STCAlphaEquiv.  SpecialTransCmd ::= "-alpha-equiv";
-STCReorderCase. SpecialTransCmd ::= "-reorder-case" "(" [Var] ")";
-STCReorderLet.  SpecialTransCmd ::= "-reorder-let" "(" [Var] ")";
+-- STCReorderCase. SpecialTransCmd ::= "-reorder-case" "(" [Var] ")";
+-- STCReorderLet.  SpecialTransCmd ::= "-reorder-let" "(" [Var] ")";

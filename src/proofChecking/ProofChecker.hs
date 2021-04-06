@@ -10,7 +10,7 @@ module ProofChecker where
 import qualified Control.Monad.Logger as Log
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
-import Data.Text (pack)
+import Data.Text (pack, Text)
 import Data.Maybe
 import qualified Data.Set as Set
 
@@ -124,11 +124,45 @@ checkStep globalImpRel
       return undefined
 
 -- | Given the subtermterm M and the whole term N, this function returns the
--- context C such that C[M] = N
+-- context C such that C[M] = N. This equivalence is strict equivalence and not
+-- alpha equivalence.
 --
 -- Fails if M is not a subterm of N
+-- TODO think about the case if there are more than one hole
+-- TODO This failed because you might get to the case where the subterm is
+-- present in more than one place in the term. Instead, you will need to
+-- specify the context instead, and use this getContext in the typechecker.
 getContext :: T.Term -> T.Term -> CheckM T.Term
-getContext = undefined
+getContext term1 term2 = do
+  Log.logInfoN $ pack $ "Checking if M is a subterm of N, i.e. if there is a "
+    ++"C such that C[M] = N"
+  Log.logInfoN $ pack $ "| where M = "++showTypedTerm term1
+  Log.logInfoN $ pack $ "| and N = "++showTypedTerm term2
+  case getContext' term1 term2 of
+    Just context -> return context
+    Nothing -> fail notSubTerm
+  where
+    -- | given M and N, returns C such that C[M] = N
+    getContext' :: T.Term -> T.Term -> Maybe T.Term
+    getContext' subterm term | subterm == term = return T.THole
+    getContext' subterm (T.TVar _) = Nothing
+    getContext' subterm (T.TNum _) = Nothing
+    getContext' subterm (T.TLam var term)
+      | subterm == term = return (T.TLam var T.THole)
+      | isJust subMatch = let Just ctx = subMatch
+                          in return $ T.TLam var ctx
+      where subMatch = getContext' subterm term
+    getContext' subterm T.THole = Nothing --This should not happen.
+    getContext' subterm (T.TLet letBindings term)
+      | subterm == term = return (T.TLet letBindings T.THole)
+      where
+        matchLetBindings subterm [] = Nothing
+
+        matchLetBinding (var, sw, hw, term) | subterm == term = T.THole
+
+    notSubTerm :: String
+    notSubTerm = "| M is not a subterm of N."
+
 
 -- | Given C and M, where C is a context and M is a term, returns C[M].
 -- TODO Currently only supports contexts with a single hole
@@ -138,7 +172,24 @@ applyContext = undefined
 -- | Given a term, returns the set of all variable names used in that term,
 -- regardless of if the variables are free or bound
 getAllVars :: T.Term -> Set.Set String
-getAllVars = undefined
+getAllVars (T.TVar var) = Set.singleton var
+getAllVars (T.TNum integer) = Set.empty
+getAllVars (T.TLam var term) = Set.singleton var `Set.union` getAllVars term
+getAllVars (T.THole) = Set.empty
+getAllVars (T.TLet letBindings term) =
+  getLBSVars letBindings `Set.union` getAllVars term
+  where
+    getLBSVars = Set.unions . map getLBVars
+    getLBVars :: (String, T.StackWeight, T.HeapWeight, T.Term) -> Set.Set String
+    getLBVars (name, _sw, _hw, term) = let termSet = getAllVars term
+                                       in Set.insert name termSet
+getAllVars (T.TDummyBinds varSet term) = varSet `Set.union` getAllVars term
+getAllVars (T.TRedWeight _redWeight red) =
+  case red of
+    T.RApp term var -> let termSet = getAllVars term
+                       in Set.insert var termSet
+    T.RPlusWeight term1 _rw term2 ->
+      getAllVars term1 `Set.union` getAllVars term2
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -156,23 +207,44 @@ applySubstitution = undefined
 
 -- | Finds the names of the free variables of the term
 getFreeVars :: T.Term -> CheckM (Set.Set String)
-getFreeVars = undefined
+getFreeVars term = do
+  (_lnlTerm, freeVars) <- runToLocallyNameless term
+  return freeVars
 
 -- | Checks whether the term type-checks, i.e. if all variables are bound or
 -- declared free.
+--
+-- Status: one way is tp unpype it and run it through the normal typechecker.
+-- It is ineffective, but it relies on the single implementation of
+-- typechecking. A better approach might be to divide the typechecker into one
+-- phase that converts and one that typechecks. TODO typechecker needs more
+-- context to be able to typecheck a term instead of the whole program
 typeCheck :: T.Term -> T.FreeVars -> CheckM ()
 typeCheck = undefined
 
 checkAlphaEquiv :: T.Term -> T.Term -> CheckM ()
 checkAlphaEquiv term1 term2 = do
+  Log.logInfoN . pack $ "Checking that M and N are alpha equivalent"
+  Log.logInfoN . pack $ "| where M = "++showTypedTerm term1
+  Log.logInfoN . pack $ "| and N = "++showTypedTerm term2
+  Log.logInfoN . pack $ "| see debug output for details."
+  alphaEq <- isAlphaEquiv term1 term2
+  assert alphaEq $ "| The locally-nameless representation "
+    ++"of M and N should be equal"
+
+isAlphaEquiv :: T.Term -> T.Term -> CheckM Bool
+isAlphaEquiv term1 term2 | term1 == term2 = return True
+                         | term1 /= term2 = do
+  Log.logDebugN . pack $ "Determining wheter M and N are alpha equivalent,"
+  Log.logDebugN . pack $ "| where M = "++ showTypedTerm term1
+  Log.logDebugN . pack $ "| and N = "++showTypedTerm term2
   (lnlTerm1, _) <- runToLocallyNameless term1
   (lnlTerm2, _) <- runToLocallyNameless term2
-  Log.logInfoN . pack $ "Locally nameless representation of first term is  "
+  Log.logDebugN . pack $ "| Locally nameless representation of M is  "
     ++showLNL lnlTerm1
-  Log.logInfoN . pack $ "Locally nameless representation of second term "
-    ++"is " ++ showLNL lnlTerm2
-  assert (lnlTerm1 == lnlTerm2) $ "The locally-nameless representation of "
-    ++"the terms should be equal."
+  Log.logDebugN . pack $ "| Locally nameless representation of N is "
+    ++ showLNL lnlTerm2
+  return (lnlTerm1 == lnlTerm2)
 
 runToLocallyNameless :: T.Term -> CheckM (LNL.Term, Set.Set String)
 runToLocallyNameless = liftEither . toLocallyNameless

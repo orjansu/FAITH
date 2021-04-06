@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module ShowTypedTerm (showTypedTerm) where
+module ShowTypedTerm (showTypedTerm, toUntyped) where
 
 import qualified Data.Set as Set
 

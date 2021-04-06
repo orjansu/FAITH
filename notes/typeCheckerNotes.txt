@@ -168,6 +168,11 @@ prop_rename_equiv term1 =
   (Om jag gör en som renamear bara de som behövs, så borde jag kunna göra
   en variant när bara ett subset av variabler renameas)
 -även om ex \x\y\z(x+y+z) =def= \a\b\c(a+b+c) så x+y+z !=def= a+b+c
+prop_typechecking :: UT.Program -> Monad prop
+prop_typechecking p = typed <- typecheck p
+                      let untyped = ShowTypedTerm.toUntyped typed
+                      typed2 <- typecheck untyped
+                      return (typed == typed2) && (p == untyped)
 
 ------------ Övriga idéer --------------
 -Istället för att göra separata bevisregler som jobbar på enskilda bevis, gör bevisregler som jobbar mellan bevis som är i samma fil. Ge bevisen namn och ha sen en regel för induktion som är
