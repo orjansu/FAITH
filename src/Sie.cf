@@ -125,7 +125,6 @@ CADummySet.       CmdAssignee ::= "{" CapitalIdent "}";
 CASubTerm.        CmdAssignee ::= "subterm";
 CAContext.        CmdAssignee ::= "ctx";
 
-
 BigVar.   VarAnyType ::= CapitalIdent;
 SmallVar. VarAnyType ::= Ident;
 separator VarAnyType " ";

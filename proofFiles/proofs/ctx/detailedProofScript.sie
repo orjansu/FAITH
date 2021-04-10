@@ -36,8 +36,8 @@ proof:
                             } in (x : ys)
                        )) x
         } in any(M);
-      on ([0]s^(\x. (let {ys = repeat^n x} in (x : ys))) x)
-         -spike-algebra-zero-stack-spike
+      -spike-algebra-zero-stack-spike
+            ctx=let G in (let xs = [.])
             M=((\x. (let {ys = repeat^n x} in (x : ys))) x);
       <~> let {xs = (\x. (let {ys = repeat^n x
                             } in (x : ys))

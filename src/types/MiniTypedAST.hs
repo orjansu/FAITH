@@ -34,15 +34,13 @@ type SubTerm = Term
 
 data Term
     = TVar Var
-    | TNum Integer --A
+    | TNum Integer
     | TLam Var Term
-    | THole --Ctx
-    | TLet LetBindings Term --A
-    | TDummyBinds VarSet Term --A
-    | TRedWeight RedWeight Red --A
+    | THole
+    | TLet LetBindings Term
+    | TDummyBinds VarSet Term
+    | TRedWeight RedWeight Red
   deriving (C.Eq, C.Ord, C.Show, C.Read)
--- TODO derive a better show function that converts to AbsSie and then uses
--- the pretty-printer (showTree)
 
 type VarSet = Set Var
 
@@ -77,19 +75,19 @@ data Proof
 
 type SubProof = [ProofStep]
 
+type Context = Term
 data ProofStep
-  = PSMiddle Term SubTerm Command ImpRel Term
+  = PSMiddle Term Command ImpRel Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 
 data Command
   = AlphaEquiv
-  | Law Law.Law Substitutions
+  | Law Context Law.Law Substitutions
   deriving (C.Eq, C.Ord, C.Read)
 -- Lägg till fler senare
 
-data Substitutions = Set (String, Term)
-  deriving (C.Eq, C.Ord, C.Read)
+type Substitutions = Set (String, Term)
 
 -- TODO add show in law later.
 instance C.Show Command where

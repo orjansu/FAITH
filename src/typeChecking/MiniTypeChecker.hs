@@ -10,11 +10,9 @@ import qualified TypedLawAST as Law
 import qualified Common as Com (ImpRel(..))
 
 import qualified Data.Set as Set
-import Control.Monad.Except
-import Control.Monad.State
-import Data.Functor.Identity
-
-import Debug.Trace (trace)
+import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
+import Control.Monad.State (StateT, runStateT, gets, MonadState, modify)
+import Data.Functor.Identity (Identity, runIdentity)
 
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
@@ -234,16 +232,29 @@ instance Checkable UT.Proof where
       -- make sure that t2 and t2' point to the same values.
       -- TODO: HereMarker ($)
       checkSteps1 :: [UT.ProofStep] -> CheckM T.SubProof
-      checkSteps1 ((UT.PSCmd subterm transCmd):(UT.PSImpRel imprel):[]) = do
+      checkSteps1 ((UT.PSCmd transCmd):(UT.PSImpRel imprel):[]) = do
         -- Replace first term with start and last term with goal.
         tStart <- gets start
         shownStart <- removeImplicitLet tStart
-        tSubTerm <- getSubTerm subterm shownStart
         tTransCmd <- check transCmd
         tImprel <- check imprel
         tEnd <- gets goal
-        return $ [T.PSMiddle tStart tSubTerm tTransCmd tImprel tEnd]
-      checkSteps1 ((UT.PSCmd subterm transCmd)
+        return $ [T.PSMiddle tStart tTransCmd tImprel tEnd]
+
+      -- | Given
+      -- - a transformational command
+      -- - The previous shown term
+      --Returns the context that the transformational command should be
+      --applied to.
+      --Status: Currently only works if the context is supplied explicitly
+      --via an argument. Later, it may also work by matching subterms on the
+      --term or similar.
+      getContext :: UT.TransCmd -> T.Term -> CheckM T.Term
+      getContext (UT.CmdSpecial UT.STCAlphaEquiv) _ = return T.THole
+      getContext (UT.CmdGeneral _name argList) _ = undefined
+
+      {-
+      checkSteps1 ((UT.PSCmd transCmd)
                    :(UT.PSImpRel imprel)
                    :(UT.PSTerm term2)
                    :cmds) = do
@@ -263,7 +274,7 @@ instance Checkable UT.Proof where
       checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
       checkSteps2 [] = return []
       checkSteps2 ((UT.PSTerm term1)
-                     :(UT.PSCmd subterm transCmd)
+                     :(UT.PSCmd transCmd)
                      :(UT.PSImpRel imprel)
                      :(UT.PSTerm term2)
                      :cmds) = do
@@ -271,7 +282,7 @@ instance Checkable UT.Proof where
         proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
         return $ proofStep:proofSteps
       checkSteps2 ((UT.PSTerm term1)
-                   :(UT.PSCmd subterm transCmd)
+                   :(UT.PSCmd transCmd)
                    :(UT.PSImpRel impRel)
                    :[]) = do
         -- If the last term is skipped, the last term is implicitly the goal,
@@ -313,6 +324,7 @@ instance Checkable UT.Proof where
                                    tImprel
                                    tTerm2withCtx
         return proofStep
+        -}
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
     fail "not implemented yet 20"
 
@@ -340,8 +352,4 @@ instance Checkable UT.ImpRel where
 instance Checkable UT.TransCmd where
   type TypedVersion UT.TransCmd = T.Command
   check (UT.CmdSpecial UT.STCAlphaEquiv) = return T.AlphaEquiv
-  check (UT.CmdSpecial (UT.STCReorderLet varOrder)) =
-    fail "not implemented yet 28"
-  check (UT.CmdSpecial (UT.STCReorderCase varOrder)) =
-    fail "not implemented yet 29"
   check (UT.CmdGeneral cmdName args)  = fail "not implemented yet 30"

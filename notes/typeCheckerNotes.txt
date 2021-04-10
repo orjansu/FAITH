@@ -54,7 +54,7 @@ FV -- Term or context -> Set(Var). Del av syntax och ej variabel
 Language notes, patternmatch:
 bara här används "?"
 
-Proofs:
+---------------Proofs:-----------
 Ide: om man vill kanske man kan ha en av variablerna från laws.sie här?
 t.ex.
   on "s^M" spike-algebra-13.
@@ -173,10 +173,96 @@ prop_typechecking p = typed <- typecheck p
                       let untyped = ShowTypedTerm.toUntyped typed
                       typed2 <- typecheck untyped
                       return (typed == typed2) && (p == untyped)
+prop_get_subTerm_insert :: Context -> Term
+prop_get_subterm_insert C M = N <- getSubterm C M
+                              M' <- insert C N
+                              M `alphaEq` M'
+forall terms .
+  - getBoundVariables term `Set.intersection` getFreeVariables term = Set.empty
+  - getBoundVariables term `Set.union` getFreeVariables term
+      = getAllVariables term
 
+forall terms M, Sets S
+  M2 <- renameNeeded M S
+  getBoundVariables M2 `Set.disjoint` S
 ------------ Övriga idéer --------------
 -Istället för att göra separata bevisregler som jobbar på enskilda bevis, gör bevisregler som jobbar mellan bevis som är i samma fil. Ge bevisen namn och ha sen en regel för induktion som är
 Grund -> M
 IH |- Induktion -> M
 eller en bevisprincip som går på case-satserna
 -Skriv explicit vilka regler som beviset använder genom att ge namnet på lagfilen de ligger i. Då kan man även lägga till egna regler, t.ex. induktiva hypotesen
+
+-------------- Alpha equivalence ------------
+När man bara kollar alpha-ekvivalens mellan bara let-bindings, skulle man kunna
+göra så att
+  -- | For now, the order of let-bindings does not matter,
+  -- but the names of the variables does matter. This means that
+  -- let {x = 1, y = 2} in 1 =alpha= let {y = 2, x = 1} in 1
+  -- but
+  -- let {x = 1, y = 2} in 1 =NotAlpha= let {y = 1, x = 2} in 1
+  -- This incurs a O(n! + n*t) complexity but  not O(n!*n*t*r), where
+  -- n=num(bindings), t is the time complexity for checking
+  -- alpha equivalence between two terms and r is the time complexity
+  -- for renaming a single term with the new ordering of bindings
+Vilket skulle vara bra för att kolla att en regel med subtitutioner
+skulle vara alpha-ekvivalent med starttermen. Ett par saker man kan uttnytja
+för att inte testa alla ordningar:
+- Det finns, i de nuvarande lagarna ingen C[let G in M], vilket gör att det
+  - Finns ett konstant antal let:s
+  - Är en konstant längd från start på regeltermen till alla let:s som är
+    specificerade.
+Om man skulle testa alla ordningar skulle man göra i princip, i en special, som
+bara är för att testa en substituerad regel mot en term:
+- Om inte alpha-eq
+- Om den o-substituerade regeltermen har en let:
+  - Skapa alla permutationer av första let:en i termen
+    - Om det inte är alpha-eq, skapa alla permutationer av andra let:en i termen
+    - osv
+  - Det skulle vara smart om man bara ändrar permutationer på let:s som finns i
+    den osubstituerade regeltermen och inte alla let:s i hela termen.
+En annan approach är att när man substituerar, så sparar man vilka ordningar man har bytt, och använder det för att skapa alpha-ekvivalens. Det blir lite krångligare och mindre generellt, och inte lika självklart att det blir likadant. Jag tror mer på approachen ovan.
+
+-------------- Matching Contexts on terms -------------------------
+Variationer:
+C may contain more than one hole. In that case, all subterms matching those
+holes in M has to be alpha-equivalent. However, C needs to be a syntactic
+copy of M, with some of its subterms replaced with holes. That is, the
+variable names has to match, so in C[N] =alpha= M, only the names of bound
+variables in N may vary, not the bound variables in C.
+
+Note: I could easily make it so that subterms that do not contain holes can
+be alpha-equivalent and not needing their variable names match.
+
+getSubterm' :: C M (potential N)
+The potential N is to make sure that if the term contains more than
+one hole, the terms in all of the holes should be alpha-equivalent.
+
+Jag är osäker på vilka implementationer och frihetsgrader som skulle vara korrekta.
+TODO: fråga om detta på måndag.
+
+TODO: Gör så att kontexter har et set av deras bundna variabler. På detta sättet blir alpha-ekvivalens av kontexter korrekta. Det är de inte nu tror jag.
+
+-------------- Saker att ta upp på presentationen -----------------------------
+-Först trodde att det fanns ngt verktyg som kan göra detta åt en - insåg nej
+-Sen trodde att UNIE enkelt kan expanderas - nej
+-Sen göra själv.
+  -Vision (kort)
+  -Status (demo av alpha-eq, och ev ev ev en enkel transformation)
+  -Variabel-representation
+    -Lösning: Unika namn och De Bruijn
+    -Endast de bruijn - krångligt vid alpha-eq av subtermer samt generell spec
+     av transformationer
+    -Endast unika namn - ingen alpha-ekvivalens, men enkel spec av
+     transformationer
+    -HOAS shallow embedding - krångligt att visa termer, modifiera dem, och
+     i allmänhet göra särskilt mycket annat än typ beta-reduktion tror jag...
+  -Set
+    -Case och Letrecs.
+      -Case: fastställ en ordning på konstruktorer
+      -Letrec
+        -Semantiken säger att varken ordning eller namn på variabler spelar roll
+          -Om namn skulle spela roll: Hitta snabbt (O(n!)) ordning på variabler
+          -Om ordning skulle spela roll: Kör bara alpha-eq rakt på.
+            -Detta är okej i alla fall förutom när man ska matcha substituerade
+             regler mot termer
+  -Läs artikeln om matching

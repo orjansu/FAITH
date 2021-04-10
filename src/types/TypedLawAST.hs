@@ -17,8 +17,8 @@ data Law = DLaw LawName Term ImpRel Term
 -- -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 
 data Term
-    = TValueMetaVar UTLaw.MVValue
-    | TAppCtx UTLaw.MVContext Term
+    = TValueMetaVar String
+    | TAppCtx String Term
     | TLet LetBindings Term
     | TDummyBinds VarSet Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)

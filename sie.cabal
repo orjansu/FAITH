@@ -51,6 +51,8 @@ executable sie
                        containers,
                        monad-logger,
                        text,
-                       transformers
+                       transformers,
+                       extra,
+                       ghc
 
   default-language:    Haskell2010
