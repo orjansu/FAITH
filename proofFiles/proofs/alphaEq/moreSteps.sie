@@ -1,0 +1,16 @@
+bindings{}
+
+proposition: free(y) |- let {x = 2 + y} in (x + (\a.a+x) y + { x y }d^1)
+                  =def= let {u = 2 + y} in (u + (\b.b+u) y + { u y }d^1);
+proof: -simple
+  -single{
+  on whole -alpha-equiv;
+  =def=
+  let {g = 2 + y} in (g + (\b.b+g) y+ {g y}d^1);
+  on whole -alpha-equiv;
+  =def=
+  let {g = 2 + y} in (g + (\x.x+g) y + {g y}d^1);
+  on whole -alpha-equiv;
+  =def=
+  }
+  qed;

@@ -42,22 +42,22 @@ DRedWeight. RedWeight ::= "[" StackWeight "]";
 layout "let","case";
 layout stop "in";
 
-TAny.             Term1 ::= "?";
-TTermVar.         Term1 ::= "any" "(" CapitalIdent ")";
-TNonTerminating.  Term1 ::= "@" ;
-TVar.             Term1 ::= Var;
-TIndVar.          Term  ::= Var "^" IndExpr;
-TNum.             Term1 ::= Integer;
-THole.            Term1  ::= "[.]";
+TAny.             Term2 ::= "?";
+TTermVar.         Term2 ::= "any" "(" CapitalIdent ")";
+TNonTerminating.  Term2 ::= "@" ;
+TVar.             Term2 ::= Var;
+TNum.             Term2 ::= Integer;
+THole.            Term2  ::= "[.]";
+TIndVar.          Term1  ::= Var "^" IndExpr;
 -- Temporary. Might want to do separate grammar for contexts.
-TConstructor.     Term  ::= Constructor;
-TLam.             Term  ::= "\\" Var "." Term ;
-TLet.             Term  ::= "let" LetBindings "in" Term1;
-TStackSpike.      Term  ::= "s^" Term1;
-TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;
-THeapSpike.       Term  ::= "h^" Term1;
-THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
-TDummyBinds.      Term  ::= VarSet "d^" Term1;
+TConstructor.     Term1  ::= Constructor;
+TLam.             Term1  ::= "\\" Var "." Term1 ;
+TLet.             Term1  ::= "let" LetBindings "in" Term1;
+TStackSpike.      Term1  ::= "s^" Term1;
+TStackSpikes.     Term1 ::= "["StackWeight"]s^" Term1;
+THeapSpike.       Term1  ::= "h^" Term1;
+THeapSpikes.      Term1  ::= "["HeapWeight"]h^" Term1;
+TDummyBinds.      Term1  ::= VarSet "d^" Term1;
 TRedWeight.       Term  ::= RedWeight "(" Red ")";
 TRed.             Term  ::= Red;
 
@@ -117,7 +117,7 @@ token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 
 CAValue.          CmdArgument ::= CmdValue;
 CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
-CVTermOrCtx.      CmdValue    ::=  Term1 ;
+CVTermOrCtx.      CmdValue    ::=  Term2 ;
 CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
@@ -143,7 +143,7 @@ CmdGeneral. TransCmd ::= CommandName [CmdArgument];
 
 STWholeWithCtx. SubTerm ::= "whole";
 STShown.        SubTerm ::= "shown";
-STTerm.  SubTerm ::=  Term1  ;
+STTerm.  SubTerm ::=  Term2  ;
 STGuess. SubTerm ::= "guess";
 
 STCAlphaEquiv.  SpecialTransCmd ::= "-alpha-equiv";

@@ -1,0 +1,10 @@
+bindings{}
+
+proposition: free(a b c) |- 1 + {a b c}d^1 + let {x = 3} in {x a b}d^x
+                      =def= 1 + {c a b}d^1 + let {y = 3} in {y a b}d^y;
+proof: -simple
+  -single{
+  on whole -alpha-equiv;
+  =def=
+  }
+  qed;
