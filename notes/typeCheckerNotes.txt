@@ -79,6 +79,12 @@ on repeat -def-unwindings base;
 -- Detta börjar likna ott rätt så rejält.
 -- Testa att försöka uttrycka detta i Ott, och se vad det ger.
 -- Ott har bara konkret syntax för variabler, så det blir krångligt.
+Kommentar SimplerProofScript:
+En sak som kan bli krångligt här är att man eventuellt vill
+referera till variabelnamn som tolkaren har skrivit ut i repl.
+Det kan göra bevisen mer svårlästa. Dock, om man bara skriver
+denna filen helt själv är detta nog ungefär så mycket som man
+skulle vilja skriva.
 
 Language notes, detailed:
 [.] som hole
@@ -191,6 +197,7 @@ Grund -> M
 IH |- Induktion -> M
 eller en bevisprincip som går på case-satserna
 -Skriv explicit vilka regler som beviset använder genom att ge namnet på lagfilen de ligger i. Då kan man även lägga till egna regler, t.ex. induktiva hypotesen
+- Skippa att behöva implementera matching i detta fallet genom att be användaren specificera både subterm och kontext. Detta innebär att jag nog bara behöver implementera substitution/transformation på ett korrekt sätt.
 
 -------------- Alpha equivalence ------------
 När man bara kollar alpha-ekvivalens mellan bara let-bindings, skulle man kunna
@@ -263,6 +270,6 @@ TODO: Gör så att kontexter har et set av deras bundna variabler. På detta sä
         -Semantiken säger att varken ordning eller namn på variabler spelar roll
           -Om namn skulle spela roll: Hitta snabbt (O(n!)) ordning på variabler
           -Om ordning skulle spela roll: Kör bara alpha-eq rakt på.
-            -Detta är okej i alla fall förutom när man ska matcha substituerade
-             regler mot termer
+            -Detta är okej i alla fall förutom när man ska alpha-eq-kolla
+             substituerade regler mot termer
   -Läs artikeln om matching

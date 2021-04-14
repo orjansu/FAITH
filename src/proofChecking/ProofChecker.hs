@@ -15,7 +15,7 @@ import Control.Monad.Extra (andM)
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
 import Data.Text (pack, Text)
-import Data.Maybe (Maybe(Just, Nothing))
+import Data.Maybe (Maybe(Just, Nothing), catMaybes)
 import Maybes (firstJusts)
 import Data.List (permutations, intersperse)
 import Data.List.Extra (firstJust)
@@ -351,10 +351,23 @@ applySubstitution law substSimple initForbiddenNames = do
     substLawTerm lawTerm = case lawTerm of
       Law.TValueMetaVar valueMV -> do
         substitutableTerm <- getSubstTerm valueMV
-        return undefined
+        checkIsValue substitutableTerm
+        return substitutableTerm
       Law.TAppCtx ctxMV term -> undefined
       Law.TLet letBindings term -> undefined
       Law.TDummyBinds varSet term -> undefined
+
+    checkIsValue :: (MonadError String m) => T.Term -> m ()
+    checkIsValue term = assert (isValue term)
+      $ "M should be a value. M="++showTypedTerm term
+      where
+        isValue (T.TVar _var) = False
+        isValue (T.TNum _integer) = True
+        isValue (T.TLam _var _term) = True
+        isValue (T.THole) = False
+        isValue (T.TLet _letBindings _term) = False
+        isValue (T.TDummyBinds _varSet term) = isValue term
+        isValue (T.TRedWeight _redWeight _redFD) = False
 
     getSubstTerm :: String -> SubstM T.Term
     getSubstTerm metaVar = do
@@ -365,6 +378,13 @@ applySubstitution law substSimple initForbiddenNames = do
             then do
               forbidden <- gets forbiddenNames
               renamed <- renameNeeded term forbidden
+              assertInternal (getBoundVariables renamed `Set.disjoint`
+                              getBoundVariables term)
+                $ "bound variables of used term "++showTypedTerm term
+                  ++" when renamed to "++showTypedTerm renamed
+                  ++" should rename all bound variables so "
+                  ++show (getBoundVariables renamed `Set.intersection`
+                    getBoundVariables term)++" should be empty."
               let newBoundVars = getBoundVariables renamed
                   forbidden' = newBoundVars `Set.union` forbidden
               modify (\st -> st{forbiddenNames = forbidden'})
@@ -374,7 +394,7 @@ applySubstitution law substSimple initForbiddenNames = do
               let termBV = getBoundVariables term
               assertInternal (termBV `Set.disjoint` forbidden)
                 $ "term M inserted the first time should only contain new "
-                  ++"names for bound variables"
+                  ++"names for bound variables. M="++showTypedTerm term
               let forbidden' = termBV `Set.union` forbidden
                   setToUsed = (\(t, False) -> (t, True))
                   substMap' = Map.adjust setToUsed metaVar substMap
@@ -629,7 +649,7 @@ liftEither :: Either String a -> CheckM a
 liftEither (Left errorMsg) = throwError errorMsg
 liftEither (Right a) = return a
 
-assert :: Bool -> String -> CheckM ()
+assert :: (MonadError String m) => Bool -> String -> m ()
 assert True _ = return ()
 assert False description = throwError $ "assertion failed: "++description
 
@@ -639,3 +659,54 @@ assertInternal True _ = return ()
 assertInternal False description = do
   Log.logOtherN (Log.LevelOther (pack "InternalAssertion")) $ pack description
   throwError $ "Internal assertion failed: "++description
+
+{-
+matchLaw :: Law.Term -> T.Term -> [Map.Map String T.Term]
+matchLaw (Law.TValueMetaVar mv) term = case term of
+  T.TNum n -> [Map.singleton mv term]
+  T.TLam v term -> [Map.singleton mv term]
+  _ -> []
+matchLaw (Law.TAppCtx mvC termPtn) term = undefined--findContextMatch termPtn term
+
+-- | given a law term L and a term M, returns every C such that there is
+-- a term N such that N matches L. In math:
+-- L -> M -> [C1..Cn] st. forall i in (1..n). exists N s.t Ci[N] `matches` L
+findContextMatch :: Law.Term -> T.Term -> [T.Term]
+findContextMatch (Law.TValueMetaVar mv) term
+  | isValue term = Just term
+  | otherwise = recurse (findContextMatch (Law.TValueMetaVar mv)) term
+
+-- | given f and M, apply f to all subterms one step down into M, and return
+-- the list [N1...Nn] of all those subterms that returns Just Ni.
+recurse :: (T.Term -> Maybe T.Term) -> T.Term -> [T.Term]
+recurse f (T.TVar _) = []
+recurse f (T.TNum _) = []
+recurse f (T.TLam _ term) = catMaybes [f term]
+recurse f (T.THole) = []
+recurse f (T.TLet letBindings term) =
+  let lbMaybeRecs = map recLB letBindings
+  in catMaybes $ f term:lbMaybeRecs
+  where
+    recLB (_var, _sw, _hw, term) = f term
+recurse f (T.TDummyBinds _ term) = catMaybes [f term]
+recurse f (T.TRedWeight rw red) = case red of
+  T.RApp term _var -> catMaybes [f term]
+  T.RPlusWeight t1 _rw t2 -> catMaybes [f t1, f t2]
+
+
+isValue :: T.Term -> Bool
+isValue (T.TNum _) = True
+isValue (T.TLam _ _) = True
+isValue _ = False
+
+data MatchAns = Yes | No | Recursion
+
+matches :: Law.Term -> T.Term -> MatchAns
+matches (Law.TValueMetaVar _) t = case t of
+  T.TNum _ -> Yes
+  T.TLam _ _ -> Yes
+  _ -> No
+matches (Law.TAppCtx _ _) t = Recursion
+matches (Law.TLet _ _) t = Recursion
+matches (Law.TDummyBinds _ _) t = Recursion
+-}

@@ -83,7 +83,7 @@ M |~> N && N |~> M |- N <~> M
 -@-rules-2: let G {x = {X}d^@} in N |~> let G {x = M} in N
       if FV(M) subsetof X union {x};
 
--reduction-beta: (\x. M) y ~~> M[x/y];
+-reduction-beta: (\x. M) y ~~> M[y/x];
 -reduction-case: case c_j ys of {c_i xs_i -> M_i} ~~> M_j[ys/xs_j];
 -reduction-seq: seq V M ~~> M;
 -reduction-plus: m + [w]N ~~> [w](add m N);
