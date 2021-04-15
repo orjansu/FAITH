@@ -29,17 +29,20 @@ instance MonadFail CheckM where
     fail str = throwError str
 
 typecheck :: UT.ProofScript -> Either String T.ProofScript
-typecheck untypedProofScript = do
+typecheck ps = runCheckM $ check ps
+
+runCheckM :: CheckM a -> Either String a
+runCheckM monadic = do
   let res = runIdentity (
               runExceptT (
                 runStateT
-                  (getM (check untypedProofScript))
+                  (getM monadic)
                   initSt
                 )
               )
   case res of
-    Left errorMsg                    -> Left errorMsg
-    Right (typedProofScript, _state) -> Right typedProofScript
+    Left errorMsg     -> Left errorMsg
+    Right (a, _state) -> Right a
 
 --- Utility
 -- converts the term M to let G in M if G is the context of the proof.
@@ -128,42 +131,51 @@ instance Checkable UT.Term where
   -- - General terms, i.e. any(M) are declare free (TODO)
   -- - Stack weight expressions: See checkWeightExpr
   check :: UT.Term -> CheckM T.Term
-  check (UT.TAny)                          = fail "not implemented yet 3"
-  check (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
-  check (UT.TNonTerminating)               = fail "not implemented yet 5"
-  check (UT.TVar var)                      = do
-    tVar <- checkMentionedVar var
-    return $ T.TVar tVar
-  check (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
-  check (UT.TNum integer)                  = return $ T.TNum integer
-  check (UT.THole)                         = return T.THole
-  check (UT.TConstructor constructor)      = fail "not implemented yet 7"
-  check (UT.TLam var term)                 = do
-    tVar <- checkBindingVarUnique var
-    -- TODO add the var to the binding list for lambdas
-    tTerm <- check term
-    return $ T.TLam tVar tTerm
-  check (UT.TLet letBindings term)         = do
-    tLetBindings <- check letBindings
-    tTerm <- check term
-    return $ T.TLet tLetBindings tTerm
-  check (UT.TStackSpike term)              = fail "not implemented yet 8"
-  check (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
-  check (UT.THeapSpike term)               = fail "not implemented yet 10"
-  check (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
-  check (UT.TDummyBinds varSet term)       = do
-    tVarSet <- check varSet
-    tTerm <- check term
-    return $ T.TDummyBinds tVarSet tTerm
-  check (UT.TRedWeight redWeight red)      = do
-    case redWeight of
-      UT.DRedWeight (UT.StackWeightExpr (UT.IENum n)) -> do
-        tRed <- check red
-        return $ T.TRedWeight n tRed
-      _ -> fail "not implemented yet"
-  check (UT.TRed red)                      = do
-    tRed <- check red
-    return $ T.TRedWeight 1 tRed
+  check = checkUniqueBinders . checkFreeVars . transform
+
+checkUniqueBinders :: CheckM T.Term -> CheckM T.Term
+checkUniqueBinders = undefined
+
+checkFreeVars :: CheckM T.Term -> CheckM T.Term
+checkFreeVars = undefined
+
+transform :: UT.Term -> CheckM T.Term
+transform (UT.TAny)                          = fail "not implemented yet 3"
+transform (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
+transform (UT.TNonTerminating)               = fail "not implemented yet 5"
+transform (UT.TVar var)                      = do
+  tVar <- checkMentionedVar var
+  return $ T.TVar tVar
+transform (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
+transform (UT.TNum integer)                  = return $ T.TNum integer
+transform (UT.THole)                         = return T.THole
+transform (UT.TConstructor constructor)      = fail "not implemented yet 7"
+transform (UT.TLam var term)                 = do
+  tVar <- checkBindingVarUnique var
+  -- TODO add the var to the binding list for lambdas
+  tTerm <- check term
+  return $ T.TLam tVar tTerm
+transform (UT.TLet letBindings term)         = do
+  tLetBindings <- check letBindings
+  tTerm <- check term
+  return $ T.TLet tLetBindings tTerm
+transform (UT.TStackSpike term)              = fail "not implemented yet 8"
+transform (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
+transform (UT.THeapSpike term)               = fail "not implemented yet 10"
+transform (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
+transform (UT.TDummyBinds varSet term)       = do
+  tVarSet <- check varSet
+  tTerm <- check term
+  return $ T.TDummyBinds tVarSet tTerm
+transform (UT.TRedWeight redWeight red)      = do
+  case redWeight of
+    UT.DRedWeight (UT.StackWeightExpr (UT.IENum n)) -> do
+      tRed <- check red
+      return $ T.TRedWeight n tRed
+    _ -> fail "not implemented yet"
+transform (UT.TRed red)                      = do
+  tRed <- check red
+  return $ T.TRedWeight 1 tRed
 
 instance Checkable UT.LetBindings where
   type TypedVersion UT.LetBindings = T.LetBindings
