@@ -1,0 +1,24 @@
+bindings{}
+
+proposition: free( u f z)
+             |- let {x = \y. x + y + let {z2 = 5, ab = \b . \c. b}
+                                     in u + z2 + (ab u) z,
+                     e = u + f + x}
+                in let {g = 5}
+                   in g + e + 0 + (let {h1 = 1 + h1}
+                                  in let {i = 5} in i + h1)
+                      + ((((\j. (\k. (\l. j + (\m . m) k))) g) e) f)
+          =def= let {x = \y. x + y + (let {z2 = 5, ab = \b . (\c. b)}
+                                    in (u + z2 + (ab u) z)),
+                   e = u + f + x,
+                  }
+              in (let {g = 5}
+                  in (g + e + 0 + (let {h1 = 1 + h1}
+                                   in (let {i = 5} in (i + h1))) +
+                      ((((\j. (\k. (\l. j + (\m . m) k))) g) e) f)));
+proof: -simple
+  -single{
+  on whole -alpha-equiv;
+  =def=
+  }
+  qed;

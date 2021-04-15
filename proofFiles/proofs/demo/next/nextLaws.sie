@@ -1,0 +1,3 @@
+-unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
+-unfold-5: let G {x =[0,0]= V} in C[x] <~> let G {x =[0,0]= V} in C[V];
+-dummy-ref-algebra-8: {X}d^M |~> M;

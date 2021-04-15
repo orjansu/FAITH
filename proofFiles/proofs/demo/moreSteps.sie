@@ -6,7 +6,7 @@ proof: -simple
   -single{
   on whole -alpha-equiv;
   =def=
-  let {g = 2 + y} in (g + (\b.b+g) y+ {g y}d^1);
+  let {g = 2 + y} in (y + (\b.b+g) y+ {g y}d^1);
   on whole -alpha-equiv;
   =def=
   let {g = 2 + y} in (g + (\x.x+g) y + {g y}d^1);

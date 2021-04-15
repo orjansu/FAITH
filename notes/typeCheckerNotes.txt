@@ -168,3 +168,12 @@ prop_rename_equiv term1 =
   (Om jag gör en som renamear bara de som behövs, så borde jag kunna göra
   en variant när bara ett subset av variabler renameas)
 -även om ex \x\y\z(x+y+z) =def= \a\b\c(a+b+c) så x+y+z !=def= a+b+c
+-Om lnl-intern-representationen är ekvivalent, ska även den pretty-printade termen vara ekvivalent.
+-Man ska kunna renamea strängen via find/replace på strängnivå och få samma resultat som att göra det i syntaxen och sen parsea
+-forall terms M
+  let txt = prettyPrint M
+      M' = parse txt
+      M =alpha= M'
+
+--- Buggar---
+Just nu blir x + y z till (x + y) z och inte x + (y z).

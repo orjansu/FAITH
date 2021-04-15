@@ -4,14 +4,16 @@
 
 entrypoints Term;
 
-TVar. Term ::= Var;
-TNum. Term ::= Integer;
-THole. Term ::= "[.]";
-TLam. Term ::= "(\\" Term ")";
-TLet. Term ::= "let" "{" [LetBinding] "}" "in" Term;
-TDummyBinds. Term ::= "{" [Var] "}d^" Term;
-TRedWeight. Term ::= "[" Integer "]" Red;
-TRed. Term ::= Red;
+TVar.        Term2 ::= Var;
+TNum.        Term2 ::= Integer;
+THole.       Term2 ::= "[.]";
+TLam.        Term1 ::= "\\" Term "";
+TLet.        Term1 ::= "let" "{" [LetBinding] "}" "in" Term;
+TDummyBinds. Term1 ::= "{" [Var] "}d^" Term;
+TRedWeight.  Term ::= "[" Integer "]" "(" Red ")";
+TRed.        Term ::= Red;
+
+coercions Term 2;
 
 LambdaVar.          Var ::= "a(" Integer ")";
 LetVar.             Var ::= "e("Integer "," Integer")";
@@ -23,6 +25,6 @@ LBWeight. LetBinding ::= "[" Integer","Integer "]=" Term;
 LBNoWeight. LetBinding ::= Term;
 separator LetBinding ",";
 
-RApp. Red ::= Term Var;
-RPlusWeight. Red ::= Term "+" "[" Integer"]" Term;
-RPlus. Red ::= Term "+" Term;
+RApp. Red ::= Term1 Var;
+RPlusWeight. Red ::= Term "+" "[" Integer"]" Term1;
+RPlus. Red ::= Term "+" Term1;

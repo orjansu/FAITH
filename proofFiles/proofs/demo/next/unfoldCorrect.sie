@@ -1,0 +1,17 @@
+bindings{}
+
+--correct proof
+proposition: free(y) |- let {f = \a.y}
+                          in (let {z = 1} in ((f z) + z))
+                      |~> let {f = \a.y}
+                          in (let {z = 1} in ({f}d^(\a.y) z + z));
+proof: -simple
+  -single{
+          let {f = \a.y}
+          in (let {y = 1} in ((f y) + y));
+          on whole -unfold-1 G={} x=f v=1 w=1 V=(\a.y)
+                             C=(let {y = 1} in (([.] y) + y));
+          |~> let {f = \a.y}
+              in (let {b = 1} in (({f}d^(\a.y) b) + b));
+         }
+         qed;

@@ -3,6 +3,7 @@
 module ToPrettyLNL (showLNL) where
 
 import qualified Data.Set as Set
+import Data.List.Extra (replace)
 
 import qualified LocallyNameless as LNL
 import qualified AbsLNL as P
@@ -12,7 +13,9 @@ showLNL :: LNL.Term -> String
 showLNL = filterNoise . printTree . toPrintable
 
 filterNoise :: String -> String
-filterNoise = filter (\c -> c /='\"' && c /= '\n')
+filterNoise = let removeChars = filter (\c -> c /='\"' && c /= '\n')
+                  lessWhiteSpace = replace "  " " "
+              in lessWhiteSpace . removeChars
 
 class Convertible a where
   type PrintVersion a

@@ -2,7 +2,7 @@ bindings {
 G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))};
 }
 
--- kommentarer är tillåtna.
+-- This file should be auto-generated
 proposition: G free(x xs M) |- let {xs = repeat x} in any(M)
                                |~> let {xs = x : xs} in any(M);
 proof:

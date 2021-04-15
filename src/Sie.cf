@@ -51,8 +51,8 @@ THole.            Term2  ::= "[.]";
 TIndVar.          Term1  ::= Var "^" IndExpr;
 -- Temporary. Might want to do separate grammar for contexts.
 TConstructor.     Term1  ::= Constructor;
-TLam.             Term1  ::= "\\" Var "." Term1 ;
-TLet.             Term1  ::= "let" LetBindings "in" Term1;
+TLam.             Term1  ::= "\\" Var "." Term ;
+TLet.             Term1  ::= "let" LetBindings "in" Term;
 TStackSpike.      Term1  ::= "s^" Term1;
 TStackSpikes.     Term1 ::= "["StackWeight"]s^" Term1;
 THeapSpike.       Term1  ::= "h^" Term1;
@@ -62,7 +62,7 @@ TRedWeight.       Term  ::= RedWeight "(" Red ")";
 TRed.             Term  ::= Red;
 
 RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
-RApp.        Red ::= Term Var;
+RApp.        Red ::= Term Var; 
 RAddConst.   Red ::= "add" Integer Term1;
 RIsZero.     Red ::= "iszero" Term1;
 RSeq.        Red ::= "seq" Term1 Term1 ;
