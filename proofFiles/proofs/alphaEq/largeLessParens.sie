@@ -1,15 +1,15 @@
 bindings{}
 
 proposition: free( u f z)
-             |- let {x = \y. x + y + let {z2 = 5, ab = \b . \c. b}
-                                     in u + z2 + (ab u) z,
+             |- let {x = \y. x + y + (let {z2 = 5, ab = \b . \c. b}
+                                      in u + z2 + (ab u) z),
                      e = u + f + x}
                 in let {g = 5}
                    in g + e + 0 + (let {h1 = 1 + h1}
                                   in let {i = 5} in i + h1)
                       + ((((\j. (\k. (\l. j + (\m . m) k))) g) e) f)
-          =def= let {q = \x. q + x + let {z3 = 5, ba = \f . \c. f}
-                                  in u + z3 + (ba u) z,
+          =def= let {q = \x. q + x + (let {z3 = 5, ba = \f . \c. f}
+                                      in u + z3 + (ba u) z),
                   e = u + f + q}
                 in let {p = 5}
                    in p + e + 0 + (let {h2 = 1 + h2}

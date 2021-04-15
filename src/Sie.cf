@@ -39,37 +39,40 @@ coercions IntExpr 1;
 
 DRedWeight. RedWeight ::= "[" StackWeight "]";
 
-layout "let","case";
-layout stop "in";
+TAny.             Term3 ::= "?";
+TTermVar.         Term3 ::= "any" "(" CapitalIdent ")";
+TNonTerminating.  Term3 ::= "@" ;
+TVar.             Term3 ::= Var;
+TNum.             Term3 ::= Integer;
+THole.            Term3  ::= "[.]";
+TIndVar.          Term3  ::= Var "^" IndExpr;
+TConstructor.     Term3  ::= Constructor;
+TStackSpike.      Term3  ::= "s^" Term3;
+TStackSpikes.     Term3 ::= "["StackWeight"]s^" Term3;
+THeapSpike.       Term3  ::= "h^" Term3;
+THeapSpikes.      Term3  ::= "["HeapWeight"]h^" Term3;
+TDummyBinds.      Term3  ::= VarSet "d^" Term3;
 
-TAny.             Term2 ::= "?";
-TTermVar.         Term2 ::= "any" "(" CapitalIdent ")";
-TNonTerminating.  Term2 ::= "@" ;
-TVar.             Term2 ::= Var;
-TNum.             Term2 ::= Integer;
-THole.            Term2  ::= "[.]";
-TIndVar.          Term1  ::= Var "^" IndExpr;
--- Temporary. Might want to do separate grammar for contexts.
-TConstructor.     Term1  ::= Constructor;
-TLam.             Term1  ::= "\\" Var "." Term ;
-TLet.             Term1  ::= "let" LetBindings "in" Term;
-TStackSpike.      Term1  ::= "s^" Term1;
-TStackSpikes.     Term1 ::= "["StackWeight"]s^" Term1;
-THeapSpike.       Term1  ::= "h^" Term1;
-THeapSpikes.      Term1  ::= "["HeapWeight"]h^" Term1;
-TDummyBinds.      Term1  ::= VarSet "d^" Term1;
-TRedWeight.       Term  ::= RedWeight "(" Red ")";
-TRed.             Term  ::= Red;
+TRApp.     Term2    ::= Term2 Term3;
+TRAppW.    Term2    ::= RedWeight "(" Term2 Term3 ")";
 
-RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
-RApp.        Red ::= Term Var; 
-RAddConst.   Red ::= "add" Integer Term1;
-RIsZero.     Red ::= "iszero" Term1;
-RSeq.        Red ::= "seq" Term1 Term1 ;
-RPlusWeight. Red ::= Term "+" RedWeight Term1;
-RPlus.       Red ::= Term "+" Term1;
+TRPlus.    Term1    ::= Term1 "+" Term2;
+TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
+TRPlusW2.  Term1    ::= Term1 "+" RedWeight Term2;
+TRPlusWW.  Term1    ::= RedWeight "(" Term1 "+" RedWeight Term2 ")";
+
+TAbs.   Term     ::= "\\" Var "." Term            ;
+TLet.   Term     ::= "let" LetBindings "in" Term;
+
+TRCase.       Term ::= MaybeRedWeight "case" Term "of" "{" [CaseStm] "}";
+TRAddConst.   Term ::= MaybeRedWeight "add" Integer Term1;
+TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
+TRSeq.        Term ::= MaybeRedWeight "seq" Term3 Term3;
 
 coercions Term 3;
+
+WithRedWeight. MaybeRedWeight ::= RedWeight;
+NoRedWeight.   MaybeRedWeight ::= ;
 
 DIndExpr. IndExpr ::= IntExpr1;
 CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
@@ -117,7 +120,7 @@ token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 
 CAValue.          CmdArgument ::= CmdValue;
 CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
-CVTermOrCtx.      CmdValue    ::=  Term2 ;
+CVTermOrCtx.      CmdValue    ::=  Term3 ;
 CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
 CASmallVar.       CmdAssignee ::= VarAnyType;
@@ -143,7 +146,7 @@ CmdGeneral. TransCmd ::= CommandName [CmdArgument];
 
 STWholeWithCtx. SubTerm ::= "whole";
 STShown.        SubTerm ::= "shown";
-STTerm.  SubTerm ::=  Term2  ;
+STTerm.  SubTerm ::=  Term3  ;
 STGuess. SubTerm ::= "guess";
 
 STCAlphaEquiv.  SpecialTransCmd ::= "-alpha-equiv";
