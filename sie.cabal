@@ -39,7 +39,8 @@ executable sie
                        ShowTypedTerm,
                        AbsSieLaws,
                        Common,
-                       TermCorrectness
+                       TermCorrectness,
+                       LawTypeChecker
 
   main-is:             Main.hs
   -- other-modules:
