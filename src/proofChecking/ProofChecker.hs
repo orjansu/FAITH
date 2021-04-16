@@ -40,7 +40,10 @@ import CheckMonad (CheckM, runCheckM, assert, assertInternal)
 --
 -- Assumes that the incoming proof script is typechecked.
 checkDetailedProof :: T.ProofScript -> Maybe [String]
-checkDetailedProof proofScript = runCheckM $ check proofScript
+checkDetailedProof proofScript =
+  case runCheckM $ check proofScript of
+    Right () -> Nothing
+    Left errorMsgs -> Just errorMsgs
 
 class Checkable a where
   check :: a -> CheckM ()

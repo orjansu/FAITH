@@ -16,7 +16,7 @@ newtype CheckM a = MkM {getM :: (ExceptT String
                                   (Log.WriterLoggingT Identity) a)}
   deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadError String)
 
-runCheckM :: CheckM () -> Maybe [String]
+runCheckM :: CheckM a -> Either [String] a
 runCheckM monadComputation =
   let r = runIdentity $
             Log.runWriterLoggingT $
@@ -24,8 +24,8 @@ runCheckM monadComputation =
                   getM $
                     monadComputation
   in case r of
-    (Right (), logs) -> Nothing
-    (Left errorMsg, logs) -> Just $(map toLine logs) ++ [errorMsg]
+    (Right a, logs) -> Right a
+    (Left errorMsg, logs) -> Left $ (map toLine logs) ++ [errorMsg]
 
 toLine :: Log.LogLine -> String
 toLine (loc, logsource, loglevel, logstr) =
