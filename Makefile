@@ -20,10 +20,9 @@ testLaws : proofFiles/laws/miniLaws.sie gen/TestSie
 testProof :
 	./gen/TestSie < proofFiles/proofs/miniProof.sie
 
-laws : src/SieLaws.cf
+gen/AbsSieLaws.hs : src/SieLaws.cf
 	bnfc --makefile --outputdir=gen/ src/SieLaws.cf
 	make --directory=gen
-	./gen/TestSieLaws < proofFiles/laws/miniLaws.sie
 
 gen/AbsLNL.hs : src/prettyPrinting/LNL.cf
 	bnfc --makefile --outputdir=gen/ src/prettyPrinting/LNL.cf

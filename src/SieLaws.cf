@@ -33,22 +33,24 @@ token MVPattern          ('p' 'a' 't');
 token MVCaseStm          ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
 
-TValueMetaVar.    Term3 ::= MVValue;
-TGeneralMetaVar.  Term3 ::= MVTerm;
-TVar.             Term3 ::= Var;
-TAppCtx.          Term3 ::= MVContext "[" Term "]";
-TAppValCtx.       Term3 ::= MVValueContext "[" Term "]";
-TNonTerminating.  Term3 ::= "@" ;
-TNum.             Term3 ::= Integer;
-TIndVar.          Term3 ::= Var "^" IndExpr;
-TConstructor.     Term3 ::= Constructor;
-TStackSpike.      Term3  ::= "s^" Term3;
-TStackSpikes.     Term3  ::= "["StackWeight"]s^" Term3;
-THeapSpike.       Term3  ::= "h^" Term3;
-THeapSpikes.      Term3  ::= "["HeapWeight"]h^" Term3;
-TDummyBinds.      Term3  ::= VarSet "d^" Term3;
---TSubstitution.    Term3  ::= Term3 "[" Var "/" Var "]";
-TRedMetaVar.      Term3 ::= MaybeRedWeight MVReduction "[" Term "]";
+TValueMetaVar.    Term4 ::= MVValue;
+TGeneralMetaVar.  Term4 ::= MVTerm;
+TVar.             Term4 ::= Var;
+TAppCtx.          Term4 ::= MVContext "[" Term "]";
+TAppValCtx.       Term4 ::= MVValueContext "[" Term "]";
+TNonTerminating.  Term4 ::= "@" ;
+TNum.             Term4 ::= Integer;
+TIndVar.          Term4 ::= Var "^" IndExpr;
+TConstructor.     Term4 ::= Constructor;
+TStackSpike.      Term4  ::= "s^" Term4;
+TStackSpikes.     Term4  ::= "["StackWeight"]s^" Term4;
+THeapSpike.       Term4  ::= "h^" Term4;
+THeapSpikes.      Term4  ::= "["HeapWeight"]h^" Term4;
+TDummyBinds.      Term4  ::= VarSet "d^" Term4;
+TRedMetaVar.      Term4 ::= MVReduction "[" Term "]";
+TRedMetaVarW.     Term4 ::= RedWeight "^" MVReduction "[" Term "]" ;
+
+TSubstitution.    Term3  ::= Term4 "[" Var "/" Var "]";
 
 TRApp.        Term2 ::= Term2 Var;
 TRAppW.       Term2 ::= RedWeight "(" Term2 Var ")";
@@ -64,20 +66,12 @@ TLet.             Term  ::= "let" LetBindings "in" Term;
 TRCase.       Term ::= MaybeRedWeight "case" Term "of" "{" [CaseStm] "}";
 TRAddConst.   Term ::= MaybeRedWeight "add" Integer Term1;
 TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
-TRSeq.        Term ::= MaybeRedWeight "seq" Term3 Term3;
+TRSeq.        Term ::= MaybeRedWeight "seq" Term4 Term4;
 
-coercions Term 3;
+coercions Term 4;
 
 WithRedWeight. MaybeRedWeight ::= RedWeight;
 NoRedWeight.   MaybeRedWeight ::= ;
-
--- RMetaVar.    Term ::= MVReduction "[" Term "]";
--- RCase.       Term ::= "case" Term "of" "{" [CaseStm] "}";
--- RAddConst.   Term ::= "add" Integer Term3;
--- RIsZero.     Term ::= "iszero" Term3;
--- RSeq.        Term  ::= "seq" Term3 Term3 ;
--- RPlusWeight. Term  ::= Term "+" RedWeight Term3;
--- RPlus.       Term  ::= Term "+" Term3;
 
 separator Var "";
 VSMetaVar.  VarSet ::= MVVarSet;
