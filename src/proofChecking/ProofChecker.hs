@@ -32,13 +32,7 @@ import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables)
-
-newtype CheckM a = MkM {getM :: (ExceptT String
-                                  (Log.WriterLoggingT Identity) a)}
-  deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadError String)
-
-instance MonadFail CheckM where
-  fail str = throwError str
+import CheckMonad (CheckM, runCheckM, assert, assertInternal)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
 -- containing a log and error message if it is incorrect, and Nothing
@@ -47,21 +41,6 @@ instance MonadFail CheckM where
 -- Assumes that the incoming proof script is typechecked.
 checkDetailedProof :: T.ProofScript -> Maybe [String]
 checkDetailedProof proofScript = runCheckM $ check proofScript
-
-runCheckM :: CheckM () -> Maybe [String]
-runCheckM monadComputation =
-  let r = runIdentity $
-            Log.runWriterLoggingT $
-                runExceptT $
-                  getM $
-                    monadComputation
-  in case r of
-    (Right (), logs) -> Nothing
-    (Left errorMsg, logs) -> Just $(map toLine logs) ++ [errorMsg]
-
-toLine :: Log.LogLine -> String
-toLine (loc, logsource, loglevel, logstr) =
-  (show logstr)
 
 class Checkable a where
   check :: a -> CheckM ()
@@ -173,7 +152,7 @@ getSubterm context term = do
     getSubterm' _ _ = Nothing
 
     returnPotentialTerm :: Maybe T.Term -> CheckM T.Term
-    returnPotentialTerm Nothing = fail contextDoesNotMatch
+    returnPotentialTerm Nothing = throwError contextDoesNotMatch
     returnPotentialTerm (Just term) = return term
 
     contextDoesNotMatch :: String
@@ -504,7 +483,7 @@ instance AlphaEq T.LetBindings where
           ++showTypedTerm (T.TLet lbs1 T.THole)
         Log.logDebugN . pack $ "second let-binding is"
           ++showTypedTerm (T.TLet lbs2 T.THole)
-        fail "let bindings not alpha equivalent"
+        throwError "let bindings not alpha equivalent"
   -- | given { x1 = M1 ... xn = Mn} and { y1 = N1 ... yn = Nn }
   -- returns whether forall i . xi and yi have the same canonical name
   -- and forall i . Mi =alpha= Ni
@@ -540,8 +519,8 @@ checkRuleAlphaEquiv lawTerm m n = do
       then let permutations = getAllLetPermutations m
            in if any (isOrderedAlphaEq n) permutations
                 then return ()
-                else fail "Not alpha equivalent, even with reordering of let:s"
-      else fail "Not alpha equivalent, and law term does not contain let."
+                else throwError "Not alpha equivalent, even with reordering of let:s"
+      else throwError "Not alpha equivalent, and law term does not contain let."
   where
     containsLet :: Law.Term -> Bool
     containsLet (Law.TValueMetaVar _) = False
@@ -588,17 +567,6 @@ runToLocallyNameless term = return $ toLocallyNameless term
 liftEither :: Either String a -> CheckM a
 liftEither (Left errorMsg) = throwError errorMsg
 liftEither (Right a) = return a
-
-assert :: (MonadError String m) => Bool -> String -> m ()
-assert True _ = return ()
-assert False description = throwError $ "assertion failed: "++description
-
-assertInternal :: (Log.MonadLogger m, MonadError String m) =>
-                  Bool -> String -> m ()
-assertInternal True _ = return ()
-assertInternal False description = do
-  Log.logOtherN (Log.LevelOther (pack "InternalAssertion")) $ pack description
-  throwError $ "Internal assertion failed: "++description
 
 {-
 matchLaw :: Law.Term -> T.Term -> [Map.Map String T.Term]
