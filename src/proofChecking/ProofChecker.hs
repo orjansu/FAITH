@@ -110,7 +110,9 @@ checkStep globalImpRel
     T.Law context
           (Law.DLaw lawName lawLHS lawImpRel lawRHS)
           substitutions -> do
-      assert (lawImpRel == localImpRel) "The improvement relation of the law must be the same as the improvement relation in the proof"
+      assert (lawImpRel == localImpRel)
+        $ "The improvement relation of the law must be the same as the "
+        ++"improvement relation in the proof"
       subterm <- getSubterm context term1
       let contextVars = getAllVars context
       Log.logInfoN . pack $ "applying substitution from subterm to law"
@@ -120,9 +122,9 @@ checkStep globalImpRel
       substToRHS <- applySubstitution lawLHS substitutions contextVars
       fvOrig <- getFreeVars subterm
       fvTransformed <- getFreeVars substToRHS
-      assert (fvOrig == fvTransformed) "The transformation should not make bound variables free."
+      assert (fvOrig == fvTransformed) $ "The transformation should not make"
+        ++"bound variables free."
       rhsTerm <- applyContext context substToRHS
-
       -- This shows that we could generate the next term ourselves instead.
       -- However, it is more important to typecheck rhsTerm if we generate it.
       checkRuleAlphaEquiv lawRHS rhsTerm term2

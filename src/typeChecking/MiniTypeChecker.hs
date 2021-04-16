@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module MiniTypeChecker where
 
@@ -137,16 +138,23 @@ instance Checkable UT.Free where
 
 -- | Checks a term, which consists of the following:
 -- - Converts to T.Term.
--- - Does not: Checks typing of a simply typed lambda calculus
+-- - Adds the implicit let of derivations in context (if there is one)
+-- - Does checks of checkFreeVars and checkBoundVariablesDistinct
+-- - Checks that it is not a context
+-- - Does not: Check typing of a simply typed lambda calculus
 -- - General terms, i.e. any(M) are declare free (TODO)
 -- - Stack weight expressions: See checkWeightExpr
+--
+-- Note: Expects that the incoming term does NOT have the implicit let of
+-- the inContext derivation.
 checkTopLevelTerm :: UT.Term -> CheckM T.Term
 checkTopLevelTerm term = do
   transformed <- transform term
-  checkBoundVariablesDistinct transformed
-  checkFreeVars transformed
-  assertTerm (numHoles transformed == 0)
-    "Top-level terms should not be contexts" transformed
+  withLet <- withLetContext transformed
+  checkBoundVariablesDistinct withLet
+  checkFreeVars withLet
+  assertTerm (numHoles withLet == 0)
+    "Top-level terms should not be contexts" withLet
   return transformed
 
 -- | Checks that all variables are declared free or bound.
@@ -281,11 +289,65 @@ instance Checkable UT.Proof where
       checkSteps1 ((UT.PSCmd transCmd):(UT.PSImpRel imprel):[]) = do
         -- Replace first term with start and last term with goal.
         tStart <- gets start
-        shownStart <- removeImplicitLet tStart
         tTransCmd <- check transCmd
         tImprel <- check imprel
         tEnd <- gets goal
         return $ [T.PSMiddle tStart tTransCmd tImprel tEnd]
+      checkSteps1 ((UT.PSCmd transCmd)
+                   :(UT.PSImpRel imprel)
+                   :(UT.PSTerm term2)
+                   :cmds) = do
+        -- If first term is not specified, substitute for the start term. note
+        -- that this doesn't work in the inductive case.
+        startTerm <- gets start
+        tTransCmd <- check transCmd
+        tImprel <- check imprel
+        tTerm2 <- checkTopLevelTerm term2
+        let proofStep = T.PSMiddle startTerm tTransCmd tImprel tTerm2
+        proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
+        return $ proofStep:proofSteps
+      checkSteps1 steps = checkSteps2 steps
+
+      checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
+      checkSteps2 [] = return []
+      checkSteps2 ((UT.PSTerm term1)
+                     :(UT.PSCmd transCmd)
+                     :(UT.PSImpRel imprel)
+                     :(UT.PSTerm term2)
+                     :cmds) = do
+        proofStep <- checkProofStep term1 transCmd imprel term2
+        proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
+        return $ proofStep:proofSteps
+      checkSteps2 ((UT.PSTerm term1)
+                   :(UT.PSCmd transCmd)
+                   :(UT.PSImpRel impRel)
+                   :[]) = do
+        -- If the last term is skipped, the last term is implicitly the goal,
+        -- so we put it after. Note that the last improvement relation is
+        -- still needed (at least at this stage)
+        tTerm1 <- checkTopLevelTerm term1
+        tTransCmd <- check transCmd
+        tImpRel <- check impRel
+        tTerm2 <- gets goal
+        let proofStep = T.PSMiddle tTerm1 tTransCmd tImpRel tTerm2
+        return [proofStep]
+      checkSteps2 ((UT.PSTerm _ ):[]) = return []
+                   --The last term is in the next-to-last proof step too, so
+                   --it is not lost.
+      checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
+        ++"step must be a term and every other a transformational command "
+        ++"and an improvement relation. Note that the HereMarker $ is not "
+        ++"supported yet."
+
+      checkProofStep :: UT.Term -> UT.TransCmd -> UT.ImpRel
+                        -> UT.Term -> CheckM T.ProofStep
+      checkProofStep term1 transCmd imprel term2 = do
+        tTerm1 <- checkTopLevelTerm term1
+        command <- check transCmd
+        tImprel <- check imprel
+        tTerm2 <- checkTopLevelTerm term2
+        let proofStep = T.PSMiddle tTerm1 command tImprel tTerm2
+        return proofStep
 
       -- | Given
       -- - a transformational command
@@ -299,91 +361,8 @@ instance Checkable UT.Proof where
       getContext (UT.CmdSpecial UT.STCAlphaEquiv) _ = return T.THole
       getContext (UT.CmdGeneral _name argList) _ = undefined
 
-      {-
-      checkSteps1 ((UT.PSCmd transCmd)
-                   :(UT.PSImpRel imprel)
-                   :(UT.PSTerm term2)
-                   :cmds) = do
-        -- If first term is not specified, substitute for the start term. note
-        -- that this doesn't work in the inductive case.
-        startTerm <- gets start
-        startTermRaw <- removeImplicitLet startTerm
-        tTransCmd <- check transCmd
-        tSubterm <- getSubTerm subterm startTermRaw
-        tImprel <- check imprel
-        tTerm2 <- withLetContext =<< check term2
-        let proofStep = T.PSMiddle startTerm tSubterm tTransCmd tImprel tTerm2
-        proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
-        return $ proofStep:proofSteps
-      checkSteps1 steps = checkSteps2 steps
-
-      checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
-      checkSteps2 [] = return []
-      checkSteps2 ((UT.PSTerm term1)
-                     :(UT.PSCmd transCmd)
-                     :(UT.PSImpRel imprel)
-                     :(UT.PSTerm term2)
-                     :cmds) = do
-        proofStep <- checkProofStep term1 subterm transCmd imprel term2
-        proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
-        return $ proofStep:proofSteps
-      checkSteps2 ((UT.PSTerm term1)
-                   :(UT.PSCmd transCmd)
-                   :(UT.PSImpRel impRel)
-                   :[]) = do
-        -- If the last term is skipped, the last term is implicitly the goal,
-        -- so we put it after. Note that the last improvement relation is
-        -- still needed (at least at this stage)
-        tTerm1 <- check term1
-        tTerm1wCtx <- withLetContext tTerm1
-        tSubterm <- getSubTerm subterm tTerm1
-        tTransCmd <- check transCmd
-        tImpRel <- check impRel
-        tTerm2wCtx <- gets goal
-        let proofStep = T.PSMiddle tTerm1wCtx
-                                   tSubterm
-                                   tTransCmd
-                                   tImpRel
-                                   tTerm2wCtx
-        return [proofStep]
-      checkSteps2 ((UT.PSTerm _ ):[]) = return []
-                   --The last term is in the next-to-last proof step too, so
-                   --it is not lost.
-      checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
-        ++"step must be a term and every other a transformational command "
-        ++"and an improvement relation. Note that the HereMarker $ is not "
-        ++"supported yet."
-
-      checkProofStep :: UT.Term -> UT.SubTerm -> UT.TransCmd -> UT.ImpRel
-                        -> UT.Term -> CheckM T.ProofStep
-      checkProofStep term1 subterm transCmd imprel term2 = do
-        tTerm1 <- check term1
-        tTerm1withCtx <- withLetContext tTerm1
-        command <- check transCmd
-        tSubTerm <- getSubTerm subterm tTerm1
-        tImprel <- check imprel
-        tTerm2 <- check term2
-        tTerm2withCtx <- withLetContext tTerm2
-        let proofStep = T.PSMiddle tTerm1withCtx
-                                   tSubTerm
-                                   command
-                                   tImprel
-                                   tTerm2withCtx
-        return proofStep
-        -}
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
     fail "not implemented yet 20"
-
--- | Takes an expression (or command) for a subterm and the term it expresses
--- a subterm of, and returns the corresponding typed subterm if exactly one
--- such subterm exists. Throws an error otherwise.
--- Parameters: subterm-expression, term (without let-context)
--- returns: the term expressed by the subterm-expression.
-getSubTerm :: UT.SubTerm -> T.Term -> CheckM T.Term
-getSubTerm UT.STWholeWithCtx term = withLetContext term
-getSubTerm UT.STShown term = return term
-getSubTerm (UT.STTerm subtermExpr) term = fail "not implemented yet 21"
-getSubTerm UT.STGuess term = fail "not implemented yet 22"
 
 instance Checkable UT.ImpRel where
   type TypedVersion UT.ImpRel = Com.ImpRel

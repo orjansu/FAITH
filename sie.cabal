@@ -38,7 +38,8 @@ executable sie
                        ToPrettyLNL,
                        ShowTypedTerm,
                        AbsSieLaws,
-                       Common
+                       Common,
+                       TermCorrectness
 
   main-is:             Main.hs
   -- other-modules:
