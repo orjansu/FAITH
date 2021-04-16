@@ -19,7 +19,8 @@ executable sie
                        src/proofChecking,
                        src/typeChecking,
                        src/prettyPrinting,
-                       src/types
+                       src/types,
+                       src/util
   other-modules:
                        ParSie,
                        ErrM,
@@ -39,7 +40,8 @@ executable sie
                        ShowTypedTerm,
                        AbsSieLaws,
                        Common,
-                       TermCorrectness
+                       TermCorrectness,
+                       CheckMonad
 
   main-is:             Main.hs
   -- other-modules:
