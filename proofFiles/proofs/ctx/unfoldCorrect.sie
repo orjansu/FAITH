@@ -9,7 +9,7 @@ proof: -simple
   -single{
           let {f = \a.y}
           in (let {y = 1} in ((f y) + y));
-          -unfold-1 ctx=[.] G={} x=f v=1 w=1 V=(\a.y)
+          -unfold-1 ctx= [.] G={} x=f v=1 w=1 V=(\a.y)
                              C=(let {y = 1} in (([.] y) + y));
           |~> let {f = \a.y}
               in (let {b = 1} in (({f}d^(\a.y) b) + b));

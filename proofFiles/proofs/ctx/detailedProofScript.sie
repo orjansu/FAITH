@@ -37,7 +37,7 @@ proof:
                        )) x
         } in any(M);
       -spike-algebra-zero-stack-spike
-            ctx=let G in (let xs = [.])
+            ctx=(let {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))} in (let {xs = [.]} in any(M)))
             M=((\x. (let {ys = repeat^n x} in (x : ys))) x);
       <~> let {xs = (\x. (let {ys = repeat^n x
                             } in (x : ys))
