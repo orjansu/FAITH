@@ -53,8 +53,8 @@ THeapSpike.       Term3  ::= "h^" Term3;
 THeapSpikes.      Term3  ::= "["HeapWeight"]h^" Term3;
 TDummyBinds.      Term3  ::= VarSet "d^" Term3;
 
-TRApp.     Term2    ::= Term2 Term3;
-TRAppW.    Term2    ::= RedWeight "(" Term2 Term3 ")";
+TRApp.     Term2    ::= Term2 Var;
+TRAppW.    Term2    ::= RedWeight "(" Term2 Var ")";
 
 TRPlus.    Term1    ::= Term1 "+" Term2;
 TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
