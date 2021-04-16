@@ -99,18 +99,18 @@ kolla en expression mot en regel i laws.sie
 
 ---- Att kolla i typecheckern ---
 Typecheck 1
--Contexts används bara som argument
+x-Contexts används bara som argument
 -Bindingar i InContext är deklarerade i bindings
 -? används bara i on
 variabler är deklarerade
    -alla variabler kan vara:
-      -deklarerade som fria i början
-        -bindningar i bindings får ej innehålla fria variabler
-      -bundna till en letbindning som binder till termen den nämns i
+      x-deklarerade som fria i början
+        x-bindningar i bindings får ej innehålla fria variabler
+      x-bundna till en letbindning som binder till termen den nämns i
          dvs M i (let G in M)
-      -bundna till en konstruktor i en case-sats
-      -bundna till en annan let-bindning i samma let-sats
-      -bindna till en lambda som är relevant
+      x-bundna till en konstruktor i en case-sats
+      x-bundna till en annan let-bindning i samma let-sats
+      x-bindna till en lambda som är relevant
    -any(M) -> M behöver vara deklarerad fri? - ja
    -stack weights:
       -idents måste vara deklarerade fria?
@@ -120,7 +120,7 @@ variabler är deklarerade
 -Konstruktorer är deklarerade och fyllda
    -syntax för att deklarera dem saknas. (ngt i Bindings)
 -> kolla bara bevis fram till <==here-symbolen.
--alla bindande variabler är unika
+x-alla bindande variabler är unika
 
 -Korrekthet av bevis
   -Endast rätt relationssymbol får användas mellan varje term

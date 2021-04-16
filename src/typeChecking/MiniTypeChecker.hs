@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module MiniTypeChecker where
 
@@ -14,13 +15,20 @@ import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.State (StateT, runStateT, gets, MonadState, modify)
 import Data.Functor.Identity (Identity, runIdentity)
 
+import ShowTypedTerm (showTypedTerm)
+import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
+                       , numHoles)
+import ToLocallyNameless (toLocallyNameless)
+
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
                  , goal :: T.Term
+                 , freeVarVars :: Set.Set String
                  }
 
 initSt :: MySt
-initSt = MkSt {letContext = undefined, start= undefined, goal = undefined}
+initSt = MkSt {letContext = undefined, start= undefined, goal = undefined,
+              freeVarVars = undefined}
 
 newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
   deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String)
@@ -71,9 +79,15 @@ removeImplicitLet startTerm = do
       T.TLet _ inner -> return inner
       _ -> fail "internal: Tried to remove implicit let but there is none."
 
+-- Checks correctness of a
 class Checkable a where
   type TypedVersion a
   check :: a -> CheckM (TypedVersion a)
+
+-- Just transforms a to its typed version
+class Transformable a where
+  type TransformedVersion a
+  transform :: a -> CheckM (TransformedVersion a)
 
 instance Checkable UT.ProofScript where
   type TypedVersion UT.ProofScript = T.ProofScript
@@ -91,15 +105,15 @@ instance Checkable UT.Theorem where
                                        goal) proof) = do
     modify (\st -> st{letContext = Nothing})
     tFreeVars <- check freeVars
-    -- TODO add freeVars to ctx
-    tStart <- check start
-    tGoal <- check goal
+    let T.DFreeVars termVars varVars = tFreeVars
+    modify (\st -> st{freeVarVars = varVars})
+    tStart <- checkTopLevelTerm start
+    tGoal <- checkTopLevelTerm goal
     modify (\st -> st{start = tStart, goal = tGoal})
     tProof <- check proof
     let prop = T.DProposition tFreeVars tStart Com.DefinedEqual tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
-
 
 instance Checkable UT.Free where
   type TypedVersion UT.Free = T.FreeVars
@@ -121,113 +135,133 @@ instance Checkable UT.Free where
       getString (UT.SmallVar (UT.Ident name)) = name
   check UT.NoFree = return $ T.DFreeVars Set.empty Set.empty
 
-instance Checkable UT.Term where
-  type TypedVersion UT.Term = T.Term
-  -- | Checks a term, which consists of the following:
-  -- - Converts to T.Term.
-  -- - Checks that all variable names are unique wrt the whole term (TODO)
-  -- - Does not: Checks typing of a typical lambda calculus
-  -- - Variables are declared or bound (TODO)
-  -- - General terms, i.e. any(M) are declare free (TODO)
-  -- - Stack weight expressions: See checkWeightExpr
-  check :: UT.Term -> CheckM T.Term
-  check = checkUniqueBinders . checkFreeVars . transform
+-- | Checks a term, which consists of the following:
+-- - Converts to T.Term.
+-- - Does not: Checks typing of a simply typed lambda calculus
+-- - General terms, i.e. any(M) are declare free (TODO)
+-- - Stack weight expressions: See checkWeightExpr
+checkTopLevelTerm :: UT.Term -> CheckM T.Term
+checkTopLevelTerm term = do
+  transformed <- transform term
+  checkBoundVariablesDistinct transformed
+  checkFreeVars transformed
+  assertTerm (numHoles transformed == 0)
+    "Top-level terms should not be contexts" transformed
+  return transformed
 
-checkUniqueBinders :: CheckM T.Term -> CheckM T.Term
-checkUniqueBinders = undefined
+-- | Checks that all variables are declared free or bound.
+-- Also checks that no bound variable shadows a free variable.
+checkFreeVars :: T.Term -> CheckM ()
+checkFreeVars term = do
+  expectedFreeVars <- gets freeVarVars
+  let (_lnlTerm, actualFreeVars) = toLocallyNameless term
+  assert (expectedFreeVars `Set.isSubsetOf` actualFreeVars)
+    $ "All free variables should be declared. "
+      ++"In term "++showTypedTerm term++"\n, "++" Variable(s) "
+      ++show (Set.difference actualFreeVars expectedFreeVars)
+      ++" should be declared free if intended."
+  let boundVariables = getBoundVariables term
+  assert (expectedFreeVars `Set.disjoint` boundVariables)
+    $ "You may not shadow a free variable. In term "++showTypedTerm term++"\n"
+      ++"Variable(s) "
+      ++show (expectedFreeVars `Set.intersection` boundVariables)
+      ++" shadows a free variable."
 
-checkFreeVars :: CheckM T.Term -> CheckM T.Term
-checkFreeVars = undefined
+assert :: (MonadError String m) => Bool -> String -> m ()
+assert True _ = return ()
+assert False str = throwError $"Assertion failed: "++str
 
-transform :: UT.Term -> CheckM T.Term
-transform (UT.TAny)                          = fail "not implemented yet 3"
-transform (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
-transform (UT.TNonTerminating)               = fail "not implemented yet 5"
-transform (UT.TVar var)                      = do
-  tVar <- checkMentionedVar var
-  return $ T.TVar tVar
-transform (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
-transform (UT.TNum integer)                  = return $ T.TNum integer
-transform (UT.THole)                         = return T.THole
-transform (UT.TConstructor constructor)      = fail "not implemented yet 7"
-transform (UT.TLam var term)                 = do
-  tVar <- checkBindingVarUnique var
-  -- TODO add the var to the binding list for lambdas
-  tTerm <- check term
-  return $ T.TLam tVar tTerm
-transform (UT.TLet letBindings term)         = do
-  tLetBindings <- check letBindings
-  tTerm <- check term
-  return $ T.TLet tLetBindings tTerm
-transform (UT.TStackSpike term)              = fail "not implemented yet 8"
-transform (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
-transform (UT.THeapSpike term)               = fail "not implemented yet 10"
-transform (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
-transform (UT.TDummyBinds varSet term)       = do
-  tVarSet <- check varSet
-  tTerm <- check term
-  return $ T.TDummyBinds tVarSet tTerm
-transform (UT.TRedWeight redWeight red)      = do
-  case redWeight of
-    UT.DRedWeight (UT.StackWeightExpr (UT.IENum n)) -> do
-      tRed <- check red
-      return $ T.TRedWeight n tRed
-    _ -> fail "not implemented yet"
-transform (UT.TRed red)                      = do
-  tRed <- check red
-  return $ T.TRedWeight 1 tRed
+assertTerm :: (MonadError String m) => Bool -> String -> T.Term -> m ()
+assertTerm True _ _ = return ()
+assertTerm False str term = throwError $
+  "Assertion "++str++" failed for term "++showTypedTerm term
 
-instance Checkable UT.LetBindings where
-  type TypedVersion UT.LetBindings = T.LetBindings
-  check UT.LBSAny = fail "not implemented yet 12"
-  check (UT.LBSVar capitalIdent) = fail "not implemented yet"
-  check (UT.LBSSet bindingSetList) = do
-    tLetBindings <- mapM checkSingle bindingSetList
+instance Transformable UT.Term where
+  type TransformedVersion UT.Term = T.Term
+  transform :: UT.Term -> CheckM T.Term
+  transform (UT.TAny)                          = fail "not implemented yet 3"
+  transform (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
+  transform (UT.TNonTerminating)               = fail "not implemented yet 5"
+  transform (UT.TVar var)                      = do
+    let tVar = getVarName var
+    return $ T.TVar tVar
+  transform (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
+  transform (UT.TNum integer)                  = return $ T.TNum integer
+  transform (UT.THole)                         = return T.THole
+  transform (UT.TConstructor constructor)      = fail "not implemented yet 7"
+  transform (UT.TLam var term)                 = do
+    let tVar = getVarName var
+    tTerm <- transform term
+    return $ T.TLam tVar tTerm
+  transform (UT.TLet letBindings term)         = do
+    tLetBindings <- transform letBindings
+    tTerm <- transform term
+    return $ T.TLet tLetBindings tTerm
+  transform (UT.TStackSpike term)              = fail "not implemented yet 8"
+  transform (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
+  transform (UT.THeapSpike term)               = fail "not implemented yet 10"
+  transform (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
+  transform (UT.TDummyBinds varSet term)       = do
+    tVarSet <- transform varSet
+    tTerm <- transform term
+    return $ T.TDummyBinds tVarSet tTerm
+  transform (UT.TRApp term var) = do
+    tTerm <- transform term
+    let tVar = getVarName var
+    return $ T.TRedWeight 1 $ T.RApp tTerm tVar
+  transform (UT.TRAppW redWeight term var) = undefined
+  transform (UT.TRPlus term1 term2) = undefined
+  transform (UT.TRPlusW1 redWeight term1 term2) =
+    transformPlus (Just redWeight) term1 Nothing term2
+  transform (UT.TRPlusW2 term1 redWeight term2) =
+    transformPlus Nothing term1 (Just redWeight) term2
+  transform (UT.TRPlusWW redWeight1 term1 redWeight2 term2) =
+    transformPlus (Just redWeight1) term1 (Just redWeight2) term2
+  transform (UT.TRCase maybeRedWeight term caseStms) = undefined
+  transform (UT.TRAddConst maybeRedWeight integer term) = undefined
+  transform (UT.TRIsZero maybeRedWeight term) = undefined
+  transform (UT.TRSeq maybeRedWeight term1 term2) = undefined
+
+transformPlus :: Maybe UT.RedWeight
+                 -> UT.Term
+                 -> Maybe UT.RedWeight
+                 -> UT.Term
+                 -> CheckM T.Term
+transformPlus rw1 t1 rw2 t2 = do
+  trans1 <- transform t1
+  trans2 <- transform t2
+  case (rw1, rw2) of
+    (Nothing, Nothing) ->
+      return $ T.TRedWeight 1 $ T.RPlusWeight trans1 1 trans2
+    _ -> fail "not implemented yet: weights on Plus"
+
+instance Transformable UT.LetBindings where
+  type TransformedVersion UT.LetBindings = T.LetBindings
+  transform UT.LBSAny = fail "not implemented yet 12"
+  transform (UT.LBSVar capitalIdent) = fail "not implemented yet"
+  transform (UT.LBSSet bindingSetList) = do
+    tLetBindings <- mapM transformSingle bindingSetList
     return tLetBindings
     where
-      checkSingle :: UT.LetBinding
+      transformSingle :: UT.LetBinding
                      -> CheckM (T.Name, T.StackWeight, T.HeapWeight, T.Term)
-      checkSingle UT.LBAny = fail "not implemented yet 13"
-      checkSingle (UT.LBConcrete var UT.BSNoWeight term) = do
-        tVar <- checkBindingVarUnique var
-        -- TODO add var to let binding list
-        tTerm <- check term
+      transformSingle UT.LBAny = fail "not implemented yet 13"
+      transformSingle (UT.LBConcrete var UT.BSNoWeight term) = do
+        let tVar = getVarName var
+        tTerm <- transform term
         return (tVar, 1,1, tTerm)
-      checkSingle (UT.LBConcrete var withWeight term) =
+      transformSingle (UT.LBConcrete var withWeight term) =
         fail "not implemented yet 14"
 
 
-instance Checkable UT.VarSet where
-  type TypedVersion UT.VarSet = T.VarSet
-  check (UT.DVarSet vars) = do
-    tVars <- mapM checkMentionedVar vars
+instance Transformable UT.VarSet where
+  type TransformedVersion UT.VarSet = T.VarSet
+  transform (UT.DVarSet vars) = do
+    let tVars = map getVarName vars
     return $ Set.fromList tVars
 
-instance Checkable UT.Red where
-  type TypedVersion UT.Red = T.Red
-  check (UT.RCase term caseStms)               = fail "not implemented yet 15"
-  check (UT.RApp term var)                     = do
-    tTerm <- check term
-    tVar <- checkMentionedVar var
-    return $ T.RApp tTerm tVar
-  check (UT.RAddConst integer term)            = fail "not implemented yet 16"
-  check (UT.RIsZero term)                      = fail "not implemented yet 17"
-  check (UT.RSeq term1 term2)                  = fail "not implemented yet 18"
-  check (UT.RPlusWeight term1 redWeight term2) = fail "not implemented yet 19"
-  check (UT.RPlus term1 term2)                 = do
-    tTerm1 <- check term1
-    tTerm2 <- check term2
-    return $ T.RPlusWeight tTerm1 1 tTerm2
-
--- | TODO check that the var is bound or declared free
-checkMentionedVar :: UT.Var -> CheckM T.Var
-checkMentionedVar (UT.DVar (UT.Ident name)) = return name
-
--- | TODO:
--- - Check that the binding var is not declared before
--- (in that case rename or return something else?)
-checkBindingVarUnique :: UT.Var -> CheckM T.Var
-checkBindingVarUnique (UT.DVar (UT.Ident name)) = return name
+getVarName :: UT.Var -> String
+getVarName (UT.DVar (UT.Ident name)) = name
 
 instance Checkable UT.Proof where
   type TypedVersion UT.Proof = T.Proof

@@ -49,8 +49,38 @@ instance Convertible T.Term where
     where
       toUtVar :: String -> UT.Var
       toUtVar = UT.DVar . UT.Ident
-  toUntyped (T.TRedWeight 1 red) = UT.TRed $ toUntyped red
+  toUntyped (T.TRedWeight 1 red) = case red of
+    T.RApp term var -> let utTerm = toUntyped term
+                           utVar = toUntypedVar var
+                       in UT.TRApp utTerm utVar
+    T.RPlusWeight term1 rw term2 ->
+      let utTerm1 = toUntyped term1
+          utTerm2 = toUntyped term2
+      in case rw of
+        1 -> UT.TRPlus utTerm1 utTerm2
+        _ -> let utWeight = toUntypedRedWeight rw
+             in UT.TRPlusW2 utTerm1 utWeight utTerm2
   toUntyped (T.TRedWeight redWeight red) =
+    let utRedw = toUntypedRedWeight redWeight
+    in case red of
+         T.RApp term var -> let utTerm = toUntyped term
+                                utVar = toUntypedVar var
+                            in UT.TRAppW utRedw utTerm utVar
+         T.RPlusWeight term1 rw term2 ->
+           let utTerm1 = toUntyped term1
+               utTerm2 = toUntyped term2
+           in case rw of
+             1 -> UT.TRPlusW1 utRedw utTerm1 utTerm2
+             _ -> let utWeight2 = toUntypedRedWeight rw
+                  in UT.TRPlusWW utRedw utTerm1 utWeight2 utTerm2
+
+toUntypedVar :: String -> UT.Var
+toUntypedVar name = UT.DVar $ UT.Ident name
+
+toUntypedRedWeight :: Integer -> UT.RedWeight
+toUntypedRedWeight rw = UT.DRedWeight $ UT.StackWeightExpr $ UT.IENum rw
+
+{-
     let utWeight = UT.DRedWeight $ UT.StackWeightExpr $ UT.IENum redWeight
         utRed = toUntyped red
     in UT.TRedWeight utWeight utRed
@@ -67,3 +97,4 @@ instance Convertible T.Red where
       1 -> UT.RPlus utTerm1 utTerm2
       _ -> let utWeight = UT.DRedWeight $ UT.StackWeightExpr $ UT.IENum rw
            in UT.RPlusWeight utTerm1 utWeight utTerm2
+-}

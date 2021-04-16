@@ -61,7 +61,7 @@ TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
 TRPlusW2.  Term1    ::= Term1 "+" RedWeight Term2;
 TRPlusWW.  Term1    ::= RedWeight "(" Term1 "+" RedWeight Term2 ")";
 
-TAbs.   Term     ::= "\\" Var "." Term            ;
+TLam.   Term     ::= "\\" Var "." Term            ;
 TLet.   Term     ::= "let" LetBindings "in" Term;
 
 TRCase.       Term ::= MaybeRedWeight "case" Term "of" "{" [CaseStm] "}";
