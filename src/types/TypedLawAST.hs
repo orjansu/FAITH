@@ -12,7 +12,7 @@ type LawName = String
 
 type LawMap = Map LawName Law
 
-data Law = DLaw LawName Term ImpRel Term
+data Law = DLaw LawName Term ImpRel Term SideCond
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 -- -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 
@@ -50,3 +50,6 @@ data IntExpr
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type IntegerVar = UTLaw.MVIntegerVar
+
+data SideCond = NoSideCond
+  deriving (C.Eq, C.Ord, C.Show, C.Read)

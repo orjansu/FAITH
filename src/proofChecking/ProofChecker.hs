@@ -87,7 +87,7 @@ checkStep globalImpRel
   case command of
     T.AlphaEquiv -> checkAlphaEquiv term1 term2
     T.Law context
-          (Law.DLaw lawName lawLHS lawImpRel lawRHS)
+          (Law.DLaw lawName lawLHS lawImpRel lawRHS _sideCond)
           substitutions -> do
       assert (lawImpRel == localImpRel)
         $ "The improvement relation of the law must be the same as the "
