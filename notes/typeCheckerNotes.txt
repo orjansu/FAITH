@@ -273,3 +273,7 @@ TODO: Gör så att kontexter har et set av deras bundna variabler. På detta sä
             -Detta är okej i alla fall förutom när man ska alpha-eq-kolla
              substituerade regler mot termer
   -Läs artikeln om matching
+
+-- TODO -- Glöm inte
+> Vid <~> som används med |~>, ha ngt sätt att indikera vilken riktning som
+används.

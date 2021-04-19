@@ -3,7 +3,8 @@ module TypedLawAST where
 
 import Prelude (Char, Double, Integer, String, Maybe, Bool)
 import qualified Prelude as C (Eq, Ord, Show, Read)
-import Data.Map
+import Data.Map (Map)
+import Data.Set (Set)
 
 import qualified AbsSieLaws as UTLaw
 import Common (ImpRel)
@@ -23,10 +24,10 @@ data Term
     | TDummyBinds VarSet Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-type Var = UTLaw.MVVar
+type Var = String
 
 data VarSet
-  = VSConcrete [Var]
+  = VSConcrete (Set Var)
   deriving (C.Eq, C.Ord, C.Show, C.Read)
   -- TODO expand
 
@@ -35,7 +36,7 @@ data LetBindings
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data MetaBindSet
-    = MBSMetaVar UTLaw.MVLetBindings
+    = MBSMetaVar String
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data LetBinding = DLetBinding Var StackWeight HeapWeight Term
@@ -46,10 +47,9 @@ type StackWeight = IntExpr
 type HeapWeight = IntExpr
 
 data IntExpr
-  = IEVar IntegerVar
+  = IEVar String
+  | IENum Integer
   deriving (C.Eq, C.Ord, C.Show, C.Read)
-
-type IntegerVar = UTLaw.MVIntegerVar
 
 data SideCond = NoSideCond
   deriving (C.Eq, C.Ord, C.Show, C.Read)
