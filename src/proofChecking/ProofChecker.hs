@@ -31,7 +31,8 @@ import ToLocallyNameless (toLocallyNameless)
 import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
-import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables)
+import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
+                       , checkTypedTerm)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
@@ -446,7 +447,7 @@ getFreeVars term = do
 -- phase that converts and one that typechecks. TODO typechecker needs more
 -- context to be able to typecheck a term instead of the whole program
 typeCheck :: T.Term -> T.FreeVars -> CheckM ()
-typeCheck = undefined
+typeCheck term (T.DFreeVars termVars varVars) = checkTypedTerm term varVars
 
 class AlphaEq a where
   isAlphaEquiv :: a -> a -> CheckM Bool

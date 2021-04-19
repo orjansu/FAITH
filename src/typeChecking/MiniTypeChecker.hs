@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module MiniTypeChecker (typecheckProof) where
+module MiniTypeChecker (typecheckProof, checkTypedTerm) where
 
 import qualified AbsSie as UT
 import qualified MiniTypedAST as T
@@ -18,9 +18,10 @@ import Data.Functor.Identity (Identity, runIdentity)
 
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
-                       , numHoles)
+                       , numHoles, checkTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import qualified TypedLawAST as Law
+import OtherUtils (assert, assertTerm)
 
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
@@ -147,50 +148,14 @@ instance Checkable UT.Free where
 -- | Checks a term, which consists of the following:
 -- - Converts to T.Term.
 -- - Adds the implicit let of derivations in context (if there is one)
--- - Does checks of checkFreeVars and checkBoundVariablesDistinct
--- - Checks that it is not a context
--- - Does not: Check typing of a simply typed lambda calculus
--- - General terms, i.e. any(M) are declare free (TODO)
 -- - Stack weight expressions: See checkWeightExpr
---
--- Note: Expects that the incoming term does NOT have the implicit let of
--- the inContext derivation.
 checkTopLevelTerm :: UT.Term -> CheckM T.Term
 checkTopLevelTerm term = do
   transformed <- transform term
   withLet <- withLetContext transformed
-  checkBoundVariablesDistinct withLet
-  checkFreeVars withLet
-  assertTerm (numHoles withLet == 0)
-    "Top-level terms should not be contexts" withLet
-  return transformed
-
--- | Checks that all variables are declared free or bound.
--- Also checks that no bound variable shadows a free variable.
-checkFreeVars :: T.Term -> CheckM ()
-checkFreeVars term = do
   expectedFreeVars <- gets freeVarVars
-  let (_lnlTerm, actualFreeVars) = toLocallyNameless term
-  assert (expectedFreeVars `Set.isSubsetOf` actualFreeVars)
-    $ "All free variables should be declared. "
-      ++"In term "++showTypedTerm term++"\n, "++" Variable(s) "
-      ++show (Set.difference actualFreeVars expectedFreeVars)
-      ++" should be declared free if intended."
-  let boundVariables = getBoundVariables term
-  assert (expectedFreeVars `Set.disjoint` boundVariables)
-    $ "You may not shadow a free variable. In term "++showTypedTerm term++"\n"
-      ++"Variable(s) "
-      ++show (expectedFreeVars `Set.intersection` boundVariables)
-      ++" shadows a free variable."
-
-assert :: (MonadError String m) => Bool -> String -> m ()
-assert True _ = return ()
-assert False str = throwError $"Assertion failed: "++str
-
-assertTerm :: (MonadError String m) => Bool -> String -> T.Term -> m ()
-assertTerm True _ _ = return ()
-assertTerm False str term = throwError $
-  "Assertion "++str++" failed for term "++showTypedTerm term
+  checkTypedTerm withLet expectedFreeVars
+  return withLet
 
 instance Transformable UT.Term where
   type TransformedVersion UT.Term = T.Term

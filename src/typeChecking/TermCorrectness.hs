@@ -10,6 +10,21 @@ import qualified MiniTypedAST as T
 import qualified Data.Set as Set
 
 import ShowTypedTerm (showTypedTerm)
+import ToLocallyNameless (toLocallyNameless)
+import OtherUtils (assert, assertTerm)
+
+-- | given M and S, where S is the set of variables that are allowed to be free
+-- in M, checks that:
+-- - Does checks of checkFreeVars and checkBoundVariablesDistinct
+-- - Checks that it is not a context
+-- - Does not: Check typing of a simply typed lambda calculus
+-- - General terms, i.e. any(M) are declared free (TODO)
+checkTypedTerm :: (MonadError String m) => T.Term -> Set.Set String -> m ()
+checkTypedTerm term expectedFreeVars = do
+  checkBoundVariablesDistinct term
+  checkFreeVars term expectedFreeVars
+  assertTerm (numHoles term == 0)
+    "Top-level terms should not be contexts" term
 
 -- | given M, checks that the names of all bound variables in M are distinct.
 --
@@ -54,6 +69,23 @@ checkBoundVariablesDistinct term =
         else do
           let boundVars' = Set.insert name boundVars
           put boundVars'
+
+-- | Checks that all variables are declared free or bound.
+-- Also checks that no bound variable shadows a free variable.
+checkFreeVars :: (MonadError String m) => T.Term -> Set.Set String -> m ()
+checkFreeVars term expectedFreeVars = do
+  let (_lnlTerm, actualFreeVars) = toLocallyNameless term
+  assert (expectedFreeVars `Set.isSubsetOf` actualFreeVars)
+    $ "All free variables should be declared. "
+      ++"In term "++showTypedTerm term++"\n, "++" Variable(s) "
+      ++show (Set.difference actualFreeVars expectedFreeVars)
+      ++" should be declared free if intended."
+  let boundVariables = getBoundVariables term
+  assert (expectedFreeVars `Set.disjoint` boundVariables)
+    $ "You may not shadow a free variable. In term "++showTypedTerm term++"\n"
+      ++"Variable(s) "
+      ++show (expectedFreeVars `Set.intersection` boundVariables)
+      ++" shadows a free variable."
 
 -- | Returns the set of bound variables in a term.
 -- does no further checks on the correctness of the term.

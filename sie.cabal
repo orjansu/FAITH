@@ -44,7 +44,8 @@ executable sie
                        LawTypeChecker,
                        CheckMonad,
                        LexSieLaws,
-                       ParSieLaws
+                       ParSieLaws,
+                       OtherUtils
 
   main-is:             Main.hs
   -- other-modules:
