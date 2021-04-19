@@ -50,7 +50,8 @@ instance Transformable UT.Term where
     UT.TValueMetaVar mvValue -> let (UT.MVValue str) = mvValue
                                 in return $ T.TValueMetaVar str
     UT.TGeneralMetaVar mvTerm -> noSupport "TGeneralMetaVar"
-    UT.TVar var -> noSupport "TVar"
+    UT.TVar var -> let varStr = getVarName var
+                   in return $ T.TVar varStr
     UT.TAppCtx mvContext term -> do
       let (UT.MVContext str) = mvContext
       tTerm <- transform term
@@ -152,7 +153,7 @@ getVarName :: UT.Var -> String
 getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 
 noSupport :: String -> CheckM a
-noSupport spec = throwError $ spec ++ "not supported yet"
+noSupport spec = throwError $ spec ++ " not supported yet"
 
 ------------------------Checking--------------------
 
@@ -194,9 +195,15 @@ getTermsInsideRepeatedCtxs term = getInRepeated ++ getInInner
   where
     getInRepeated = evalState (getInRepeated' term) Map.empty
 
+    -- | If the law term mentions a context twice, this function returns the
+    -- value inside that context. For example, if the term is
+    -- let {x = C[M1], y = C[M2]} in C[M3] + C[M4]
+    -- This function should return M1, M2, M3 and M4.
+    -- The state is the currently mentioned contexts.
     -- getInRepeated'  term    (Currently mentioned contexts)
     getInRepeated' :: T.Term -> State (Map.Map String T.Term) [T.Term]
     getInRepeated' (T.TValueMetaVar _) = return []
+    getInRepeated' (T.TVar _) = return []
     getInRepeated' (T.TAppCtx ctxVar term) = do
       mentionedCtxs <- get
       case Map.lookup ctxVar mentionedCtxs of
@@ -212,10 +219,14 @@ getTermsInsideRepeatedCtxs term = getInRepeated ++ getInInner
       return $ letBindRepeats' ++ inRepeats
     getInRepeated' (T.TDummyBinds (T.VSConcrete _vs) term) = getInRepeated' term
 
+    -- | If there is a context inside a context, this function returns the
+    -- term(s) inside the inner context. For example, in C[D[M]], the function
+    -- should return M.
     getInInner = getInInner' False term
     --         IsInsideCtx  term
     getInInner' :: Bool -> T.Term -> [T.Term]
     getInInner' _ (T.TValueMetaVar _) = []
+    getInInner' _ (T.TVar _) = []
     getInInner' False (T.TAppCtx _ term) = getInInner' True term
     getInInner' True (T.TAppCtx _ term) = [term]
     getInInner' isInsideCtx (T.TLet lets term) =
@@ -235,6 +246,7 @@ getLetTerms (T.LBSBoth _metabindset letBindings) = map getLetTerm letBindings
 contextRepeatedInside :: T.Term -> Bool
 contextRepeatedInside = \case
   T.TValueMetaVar _ -> False
+  T.TVar _ -> False
   T.TAppCtx ctxMV term -> let ctxVars = getCtxVars term
                               repeatedHere = Set.member ctxMV ctxVars
                               repeatedInside = contextRepeatedInside term
@@ -247,6 +259,7 @@ contextRepeatedInside = \case
   where
     getCtxVars :: T.Term -> Set.Set String
     getCtxVars (T.TValueMetaVar _) = Set.empty
+    getCtxVars (T.TVar _) = Set.empty
     getCtxVars (T.TAppCtx ctxVar term) = Set.union (Set.singleton ctxVar)
                                                    (getCtxVars term)
     getCtxVars (T.TLet lbs term) = Set.union (letCtxslbs lbs) (getCtxVars term)
@@ -259,6 +272,7 @@ contextRepeatedInside = \case
 isTermWithFreeVars :: T.Term -> Bool
 isTermWithFreeVars = \case
   T.TValueMetaVar str -> True -- V may contain FV
+  T.TVar _ -> False
   T.TAppCtx str term -> True -- C may contain FV
   T.TLet letBindings term -> isTermWithFreeVars term || lbsIsWithFV letBindings
     where

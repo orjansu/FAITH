@@ -19,6 +19,7 @@ data Law = DLaw LawName Term ImpRel Term SideCond
 
 data Term
     = TValueMetaVar String
+    | TVar String
     | TAppCtx String Term
     | TLet LetBindings Term
     | TDummyBinds VarSet Term

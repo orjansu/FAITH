@@ -42,7 +42,9 @@ executable sie
                        Common,
                        TermCorrectness,
                        LawTypeChecker,
-                       CheckMonad
+                       CheckMonad,
+                       LexSieLaws,
+                       ParSieLaws
 
   main-is:             Main.hs
   -- other-modules:

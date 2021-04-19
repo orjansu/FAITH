@@ -12,7 +12,6 @@ module Common where
 
 import qualified Prelude as C (Eq, Ord, Show, Read, show)
 
--- Just deals with this one right now.
 -- TODO as this is expanded, add clauses to LanguageLogic.hs
 data ImpRel
   = DefinedEqual

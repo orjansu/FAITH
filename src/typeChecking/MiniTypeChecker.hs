@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module MiniTypeChecker where
+module MiniTypeChecker (typecheckProof) where
 
 import qualified AbsSie as UT
 import qualified MiniTypedAST as T
@@ -20,16 +20,22 @@ import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
                        , numHoles)
 import ToLocallyNameless (toLocallyNameless)
+import qualified TypedLawAST as Law
 
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
                  , goal :: T.Term
                  , freeVarVars :: Set.Set String
+                 , lawMap :: Law.LawMap
                  }
 
-initSt :: MySt
-initSt = MkSt {letContext = undefined, start= undefined, goal = undefined,
-              freeVarVars = undefined}
+mkInitSt :: Law.LawMap -> MySt
+mkInitSt lawMap = MkSt {letContext = undefined
+                       , start= undefined
+                       , goal = undefined
+                       , freeVarVars = undefined
+                       , lawMap = lawMap
+                       }
 
 newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
   deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String)
@@ -37,11 +43,13 @@ newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
 instance MonadFail CheckM where
     fail str = throwError str
 
-typecheck :: UT.ProofScript -> Either String T.ProofScript
-typecheck ps = runCheckM $ check ps
+typecheckProof :: UT.ProofScript -> Law.LawMap -> Either String T.ProofScript
+typecheckProof proofScript lawMap =
+  let initSt = mkInitSt lawMap
+  in runCheckM initSt $ check proofScript
 
-runCheckM :: CheckM a -> Either String a
-runCheckM monadic = do
+runCheckM :: MySt -> CheckM a -> Either String a
+runCheckM initSt monadic = do
   let res = runIdentity (
               runExceptT (
                 runStateT
