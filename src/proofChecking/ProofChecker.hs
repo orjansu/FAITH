@@ -319,6 +319,7 @@ applySubstitution law substSimple initForbiddenNames = do
         substitutableTerm <- getSubstTerm valueMV
         checkIsValue substitutableTerm
         return substitutableTerm
+      Law.TVar var -> undefined
       Law.TAppCtx ctxMV term -> undefined
       Law.TLet letBindings term -> undefined
       Law.TDummyBinds varSet term -> undefined
@@ -527,6 +528,7 @@ checkRuleAlphaEquiv lawTerm m n = do
   where
     containsLet :: Law.Term -> Bool
     containsLet (Law.TValueMetaVar _) = False
+    containsLet (Law.TVar _) = False
     containsLet (Law.TAppCtx mv term) = containsLet term
     containsLet (Law.TLet _ _) = True
     containsLet (Law.TDummyBinds _ term) = containsLet term
@@ -562,7 +564,6 @@ checkRuleAlphaEquiv lawTerm m n = do
     isOrderedAlphaEq m n = let (mLNL, _) = toLocallyNameless m
                                (nLNL, _) = toLocallyNameless n
                            in mLNL == nLNL
-
 
 runToLocallyNameless :: T.Term -> CheckM (LNL.Term, Set.Set String)
 runToLocallyNameless term = return $ toLocallyNameless term
