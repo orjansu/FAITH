@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module TermCorrectness where
 
@@ -120,3 +121,12 @@ numHoles (T.TDummyBinds _varSet term) = numHoles term
 numHoles (T.TRedWeight _redWeight red) = case red of
   T.RApp term _var -> numHoles term
   T.RPlusWeight t1 _rw t2 -> numHoles t1 + numHoles t2
+
+isValue :: T.Term -> Bool
+isValue (T.TVar _var) = False
+isValue (T.TNum _integer) = True
+isValue (T.TLam _var _term) = True
+isValue (T.THole) = False
+isValue (T.TLet _letBindings _term) = False
+isValue (T.TDummyBinds _varSet term) = isValue term
+isValue (T.TRedWeight _redWeight _redFD) = False

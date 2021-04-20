@@ -107,6 +107,10 @@ NoContext.   InContext ::= ;
 WithFree. Free ::= "free" "(" [VarAnyType] ")" ;
 NoFree.   Free ::= ;
 
+BigVar.   VarAnyType ::= CapitalIdent;
+SmallVar. VarAnyType ::= Ident;
+separator VarAnyType " ";
+
 DefinedEqual.        ImpRel ::= "=def=";
 StrongImprovementLR. ImpRel ::= "|~>";
 WeakImprovementLR.   ImpRel ::= "|~~>";
@@ -119,20 +123,33 @@ token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 -- copied to SieLaws
 
 CAValue.          CmdArgument ::= CmdValue;
-CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
+CAAssignInt.      CmdArgument ::= MVIntegerVar "=" IntExpr;
+CAAssignLet.      CmdArgument ::= MVLetBindings "=" LetBindings;
+CAAssignGeneral.  CmdArgument ::= CmdAssignee "=" CmdValue ;
 CVSubTerm.        CmdValue    ::= SubTerm ;
-CVLetBindings.    CmdValue    ::= "let" LetBindings;
 CVVarSet.         CmdValue    ::= VarSet;
-CASmallVar.       CmdAssignee ::= VarAnyType;
-CADummySet.       CmdAssignee ::= "{" CapitalIdent "}";
+CAOtherMetaVar.   CmdAssignee ::= OtherMetaVar;
 CASubTerm.        CmdAssignee ::= "subterm";
 CAContext.        CmdAssignee ::= "ctx";
-
-BigVar.   VarAnyType ::= CapitalIdent;
-SmallVar. VarAnyType ::= Ident;
-separator VarAnyType " ";
-
 separator CmdArgument " ";
+
+token MVLetBindings      ('G' digit*);
+token MVValue            ('V');
+token MVContext          ('C' | 'D');
+token MVIntegerVar       ('v' | 'w' | 'n' | 'm' | 'i' | 'j');
+token MVVar              ('x' | 'y' | 'f');
+token MVVarVect          ('x' 's' | 'y' 's');
+token MVValueContext     ('V' 'c' 't' 'x');
+token MVReduction        ('R');
+token MVVarSet           ('X');
+token MVTerm             ('M' | 'N');
+token MVPattern          ('p' 'a' 't');
+token MVCaseStm          ('a' 'l' 't' 's' digit*);
+token MVConstructorName  ('c' digit*);
+
+rules OtherMetaVar ::= MVValue | MVContext | MVVar
+                  | MVVarVect | MVValueContext | MVReduction | MVVarSet
+                  | MVTerm | MVPattern | MVCaseStm | MVConstructorName;
 
 DSubProof. SubProof ::= CommandName "{" [ProofStep] "}";
 separator SubProof "";

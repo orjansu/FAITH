@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module LawTypeChecker (typecheckLaws) where
 
@@ -9,10 +10,11 @@ import qualified TypedLawAST as T
 import CheckMonad (CheckM, runCheckM, assert, assertInternal)
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (throwError, MonadError)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
+import OtherUtils (noSupport)
 
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'
@@ -152,9 +154,6 @@ instance Transformable UT.SideCond where
 getVarName :: UT.Var -> String
 getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 
-noSupport :: String -> CheckM a
-noSupport spec = throwError $ spec ++ " not supported yet"
-
 ------------------------Checking--------------------
 
 -- | Checks if laws are supported, but does not check if they are sound wrt
@@ -174,10 +173,11 @@ contextsValidInLaw (T.DLaw _name term1 _imprel term2 _sidecond) =
     ++"  context may not capture variables. For example, the term C[D[M]] is\n"
     ++"  not allowed, but the term let x = M in C[D[x]] is allowed.\n"
     ++"> A context may not be repeated inside itself, like \n"
-    ++"  let x = M in C[C[x]] for example"
-    ++"The way SIE checks if a term captures variables is that it checks if the"
-    ++"inner term may have free variables. Since all variable names are unique,"
-    ++"variables, constructors et cetera do not contain free variables, but" ++"general term meta-variables (M, V, N, C[N], et cetera) may do so."
+    ++"  let x = M in C[C[x]] for example\n"
+    ++"The way SIE checks if a term captures variables is that it checks if "
+    ++"the inner term may have free variables. Since all variable names are "
+    ++"unique, variables, constructors et cetera do not contain free "
+    ++"variables, but general term meta-variables (M, V, N, C[N], et cetera) " ++"may do so."
 
 contextsValid :: T.Term -> Bool
 contextsValid term =

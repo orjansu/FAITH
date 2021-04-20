@@ -1,10 +1,11 @@
 .PHONY : all clean testLaws testProof laws
 
 mainfiles := $(wildcard src/*.hs)
-typeChecking := $(wildcard src/typeChecking/*.hs)
-proofChecking := $(wildcard src/proofChecking/*.hs)
 prettyPrinting := $(wildcard src/prettyPrinting/*.hs)
+proofChecking := $(wildcard src/proofChecking/*.hs)
+typeChecking := $(wildcard src/typeChecking/*.hs)
 types := $(wildcard src/types/*.hs)
+util := $(wildcard src/util/*.hs)
 
 all : sie
 

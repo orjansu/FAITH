@@ -32,6 +32,8 @@ token MVTerm             ('M' | 'N');
 token MVPattern          ('p' 'a' 't');
 token MVCaseStm          ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
+-- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
+-- a way to share grammar between .cf files.
 
 TValueMetaVar.    Term4 ::= MVValue;
 TGeneralMetaVar.  Term4 ::= MVTerm;

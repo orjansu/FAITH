@@ -32,8 +32,9 @@ import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
-                       , checkTypedTerm)
+                       , checkTypedTerm, numHoles)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal)
+import OtherUtils (noSupport)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
 -- containing a log and error message if it is incorrect, and Nothing
@@ -239,21 +240,6 @@ applyContext context insertTerm = do
                         T.RPlusWeight (appCtx t1) rw (appCtx t2)
       in T.TRedWeight redWeight appRed
 
--- | Returns the number of holes in a term or context
-numHoles :: T.Term -> Integer
-numHoles (T.TVar _var) = 0
-numHoles (T.TNum _integer) = 0
-numHoles (T.TLam _var term) = numHoles term
-numHoles (T.THole) = 1
-numHoles (T.TLet letBindings term) = numHoles term + numHolesInLBS
-  where
-    numHolesInLBS = sum $ map numHolesInLB letBindings
-    numHolesInLB (_var, _sw, _hw, term) = numHoles term
-numHoles (T.TDummyBinds _varSet term) = numHoles term
-numHoles (T.TRedWeight _redWeight red) = case red of
-  T.RApp term _var -> numHoles term
-  T.RPlusWeight t1 _rw t2 -> numHoles t1 + numHoles t2
-
 -- | Given a term, returns the set of all variable names used in that term,
 -- regardless of if the variables are free or bound
 getAllVars :: T.Term -> Set.Set String
@@ -296,6 +282,8 @@ applySubstitution :: Law.Term
                   -> T.Substitutions
                   -> Set.Set String
                   -> CheckM T.Term
+applySubstitution _ _ _ = noSupport "Substitution"
+{-
 applySubstitution law substSimple initForbiddenNames = do
   Log.logInfoN . pack $ "applying substitution {"++showSubst++"}"
   Log.logInfoN . pack $ "to law term"++show law
@@ -328,14 +316,6 @@ applySubstitution law substSimple initForbiddenNames = do
     checkIsValue :: (MonadError String m) => T.Term -> m ()
     checkIsValue term = assert (isValue term)
       $ "M should be a value. M="++showTypedTerm term
-      where
-        isValue (T.TVar _var) = False
-        isValue (T.TNum _integer) = True
-        isValue (T.TLam _var _term) = True
-        isValue (T.THole) = False
-        isValue (T.TLet _letBindings _term) = False
-        isValue (T.TDummyBinds _varSet term) = isValue term
-        isValue (T.TRedWeight _redWeight _redFD) = False
 
     getSubstTerm :: String -> SubstM T.Term
     getSubstTerm metaVar = do
@@ -370,7 +350,7 @@ applySubstitution law substSimple initForbiddenNames = do
                                , substitutions = substMap'})
               return term
         Nothing -> throwError $ "Substitution for "++metaVar++" not found"
-
+-}
 -- | given a term M and a set of variables S, returns M, where all bound
 -- variables in M are distinct from the variables in S
 -- Assumes that the names of the bound variables in M are distinct
@@ -606,11 +586,6 @@ recurse f (T.TRedWeight rw red) = case red of
   T.RApp term _var -> catMaybes [f term]
   T.RPlusWeight t1 _rw t2 -> catMaybes [f t1, f t2]
 
-
-isValue :: T.Term -> Bool
-isValue (T.TNum _) = True
-isValue (T.TLam _ _) = True
-isValue _ = False
 
 data MatchAns = Yes | No | Recursion
 

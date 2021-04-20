@@ -87,7 +87,27 @@ data Command
   deriving (C.Eq, C.Ord, C.Read)
 -- Lägg till fler senare
 
-type Substitutions = Set (String, Term)
+type Substitutions = Map String Substitute
+
+data Substitute
+  = SLetBindings LetBindings
+  | SValue Term
+  | SContext Term
+  | SIntegerVar IntExpr
+  | SVar String
+  | SVarSet (Set String)
+--  | STerm Term TODO support the following later:
+--  | SVarVect
+--  | SValueContext
+--  | SReduction
+--  | SPattern
+--  | SCaseStm
+--  | SConstructorName
+  deriving (C.Eq, C.Ord, C.Read)
+
+data IntExpr
+  = IENum Integer
+  deriving (C.Eq, C.Ord, C.Read)
 
 -- TODO add show in law later.
 instance C.Show Command where
