@@ -87,6 +87,10 @@ data Command
   deriving (C.Eq, C.Ord, C.Read)
 -- Lägg till fler senare
 
+-- TODO add show in law later.
+instance C.Show Command where
+  show AlphaEquiv = "-alpha-equiv"
+
 type Substitutions = Map String Substitute
 
 data Substitute
@@ -108,7 +112,3 @@ data Substitute
 data IntExpr
   = IENum Integer
   deriving (C.Eq, C.Ord, C.Read)
-
--- TODO add show in law later.
-instance C.Show Command where
-  show AlphaEquiv = "-alpha-equiv"
