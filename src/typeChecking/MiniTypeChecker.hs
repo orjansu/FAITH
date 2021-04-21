@@ -132,7 +132,7 @@ instance Checkable UT.Theorem where
     modify (\st -> st{start = tStart, goal = tGoal})
     tProof <- check proof
     tImpRel <- check impRel
-    let prop = T.DProposition tFreeVars tStart Com.DefinedEqual tGoal
+    let prop = T.DProposition tFreeVars tStart tImpRel tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
 
@@ -472,5 +472,5 @@ checkArgumentTerm term = do
   checkBoundVariablesDistinct term
   declaredFree <- gets freeVarVars
   let boundVars = getBoundVariables term
-  assert (declaredFree `Set.disjoint` declaredFree) $ "argument cannot "
+  assert (declaredFree `Set.disjoint` boundVars) $ "argument cannot "
     ++"bind declared free variables."

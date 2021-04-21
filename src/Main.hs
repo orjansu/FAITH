@@ -77,7 +77,7 @@ runCheckDetailedProof tTree =
   case checkDetailedProof tTree of
     Nothing -> hPutStrLn stderr "Proof is correct"
     Just errorMsgs -> do
-      let relevantMsgs = take 11 errorMsgs
+      let relevantMsgs = drop (length errorMsgs - 11) errorMsgs
       hPutStrLn stderr "Error when checking proof. Last 10 logs and error:"
       mapM (hPutStrLn stderr) relevantMsgs
       let fullLog = concat $ intersperse "\n " errorMsgs

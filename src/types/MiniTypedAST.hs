@@ -90,6 +90,7 @@ data Command
 -- TODO add show in law later.
 instance C.Show Command where
   show AlphaEquiv = "-alpha-equiv"
+  show (Law _ (Law.DLaw lawName _ _ _ _) _) = lawName
 
 type Substitutions = Map String Substitute
 

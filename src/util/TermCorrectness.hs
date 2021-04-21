@@ -76,7 +76,7 @@ checkBoundVariablesDistinct term =
 checkFreeVars :: (MonadError String m) => T.Term -> Set.Set String -> m ()
 checkFreeVars term expectedFreeVars = do
   let (_lnlTerm, actualFreeVars) = toLocallyNameless term
-  assert (expectedFreeVars `Set.isSubsetOf` actualFreeVars)
+  assert (actualFreeVars `Set.isSubsetOf` expectedFreeVars)
     $ "All free variables should be declared. "
       ++"In term "++showTypedTerm term++"\n, "++" Variable(s) "
       ++show (Set.difference actualFreeVars expectedFreeVars)
