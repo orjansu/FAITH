@@ -5,6 +5,7 @@ module CheckMonad (CheckM
                   , runCheckM
                   , assert
                   , assertInternal
+                  , internalException
                   ) where
 
 import qualified Control.Monad.Logger as Log
@@ -38,6 +39,10 @@ assert False description = throwError $ "assertion failed: "++description
 assertInternal :: (Log.MonadLogger m, MonadError String m) =>
                   Bool -> String -> m ()
 assertInternal True _ = return ()
-assertInternal False description = do
-  Log.logOtherN (Log.LevelOther (pack "InternalAssertion")) $ pack description
-  throwError $ "Internal assertion failed: "++description
+assertInternal False description =
+  internalException $ "Assertion failed: "++description
+
+internalException :: (Log.MonadLogger m, MonadError String m) => String -> m a
+internalException description = do
+  Log.logOtherN (Log.LevelOther (pack "Internal")) $ pack description
+  throwError $ "Internal Error: "++description
