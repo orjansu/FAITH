@@ -45,7 +45,8 @@ executable sie
                        CheckMonad,
                        LexSieLaws,
                        ParSieLaws,
-                       OtherUtils
+                       OtherUtils,
+                       Substitution
 
   main-is:             Main.hs
   -- other-modules:
