@@ -1,4 +1,4 @@
-entrypoints LawList;
+entrypoints LawList, MetaVar;
 
 DLawList. LawList ::= [Law];
 
@@ -34,6 +34,8 @@ token MVCaseStm          ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
 -- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
 -- a way to share grammar between .cf files.
+
+rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVPattern | MVCaseStm | MVConstructorName;
 
 TValueMetaVar.    Term4 ::= MVValue;
 TGeneralMetaVar.  Term4 ::= MVTerm;

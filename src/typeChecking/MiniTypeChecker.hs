@@ -6,7 +6,10 @@
 
 module MiniTypeChecker (typecheckProof, checkTypedTerm) where
 
+import qualified ParSieLaws (pMetaVar, myLexer)
+import qualified AbsSieLaws as Law
 import qualified AbsSie as UT
+
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
 import qualified Common as Com (ImpRel(..))
@@ -118,7 +121,7 @@ instance Checkable UT.Theorem where
   check (UT.DTheorem (UT.DProposition UT.NoContext
                                        freeVars
                                        start
-                                       UT.DefinedEqual
+                                       impRel
                                        goal) proof) = do
     modify (\st -> st{letContext = Nothing})
     tFreeVars <- check freeVars
@@ -128,6 +131,7 @@ instance Checkable UT.Theorem where
     tGoal <- checkTopLevelTerm goal
     modify (\st -> st{start = tStart, goal = tGoal})
     tProof <- check proof
+    tImpRel <- check impRel
     let prop = T.DProposition tFreeVars tStart Com.DefinedEqual tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
@@ -383,8 +387,8 @@ getContext args = do
     Nothing -> throwError $ "The law does not specify the context that it is applied in. SIE is currently not able to guess that."
   where
     getCtx :: UT.CmdArgument -> Maybe UT.Term
-    getCtx (UT.CAAssignGeneral assignee value) = case assignee of
-      UT.CAOtherMetaVar _ -> Nothing
+    getCtx (UT.CAAssign assignee value) = case assignee of
+      UT.CAMetaVar _ -> Nothing
       UT.CASubTerm -> case value of
         UT.CVSubTerm UT.STWholeWithCtx -> Just UT.THole
         _ -> Nothing
@@ -396,66 +400,73 @@ getContext args = do
 
 checkArg :: UT.CmdArgument -> StCheckM (Maybe (String, T.Substitute))
 checkArg (UT.CAValue _) = noSupport "CAValue"
-checkArg (UT.CAAssignInt (UT.MVIntegerVar name) intExpr) = do
-  Log.logInfoN . pack $ "Checking argument "++name
-  tIntExpr <- check intExpr
-  return $ Just (name, T.SIntegerVar tIntExpr)
-checkArg (UT.CAAssignLet (UT.MVLetBindings name) letBindings) = do
-  Log.logInfoN . pack $ "Checking argument "++name
-  transLet <- transform letBindings
-  let inTerm = T.TLet transLet (T.TNum 1)
-  checkArgumentTerm inTerm
-  assert (numHoles inTerm == 0) "Argument should not be a context."
-  return $ Just (name, T.SLetBindings transLet)
-checkArg (UT.CAAssignGeneral assignee value) = case assignee of
+checkArg (UT.CAAssign assignee value) = case assignee of
   UT.CASubTerm -> return Nothing
   UT.CAContext -> return Nothing
-  UT.CAOtherMetaVar metaVar -> case metaVar of
-    UT.OtherMetaVarMVValue (UT.MVValue name) -> do
-      logCheckArg name
-      case value of
-        UT.CVSubTerm (UT.STTerm term) -> do
-          tTerm <- transform term
-          assertTerm (isValue tTerm) "should be a value" tTerm
-          checkArgumentTerm tTerm
-          assert (numHoles tTerm == 0) "Argument should not be a context"
-          return $ Just (name, T.SValue tTerm)
-        UT.CVSubTerm _ -> noSupport "non-explicit subterm"
-        _ -> throwError $ "value for "++name++" is not a term"
-    UT.OtherMetaVarMVContext (UT.MVContext name) -> do
-      logCheckArg name
-      case value of
-        UT.CVSubTerm (UT.STTerm utCtx) -> do
-          tCtx <- transform utCtx
-          Log.logInfoN . pack $ "Checking the value; "++showTypedTerm tCtx
-          checkArgumentTerm tCtx
-          assert (numHoles tCtx > 0) "Argument should be a context."
-          return $ Just (name, T.SContext tCtx)
-        _ -> throwError "Not a context."
-    UT.OtherMetaVarMVVar (UT.MVVar name) -> do
-      logCheckArg name
-      case value of
-        UT.CVSubTerm (UT.STTerm (UT.TVar (UT.DVar (UT.Ident varName)))) ->
-          return $ Just (name, T.SVar varName)
-        _ -> throwError "Not a variable"
-    UT.OtherMetaVarMVVarVect (UT.MVVarVect name) -> noSupport "MVVarVect"
-    UT.OtherMetaVarMVValueContext (UT.MVValueContext name) -> noSupport "MVValueContext"
-    UT.OtherMetaVarMVReduction (UT.MVReduction name) -> noSupport "MVReduction"
-    UT.OtherMetaVarMVVarSet (UT.MVVarSet name) -> do
-      logCheckArg name
-      case value of
-        UT.CVVarSet (UT.DVarSet varList) ->
-          let strList = map getVarName varList
-              strSet = Set.fromList strList
-          in return $ Just (name, T.SVarSet strSet)
-        _ -> throwError "Not a set of variables"
-    UT.OtherMetaVarMVTerm (UT.MVTerm name) -> noSupport "MVTerm"
-    UT.OtherMetaVarMVPattern (UT.MVPattern name) -> noSupport "MVPattern"
-    UT.OtherMetaVarMVCaseStm (UT.MVCaseStm name) -> noSupport "MVCaseStm"
-    UT.OtherMetaVarMVConstructorName (UT.MVConstructorName name) -> noSupport "MVConstructorName"
+  UT.CAMetaVar metaVar -> do
+    let mvStr = case metaVar of
+                  UT.BigVar (UT.CapitalIdent str) -> str
+                  UT.SmallVar (UT.Ident str) -> str
+    logCheckArg mvStr
+    parMV <- case (ParSieLaws.pMetaVar (ParSieLaws.myLexer mvStr)) of
+               Left err -> throwError $ "Error when parsing metavariable: "++err
+               Right parsed -> return parsed
+    case parMV of
+      Law.MetaVarMVLetBindings (Law.MVLetBindings name) -> case value of
+        UT.CVLet letBindings -> do
+          transLet <- transform letBindings
+          let inTerm = T.TLet transLet (T.TNum 1)
+          checkArgumentTerm inTerm
+          assert (numHoles inTerm == 0) "Argument should not be a context."
+          return $ Just (name, T.SLetBindings transLet)
+        _ -> throwError $ "argument for "++mvStr++" is not a let-binding."
+      Law.MetaVarMVValue (Law.MVValue name) -> do
+        case value of
+          UT.CVSubTerm (UT.STTerm term) -> do
+            tTerm <- transform term
+            assertTerm (isValue tTerm) "should be a value" tTerm
+            checkArgumentTerm tTerm
+            assert (numHoles tTerm == 0) "Argument should not be a context"
+            return $ Just (name, T.SValue tTerm)
+          UT.CVSubTerm _ -> noSupport "non-explicit subterm"
+          _ -> throwError $ "value for "++name++" is not a term"
+      Law.MetaVarMVContext (Law.MVContext name) -> do
+        case value of
+          UT.CVSubTerm (UT.STTerm utCtx) -> do
+            tCtx <- transform utCtx
+            Log.logInfoN . pack $ "Checking the value; "++showTypedTerm tCtx
+            checkArgumentTerm tCtx
+            assert (numHoles tCtx > 0) "Argument should be a context."
+            return $ Just (name, T.SContext tCtx)
+          _ -> throwError "Not a context."
+      Law.MetaVarMVIntegerVar (Law.MVIntegerVar name) ->
+        case value of
+          UT.CVIntExpr intExpr -> do
+            tIntExpr <- check intExpr
+            return $ Just (name, T.SIntegerVar tIntExpr)
+          _ -> throwError $ "Argument "++mvStr++" is not an integer "
+                ++"expression. Use int ( Term ) to indicate that it is."
+      Law.MetaVarMVVar (Law.MVVar name) -> do
+        case value of
+          UT.CVSubTerm (UT.STTerm (UT.TVar (UT.DVar (UT.Ident varName)))) ->
+            return $ Just (name, T.SVar varName)
+          _ -> throwError "Not a variable"
+      Law.MetaVarMVVarVect (Law.MVVarVect name) -> noSupport "MVVarVect"
+      Law.MetaVarMVValueContext (Law.MVValueContext name) -> noSupport "MVValueContext"
+      Law.MetaVarMVReduction (Law.MVReduction name) -> noSupport "MVReduction"
+      Law.MetaVarMVVarSet (Law.MVVarSet name) -> do
+        case value of
+          UT.CVVarSet (UT.DVarSet varList) ->
+            let strList = map getVarName varList
+                strSet = Set.fromList strList
+            in return $ Just (name, T.SVarSet strSet)
+          _ -> throwError "Not a set of variables"
+      Law.MetaVarMVTerm (Law.MVTerm name) -> noSupport "MVTerm"
+      Law.MetaVarMVPattern (Law.MVPattern name) -> noSupport "MVPattern"
+      Law.MetaVarMVCaseStm (Law.MVCaseStm name) -> noSupport "MVCaseStm"
+      Law.MetaVarMVConstructorName (Law.MVConstructorName name) -> noSupport "MVConstructorName"
     where
       logCheckArg name = Log.logInfoN . pack $ "Checking argument "++name
-
 checkArgumentTerm :: T.Term -> StCheckM ()
 checkArgumentTerm term = do
   checkBoundVariablesDistinct term

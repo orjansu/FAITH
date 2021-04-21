@@ -1,31 +1,9 @@
-bindings {
-G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))};
-}
+bindings {}
 
--- kommentarer tillåtna.
-
-{-
-En sak som kan bli krångligt här är att man eventuellt vill
-referera till variabelnamn som tolkaren har skrivit ut i repl.
-Det kan göra bevisen mer svårlästa. Dock, om man bara skriver
-denna filen helt själv är detta nog ungefär så mycket som man
-skulle vilja skriva.
--}
-proposition: G |- let {xs = repeat x} in any(M) |~> let {xs = x : xs} in any(M);
+proposition: free ( p ) |- 1 |~> 1;
 proof:
-  -fix-point-induction repeat
-    -base{
-      on whole -def-unwindings base;
-      on ({repeat}d^@) -dummy-ref-algebra-8;
-      on (@ x) -@-rules-3;
-      on ({x}d^@) -@-rules-1 M=(x:xs);
-    }
-    -induction{
-      on whole -def-unwindings n=n;
-      on ([0]s^(?)) -spike-algebra-zero-stack-spike;
-      on ((\x . ?) x) -reduction;
-      on (s^?) -spike-algebra-13;
-      on (let {ys = ?} in (x : ys)) -ih;
-      on shown -value-merge';
-    }
+  -simple -single{
+  -alpha-equiv;
+  =def=
+  }
   qed;

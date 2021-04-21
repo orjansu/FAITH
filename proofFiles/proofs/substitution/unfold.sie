@@ -1,0 +1,14 @@
+bindings{}
+
+--correct proof
+proposition: free(y) |- let {f = \a.y}
+                          in (let {z = 1} in ((f z) + z))
+                      |~> let {f = \a.y}
+                          in (let {z = 1} in ({f}d^(\b.y) z + z));
+proof: -simple
+  -single{
+          -unfold-1 ctx= [.] G=let {} x=f v=int(1) w=int(1) V=(\a.y)
+                             C=(let {z = 1} in (([.] z) + z));
+          |~>
+         }
+         qed;

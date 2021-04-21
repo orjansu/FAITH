@@ -22,8 +22,10 @@ import ProofChecker                 (checkDetailedProof)
 main :: IO ()
 main = do
   (lawInput, proofInput) <- getInputs
+  putStrLn "Parsing law file"
   lawTree <- parse lawInput (ParSieLaws.pLawList . ParSieLaws.myLexer)
   tLaws <- runTypecheckLaws lawTree
+  putStrLn "Parsing proof file"
   proofTree <- parse proofInput (ParSie.pProofScript . ParSie.myLexer)
   tProofScript <- runTypecheckProof proofTree tLaws
   runCheckDetailedProof tProofScript
