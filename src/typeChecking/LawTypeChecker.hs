@@ -7,14 +7,13 @@ module LawTypeChecker (typecheckLaws) where
 
 import qualified AbsSieLaws as UT
 import qualified TypedLawAST as T
-import CheckMonad (CheckM, runCheckM, assert, assertInternal)
+import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport)
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
 import Control.Monad.Except (throwError, MonadError)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
-import OtherUtils (noSupport)
 
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'

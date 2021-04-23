@@ -13,6 +13,7 @@ import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal, internalException)
 import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack)
 import Control.Monad.Except (MonadError, throwError)
 
 import qualified MiniTypedAST as T
@@ -31,7 +32,8 @@ import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext)
 -- and the variable names in S.
 --
 -- Fails if sigma doesn't contain substitutions for all meta-variables in M.
-applySubstitution :: Law.Term
+applySubstitution :: HasCallStack =>
+                  Law.Term
                   -> T.Substitutions
                   -> Set.Set String
                   -> CheckM T.Term
@@ -42,11 +44,17 @@ applySubstitution law substitutions forbiddenNames1 = do
   -- TODO revise using SubstitutionMonad
   res <- runSubstM substitutions forbiddenNames1 $ applyTermSubstM law
   let (finalTerm, forbiddenNames2) = res
-  checkTypedTerm finalTerm forbiddenNames2
+      finalBV = getBoundVariables finalTerm
+  Log.logInfoN . pack $ "checking correctness of M after substitution , where "
+    ++"M="++showTypedTerm finalTerm
+  assertInternal (finalBV `Set.disjoint` forbiddenNames2) $ "The substituted "
+    ++"term should not name the bound variables to forbidden names."
+  checkBoundVariablesDistinct finalTerm
+  assertInternal (numHoles finalTerm == 0) "| M should not be a context"
   let finalVariables = getAllVariables finalTerm
       expectedForbiddenNames = finalVariables `Set.union` forbiddenNames1
   assertInternal (expectedForbiddenNames == forbiddenNames2)
-    "M substituted wrt S -> S' => AllVars(M) union S == S'"
+    "| M substituted wrt S -> S' => AllVars(M) union S == S'"
   return finalTerm
   where
     showSubstitutions = concat $
@@ -67,7 +75,7 @@ applySubstitution law substitutions forbiddenNames1 = do
         in "{" ++ listForm ++"}"
       T.STerm term -> showTypedTerm term
 
-applyTermSubstM :: Law.Term -> SubstM T.Term
+applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
 applyTermSubstM = \case
   Law.TValueMetaVar mvName -> do
     T.SValue value <- getSubstitute mvName
@@ -100,7 +108,7 @@ applyTermSubstM = \case
 
   Law.TDummyBinds varSet term -> undefined
 
-applyIntExprSubstM :: Law.IntExpr -> SubstM Integer
+applyIntExprSubstM :: HasCallStack => Law.IntExpr -> SubstM Integer
 applyIntExprSubstM = \case
   Law.IEVar var -> do
     T.SIntegerVar intExpr <- getSubstitute var

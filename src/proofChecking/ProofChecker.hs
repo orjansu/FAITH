@@ -8,6 +8,7 @@
 module ProofChecker where
 
 import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack)
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Extra (andM)
@@ -30,8 +31,7 @@ import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
                        , checkTypedTerm, numHoles, getFreeVariables)
-import CheckMonad (CheckM, runCheckM, assert, assertInternal)
-import OtherUtils (noSupport)
+import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport)
 import Substitution (applySubstitution)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
@@ -39,14 +39,14 @@ import Substitution (applySubstitution)
 -- if it is correct.
 --
 -- Assumes that the incoming proof script is typechecked.
-checkDetailedProof :: T.ProofScript -> Maybe [String]
+checkDetailedProof :: HasCallStack => T.ProofScript -> Maybe [String]
 checkDetailedProof proofScript =
   case runCheckM $ check proofScript of
     Right () -> Nothing
     Left errorMsgs -> Just errorMsgs
 
 class Checkable a where
-  check :: a -> CheckM ()
+  check :: HasCallStack => a -> CheckM ()
 
 instance Checkable T.ProofScript where
   check (T.DProofScript theorems) = mapM check theorems >> return ()
@@ -59,7 +59,8 @@ type GlobalImpRel = Com.ImpRel
 type Start = T.Term
 type Goal = T.Term
 
-checkProofSteps :: T.Proof
+checkProofSteps :: HasCallStack =>
+                    T.Proof
                    -> Start
                    -> GlobalImpRel
                    -> T.FreeVars
@@ -75,7 +76,8 @@ checkProofSteps (T.Simple proofSteps) start globalImpRel freeVars goal = do
 -- | Checks if a single step is valid. This computation may be run
 -- independently in parallel for each step to speed things up if that is an
 -- issue. Could maybe use the globally free variables to speed things up later.
-checkStep :: GlobalImpRel -> T.FreeVars -> T.ProofStep -> CheckM ()
+checkStep :: HasCallStack =>
+             GlobalImpRel -> T.FreeVars -> T.ProofStep -> CheckM ()
 checkStep globalImpRel
           (T.DFreeVars termFreeVars varFreeVars)
           (T.PSMiddle term1 command localImpRel term2) = do
@@ -121,7 +123,7 @@ checkStep globalImpRel
 -- For now, this is the version that I implement:
 -- C needs to be a syntactic copy of M, with exactly one of its subterms
 -- replaced with a hole. For possible variations, see typecheckerNotes.
-getSubterm :: T.Term -> T.Term -> CheckM T.Term
+getSubterm :: HasCallStack => T.Term -> T.Term -> CheckM T.Term
 getSubterm context term = do
   Log.logInfoN $ pack $ "matching C="++showTypedTerm context
     ++" on M="++showTypedTerm term++" to get the subterm"
@@ -198,8 +200,8 @@ applyContext context insertTerm = do
       in T.TRedWeight redWeight appRed
 
 class AlphaEq a where
-  isAlphaEquiv :: a -> a -> CheckM Bool
-  checkAlphaEquiv :: a -> a -> CheckM ()
+  isAlphaEquiv :: HasCallStack => a -> a -> CheckM Bool
+  checkAlphaEquiv :: HasCallStack => a -> a -> CheckM ()
 
 instance AlphaEq T.Term where
   checkAlphaEquiv :: T.Term -> T.Term -> CheckM ()

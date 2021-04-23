@@ -1,23 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module OtherUtils (assert, assertTerm, noSupport, applyOnSubTermsM) where
+module OtherUtils (applyOnSubTermsM) where
 
 import Control.Monad.Except (MonadError, throwError)
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 import Data.List (zip4, unzip4)
-
-assert :: (MonadError String m) => Bool -> String -> m ()
-assert True _ = return ()
-assert False str = throwError $"Assertion failed: "++str
-
-assertTerm :: (MonadError String m) => Bool -> String -> T.Term -> m ()
-assertTerm True _ _ = return ()
-assertTerm False str term = throwError $
-  "Assertion "++str++" failed for term "++showTypedTerm term
-
-noSupport :: (MonadError String m) => String -> m a
-noSupport spec = throwError $ spec ++ " not supported yet"
+import qualified Control.Monad.Logger as Log
 
 -- | Given a monadic function on a term, applies it to all the subterms of a
 -- term. Does not do anything with the variables, throws an error on terms

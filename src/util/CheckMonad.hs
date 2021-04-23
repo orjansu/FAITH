@@ -5,13 +5,18 @@ module CheckMonad (CheckM
                   , runCheckM
                   , assert
                   , assertInternal
+                  , assertTerm
+                  , noSupport
                   , internalException
                   ) where
 
 import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack, callStack, prettyCallStack)
 import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.Text (pack, Text)
+import qualified MiniTypedAST as T
+import ShowTypedTerm (showTypedTerm)
 
 newtype CheckM a = MkM {getM :: (ExceptT String
                                   (Log.WriterLoggingT Identity) a)}
@@ -30,19 +35,36 @@ runCheckM monadComputation =
 
 toLine :: Log.LogLine -> String
 toLine (loc, logsource, loglevel, logstr) =
-  (show logstr)
+  show (loglevel, logstr)
 
-assert :: (MonadError String m) => Bool -> String -> m ()
+assert :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
+          Bool -> String -> m ()
 assert True _ = return ()
-assert False description = throwError $ "assertion failed: "++description
+assert False description = throwCallstackError $
+  "assertion failed: "++description
 
-assertInternal :: (Log.MonadLogger m, MonadError String m) =>
+assertTerm :: (MonadError String m, Log.MonadLogger m, HasCallStack) => Bool -> String -> T.Term -> m ()
+assertTerm True _ _ = return ()
+assertTerm False str term = throwCallstackError $
+  "Assertion "++str++" failed for term "++showTypedTerm term
+
+noSupport :: (MonadError String m, Log.MonadLogger m, HasCallStack)
+             => String -> m a
+noSupport spec = throwCallstackError $ spec ++ " not supported yet"
+
+assertInternal :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
                   Bool -> String -> m ()
 assertInternal True _ = return ()
 assertInternal False description =
   internalException $ "Assertion failed: "++description
 
-internalException :: (Log.MonadLogger m, MonadError String m) => String -> m a
+internalException :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
+                     String -> m a
 internalException description = do
-  Log.logOtherN (Log.LevelOther (pack "Internal")) $ pack description
-  throwError $ "Internal Error: "++description
+  Log.logOtherCS callStack (Log.LevelOther (pack "Internal")) $ pack description
+  throwCallstackError $ "Internal Error: "++description
+
+throwCallstackError :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
+  String -> m a
+throwCallstackError descr =
+  throwError $ "At "++ prettyCallStack callStack++"\n"++descr

@@ -9,12 +9,14 @@ import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
 import qualified Data.Set as Set
+import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack)
 
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
-import OtherUtils (assert, assertTerm)
+import CheckMonad (assert, assertTerm)
 
 -- | given M and S, where S is the set of variables that are allowed to be free
 -- in M, checks that:
@@ -22,7 +24,8 @@ import OtherUtils (assert, assertTerm)
 -- - Checks that it is not a context
 -- - Does not: Check typing of a simply typed lambda calculus
 -- - General terms, i.e. any(M) are declared free (TODO)
-checkTypedTerm :: (MonadError String m) => T.Term -> Set.Set String -> m ()
+checkTypedTerm :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
+                  T.Term -> Set.Set String -> m ()
 checkTypedTerm term expectedFreeVars = do
   checkBoundVariablesDistinct term
   checkFreeVars term expectedFreeVars
@@ -32,7 +35,8 @@ checkTypedTerm term expectedFreeVars = do
 -- | given M, checks that the names of all bound variables in M are distinct.
 --
 -- Does not check anything else.
-checkBoundVariablesDistinct :: (MonadError String m) => T.Term -> m ()
+checkBoundVariablesDistinct :: (MonadError String m, HasCallStack) =>
+                               T.Term -> m ()
 checkBoundVariablesDistinct term =
   let res = (flip evalState) Set.empty $ runExceptT $ checkBoundVars term
   in case res of
@@ -77,7 +81,8 @@ checkBoundVariablesDistinct term =
 -- Also checks that no bound variable shadows a free variable.
 -- Given M and S, checks that:
 -- FV(M) `isSubsetOf` S && BV(M) `disjoint` S
-checkFreeVars :: (MonadError String m) => T.Term -> Set.Set String -> m ()
+checkFreeVars :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
+                 T.Term -> Set.Set String -> m ()
 checkFreeVars term expectedFreeVars = do
   let (_lnlTerm, actualFreeVars) = toLocallyNameless term
   assert (actualFreeVars `Set.isSubsetOf` expectedFreeVars)
@@ -91,6 +96,8 @@ checkFreeVars term expectedFreeVars = do
       ++"Variable(s) "
       ++show (expectedFreeVars `Set.intersection` boundVariables)
       ++" shadows a free variable."
+      ++"expectedFreeVars= "++show expectedFreeVars
+      ++"boundVariables = "++show boundVariables
 
 -- | Returns the set of bound variables in a term.
 -- does no further checks on the correctness of the term.

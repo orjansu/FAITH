@@ -25,13 +25,13 @@ import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.State (StateT, runStateT, gets, MonadState, modify)
 import Control.Monad.Extra (firstJustM)
 import Data.Functor.Identity (Identity, runIdentity)
+import GHC.Stack (HasCallStack)
 
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
   , checkFreeVars, getBoundVariables, isValue, getAllMetaVars)
 import ToLocallyNameless (toLocallyNameless)
-import OtherUtils (assert, assertTerm, noSupport)
-import CheckMonad (CheckM, runCheckM)
+import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport)
 
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
@@ -55,7 +55,8 @@ newtype StCheckM a = Mk {getM :: (StateT MySt CheckM a)}
 instance MonadFail StCheckM where
     fail str = throwError str
 
-typecheckProof :: UT.ProofScript -> Law.LawMap -> Either String T.ProofScript
+typecheckProof :: (HasCallStack) =>
+                  UT.ProofScript -> Law.LawMap -> Either String T.ProofScript
 typecheckProof proofScript lawMap =
   let initSt = mkInitSt lawMap
   in runStCheckM initSt $ check proofScript
@@ -89,7 +90,7 @@ withLetContext startTerm = do
     Just letBindings -> return $ T.TLet letBindings startTerm
 
 -- | the inverse of withLetContext
-removeImplicitLet :: T.Term -> StCheckM T.Term
+removeImplicitLet :: HasCallStack => T.Term -> StCheckM T.Term
 removeImplicitLet startTerm = do
   context <- gets letContext
   case context of
@@ -101,12 +102,12 @@ removeImplicitLet startTerm = do
 -- Checks correctness of a
 class Checkable a where
   type TypedVersion a
-  check :: a -> StCheckM (TypedVersion a)
+  check :: HasCallStack => a -> StCheckM (TypedVersion a)
 
 -- Just transforms a to its typed version
 class Transformable a where
   type TransformedVersion a
-  transform :: a -> StCheckM (TransformedVersion a)
+  transform :: HasCallStack => a -> StCheckM (TransformedVersion a)
 
 instance Checkable UT.ProofScript where
   type TypedVersion UT.ProofScript = T.ProofScript
@@ -371,7 +372,7 @@ instance Checkable UT.IntExpr where
   check (UT.IEPlus _ _) = noSupport "IEPlus"
   check (UT.IEMinus _ _) = noSupport "IEMinus"
 
-getContext :: [UT.CmdArgument] -> StCheckM T.Term
+getContext :: HasCallStack => [UT.CmdArgument] -> StCheckM T.Term
 getContext args = do
   case firstJust getCtx args of
     Just utCtx -> do
@@ -398,7 +399,8 @@ getContext args = do
     getCtx _ = Nothing
 
 
-checkArg :: UT.CmdArgument -> StCheckM (Maybe (String, T.Substitute))
+checkArg :: HasCallStack => UT.CmdArgument
+                            -> StCheckM (Maybe (String, T.Substitute))
 checkArg (UT.CAValue _) = noSupport "CAValue"
 checkArg (UT.CAAssign assignee value) = case assignee of
   UT.CASubTerm -> return Nothing
@@ -470,7 +472,8 @@ checkArg (UT.CAAssign assignee value) = case assignee of
         noSupport "MVConstructorName"
     where
       logCheckArg name = Log.logInfoN . pack $ "Checking argument "++name
-checkArgumentTerm :: T.Term -> StCheckM ()
+
+checkArgumentTerm :: HasCallStack => T.Term -> StCheckM ()
 checkArgumentTerm term = do
   checkBoundVariablesDistinct term
   declaredFree <- gets freeVarVars
@@ -478,8 +481,9 @@ checkArgumentTerm term = do
   assert (declaredFree `Set.disjoint` boundVars) $ "argument cannot "
     ++"bind declared free variables."
 
-checkAllSubstitutionsProvided :: (MonadError String m) =>
-                                 Law.Law -> T.Substitutions -> m ()
+checkAllSubstitutionsProvided ::
+  (MonadError String m, Log.MonadLogger m, HasCallStack) =>
+  Law.Law -> T.Substitutions -> m ()
 checkAllSubstitutionsProvided (Law.DLaw _name term1 _impRel term2 _sideCond)
                               substMap = do
   let metaVars1 = getAllMetaVars term1
