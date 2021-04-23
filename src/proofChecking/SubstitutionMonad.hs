@@ -184,11 +184,7 @@ renameAllBound term1 = do
     "Renaming all bound variables should change all bound variables."
   return term2
 
--- | given M, renames all bound variables in M that need to be renamed,
-
---does the same as renameAllBound, but does not rename variables that do not
--- need to be renamed, so given M and S, it renames all bound variables in M
--- that are in S.
+-- | given M, renames all bound variables in M that need to be renamed.
 renameNeeded :: T.Term -> SubstM T.Term
 renameNeeded term1 = do
   let initBV = getBoundVariables term1
