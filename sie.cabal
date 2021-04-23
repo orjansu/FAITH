@@ -46,7 +46,8 @@ executable sie
                        LexSieLaws,
                        ParSieLaws,
                        OtherUtils,
-                       Substitution
+                       Substitution,
+                       SubstitutionMonad
 
   main-is:             Main.hs
   -- other-modules:

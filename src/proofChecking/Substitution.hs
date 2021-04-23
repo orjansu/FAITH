@@ -51,6 +51,7 @@ applySubstitution law substSimpleMap initForbiddenNames = do
   Log.logInfoN . pack $ "applying substitution {"++showSubstitutions++"}"
   Log.logInfoN . pack $ "to law term"++show law
   Log.logInfoN . pack $ "With forbidden names "++ show initForbiddenNames
+  -- TODO revise using SubstitutionMonad
   let substMap = Map.map (\substitution -> (substitution, False)) substSimpleMap
       initSt = MkSubstSt {substitutions = substMap
                          , forbiddenNames = initForbiddenNames}
@@ -137,6 +138,7 @@ substituteContext context term wasUsed = do
     -- C -> M -> has-M-been-used-before -> forbiddenNames
     insertTerm = undefined -- :: T.Term -> T.Term -> Bool -> Set.Set String
 
+-- | TODO remove
 prepareTermForSubstitution :: String -> T.Term -> Bool -> SubstM T.Term
 prepareTermForSubstitution metaVar term isUsed =
   if isUsed
@@ -191,44 +193,3 @@ renameNeeded term forbiddenNames = do
 -- every mention of v1 with v2.
 renameSingle :: T.Term -> String -> String -> CheckM T.Term
 renameSingle term oldName newname = undefined
-
--- | Given a variable name v and a set of forbidden names S, returns a new
--- variable name v' that is similar to v, but not in S.
---
--- Throws an error if v is not in S, i.e. if the renaming is not needed.
---
--- TODO: might be more user friendly to add an increasing index at the end of
--- the name. For now, I'll just get a fresh letter from the alphabet.
-freshName :: String -> Set.Set String -> CheckM String
-freshName name forbiddenNames = do
-  assertInternal (Set.notMember name forbiddenNames) $ "Renaming was "
-    ++"attempted, but not needed"
-  return $ freshName' 0
-  where
-    freshName' n = let tryName = freshNames !! n
-                   in if Set.notMember tryName forbiddenNames
-                        then tryName
-                        else freshName' (n+1)
-
-    alphabet :: String
-    alphabet = "abcdefghijklmnopqrstuvxyz"
-    -- ["a","b","c"] etc
-    firstNames :: [String]
-    firstNames = map (:[]) alphabet
-
-    genNames :: [String] -> [String]
-    genNames prev = [a++[b] | a <- prev, b <- alphabet]
-
-    -- | names of length n.
-    -- So if the alphabet would be "abc"
-    -- lenNames 0 = ["a","b","c"]
-    -- lenNames 1 = ["aa","ab","ac","ba","bb","bc","ca","cb","cc"]
-    -- etc
-    lenNames :: Integer -> [String]
-    lenNames 0 = firstNames
-    lenNames n = genNames $ lenNames $ n-1
-
-    -- | Returns an infinite list of fresh names in the style
-    -- a,b,c,...,ba,bb,bc,...ca,cb,cc,...aaa
-    freshNames :: [String]
-    freshNames = foldr (++) [] $ map lenNames [0..]

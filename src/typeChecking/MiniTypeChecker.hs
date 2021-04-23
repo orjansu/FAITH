@@ -7,7 +7,7 @@
 module MiniTypeChecker (typecheckProof, checkTypedTerm) where
 
 import qualified ParSieLaws (pMetaVar, myLexer)
-import qualified AbsSieLaws as Law
+import qualified AbsSieLaws as UTLaw
 import qualified AbsSie as UT
 
 import qualified MiniTypedAST as T
@@ -28,9 +28,8 @@ import Data.Functor.Identity (Identity, runIdentity)
 
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
-                       , checkFreeVars, getBoundVariables, isValue)
+  , checkFreeVars, getBoundVariables, isValue, getAllMetaVars)
 import ToLocallyNameless (toLocallyNameless)
-import qualified TypedLawAST as Law
 import OtherUtils (assert, assertTerm, noSupport)
 import CheckMonad (CheckM, runCheckM)
 
@@ -361,6 +360,7 @@ instance Checkable UT.TransCmd where
         checkedMaybeArgs <- mapM checkArg args
         let checkedArgs = catMaybes checkedMaybeArgs
             substitutions = Map.fromList checkedArgs
+        checkAllSubstitutionsProvided law substitutions
         return $ T.Law context law substitutions
 
 instance Checkable UT.IntExpr where
@@ -412,7 +412,7 @@ checkArg (UT.CAAssign assignee value) = case assignee of
                Left err -> throwError $ "Error when parsing metavariable: "++err
                Right parsed -> return parsed
     case parMV of
-      Law.MetaVarMVLetBindings (Law.MVLetBindings name) -> case value of
+      UTLaw.MetaVarMVLetBindings (UTLaw.MVLetBindings name) -> case value of
         UT.CVLet letBindings -> do
           transLet <- transform letBindings
           let inTerm = T.TLet transLet (T.TNum 1)
@@ -420,7 +420,7 @@ checkArg (UT.CAAssign assignee value) = case assignee of
           assert (numHoles inTerm == 0) "Argument should not be a context."
           return $ Just (name, T.SLetBindings transLet)
         _ -> throwError $ "argument for "++mvStr++" is not a let-binding."
-      Law.MetaVarMVValue (Law.MVValue name) -> do
+      UTLaw.MetaVarMVValue (UTLaw.MVValue name) -> do
         case value of
           UT.CVSubTerm (UT.STTerm term) -> do
             tTerm <- transform term
@@ -430,7 +430,7 @@ checkArg (UT.CAAssign assignee value) = case assignee of
             return $ Just (name, T.SValue tTerm)
           UT.CVSubTerm _ -> noSupport "non-explicit subterm"
           _ -> throwError $ "value for "++name++" is not a term"
-      Law.MetaVarMVContext (Law.MVContext name) -> do
+      UTLaw.MetaVarMVContext (UTLaw.MVContext name) -> do
         case value of
           UT.CVSubTerm (UT.STTerm utCtx) -> do
             tCtx <- transform utCtx
@@ -439,32 +439,35 @@ checkArg (UT.CAAssign assignee value) = case assignee of
             assert (numHoles tCtx > 0) "Argument should be a context."
             return $ Just (name, T.SContext tCtx)
           _ -> throwError "Not a context."
-      Law.MetaVarMVIntegerVar (Law.MVIntegerVar name) ->
+      UTLaw.MetaVarMVIntegerVar (UTLaw.MVIntegerVar name) ->
         case value of
           UT.CVIntExpr intExpr -> do
             tIntExpr <- check intExpr
             return $ Just (name, T.SIntegerVar tIntExpr)
           _ -> throwError $ "Argument "++mvStr++" is not an integer "
                 ++"expression. Use int ( Term ) to indicate that it is."
-      Law.MetaVarMVVar (Law.MVVar name) -> do
+      UTLaw.MetaVarMVVar (UTLaw.MVVar name) -> do
         case value of
           UT.CVSubTerm (UT.STTerm (UT.TVar (UT.DVar (UT.Ident varName)))) ->
             return $ Just (name, T.SVar varName)
           _ -> throwError "Not a variable"
-      Law.MetaVarMVVarVect (Law.MVVarVect name) -> noSupport "MVVarVect"
-      Law.MetaVarMVValueContext (Law.MVValueContext name) -> noSupport "MVValueContext"
-      Law.MetaVarMVReduction (Law.MVReduction name) -> noSupport "MVReduction"
-      Law.MetaVarMVVarSet (Law.MVVarSet name) -> do
+      UTLaw.MetaVarMVVarVect (UTLaw.MVVarVect name) -> noSupport "MVVarVect"
+      UTLaw.MetaVarMVValueContext (UTLaw.MVValueContext name) ->
+        noSupport "MVValueContext"
+      UTLaw.MetaVarMVReduction (UTLaw.MVReduction name) ->
+        noSupport "MVReduction"
+      UTLaw.MetaVarMVVarSet (UTLaw.MVVarSet name) -> do
         case value of
           UT.CVVarSet (UT.DVarSet varList) ->
             let strList = map getVarName varList
                 strSet = Set.fromList strList
             in return $ Just (name, T.SVarSet strSet)
           _ -> throwError "Not a set of variables"
-      Law.MetaVarMVTerm (Law.MVTerm name) -> noSupport "MVTerm"
-      Law.MetaVarMVPattern (Law.MVPattern name) -> noSupport "MVPattern"
-      Law.MetaVarMVCaseStm (Law.MVCaseStm name) -> noSupport "MVCaseStm"
-      Law.MetaVarMVConstructorName (Law.MVConstructorName name) -> noSupport "MVConstructorName"
+      UTLaw.MetaVarMVTerm (UTLaw.MVTerm name) -> noSupport "MVTerm"
+      UTLaw.MetaVarMVPattern (UTLaw.MVPattern name) -> noSupport "MVPattern"
+      UTLaw.MetaVarMVCaseStm (UTLaw.MVCaseStm name) -> noSupport "MVCaseStm"
+      UTLaw.MetaVarMVConstructorName (UTLaw.MVConstructorName name) ->
+        noSupport "MVConstructorName"
     where
       logCheckArg name = Log.logInfoN . pack $ "Checking argument "++name
 checkArgumentTerm :: T.Term -> StCheckM ()
@@ -474,3 +477,13 @@ checkArgumentTerm term = do
   let boundVars = getBoundVariables term
   assert (declaredFree `Set.disjoint` boundVars) $ "argument cannot "
     ++"bind declared free variables."
+
+checkAllSubstitutionsProvided :: (MonadError String m) =>
+                                 Law.Law -> T.Substitutions -> m ()
+checkAllSubstitutionsProvided (Law.DLaw _name term1 _impRel term2 _sideCond)
+                              substMap = do
+  let metaVars1 = getAllMetaVars term1
+      metaVars2 = getAllMetaVars term2
+      substitutedVars = Map.keysSet substMap
+  assert ((metaVars1 `Set.union` metaVars2) == substitutedVars)
+    "Currently, you need to specify all substitutions."

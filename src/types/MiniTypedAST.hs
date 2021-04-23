@@ -101,8 +101,8 @@ data Substitute
   | SIntegerVar IntExpr
   | SVar String
   | SVarSet (Set String)
---  | STerm Term TODO support the following later:
---  | SVarVect
+  | STerm Term
+--  | SVarVect TODO support the following later:
 --  | SValueContext
 --  | SReduction
 --  | SPattern

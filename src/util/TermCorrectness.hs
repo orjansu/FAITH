@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module TermCorrectness where
 
@@ -7,9 +8,10 @@ import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
-import qualified MiniTypedAST as T
 import qualified Data.Set as Set
 
+import qualified MiniTypedAST as T
+import qualified TypedLawAST as Law
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import OtherUtils (assert, assertTerm)
@@ -130,3 +132,27 @@ isValue (T.THole) = False
 isValue (T.TLet _letBindings _term) = False
 isValue (T.TDummyBinds _varSet term) = isValue term
 isValue (T.TRedWeight _redWeight _redFD) = False
+
+getAllMetaVars :: Law.Term -> Set.Set String
+getAllMetaVars = \case
+  Law.TValueMetaVar mvName -> Set.singleton mvName
+  Law.TVar mvName -> Set.singleton mvName
+  Law.TAppCtx mvName term ->
+    Set.singleton mvName `Set.union` getAllMetaVars term
+  Law.TLet letBindings term -> lbsMetas `Set.union` getAllMetaVars term
+    where
+      lbsMetas = case letBindings of
+        Law.LBSBoth (Law.MBSMetaVar mv1) concreteLets ->
+          let metasFromConcrete = Set.unions $ map concreteLBMetas concreteLets
+          in Set.insert mv1 metasFromConcrete
+      concreteLBMetas (Law.DLetBinding varMV sw hw lbterm) =
+        Set.singleton varMV
+          `Set.union` getIntExprMetas sw
+          `Set.union` getIntExprMetas hw
+          `Set.union` getAllMetaVars lbterm
+  Law.TDummyBinds (Law.VSConcrete varSet) term ->
+    varSet `Set.union` getAllMetaVars term
+  where
+    getIntExprMetas :: Law.IntExpr -> Set.Set String
+    getIntExprMetas (Law.IEVar mv) = Set.singleton mv
+    getIntExprMetas (Law.IENum _) = Set.empty
