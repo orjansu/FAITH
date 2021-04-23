@@ -47,14 +47,18 @@ applySubstitution law substitutions forbiddenNames1 = do
       finalBV = getBoundVariables finalTerm
   Log.logInfoN . pack $ "checking correctness of M after substitution , where "
     ++"M="++showTypedTerm finalTerm
-  assertInternal (finalBV `Set.disjoint` forbiddenNames2) $ "The substituted "
-    ++"term should not name the bound variables to forbidden names."
+  assertInternal (finalBV `Set.disjoint` forbiddenNames1) $ "The substituted "
+    ++"term should not name the bound variables to forbidden names. \n"
+    ++"Bound variables are: "++show finalBV
   checkBoundVariablesDistinct finalTerm
   assertInternal (numHoles finalTerm == 0) "| M should not be a context"
   let finalVariables = getAllVariables finalTerm
       expectedForbiddenNames = finalVariables `Set.union` forbiddenNames1
   assertInternal (expectedForbiddenNames == forbiddenNames2)
-    "| M substituted wrt S -> S' => AllVars(M) union S == S'"
+    $ "| M substituted wrt S -> S' => AllVars(M) union S == S', where "
+    ++"AllVars(M) union S = "++show expectedForbiddenNames++" and "
+    ++"S' = "++show forbiddenNames2
+
   return finalTerm
   where
     showSubstitutions = concat $
@@ -101,6 +105,10 @@ applyTermSubstM = \case
                 return concrete
         applyOnLB (Law.DLetBinding lawVar lawSw lawHw lawTerm) = do
           T.SVar var <- getSubstitute lawVar
+          TODO
+          -- TODO Här behöver jag indikera till substitutions-monaden att
+          -- variabeln är bunden. Eventuellt är det bättre om jag alltid måste
+          -- indikera det när jag frågar efter en variabel.
           sw <- applyIntExprSubstM lawSw
           hw <- applyIntExprSubstM lawHw
           term <- applyTermSubstM lawTerm
