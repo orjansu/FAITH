@@ -10,7 +10,8 @@
 -- names.
 module SubstitutionMonad (runSubstM
                          , getSubstitute
-                         , applyContext) where
+                         , applyContext
+                         , SubstM) where
 
 import qualified Data.Map.Strict as Map -- TODO fundera om lat är bättre
 import qualified Data.Set as Set

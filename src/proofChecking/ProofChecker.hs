@@ -29,7 +29,7 @@ import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
-                       , checkTypedTerm, numHoles)
+                       , checkTypedTerm, numHoles, getFreeVariables)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal)
 import OtherUtils (noSupport)
 import Substitution (applySubstitution)
@@ -77,7 +77,7 @@ checkProofSteps (T.Simple proofSteps) start globalImpRel freeVars goal = do
 -- issue. Could maybe use the globally free variables to speed things up later.
 checkStep :: GlobalImpRel -> T.FreeVars -> T.ProofStep -> CheckM ()
 checkStep globalImpRel
-          freeVars
+          (T.DFreeVars termFreeVars varFreeVars)
           (T.PSMiddle term1 command localImpRel term2) = do
   Log.logInfoN . pack $ "checking that "++showTypedTerm term1++" "
   Log.logInfoN . pack $ show localImpRel
@@ -95,27 +95,27 @@ checkStep globalImpRel
       assert (lawImpRel == localImpRel)
         $ "The improvement relation of the law must be the same as the "
         ++"improvement relation in the proof"
+      -- This ^ shows that the localImpRel could be generated
       subterm <- getSubterm context term1
-      let contextVars = getAllVars context
+      let contextBV = getBoundVariables context
+          forbiddenNames = contextBV `Set.union` varFreeVars
       Log.logInfoN . pack $ "applying substitution from subterm to law"
       -- TODO log messages
-      substToLHS <- applySubstitution lawLHS substitutions contextVars
+      substToLHS <- applySubstitution lawLHS substitutions forbiddenNames
       checkRuleAlphaEquiv lawLHS subterm substToLHS
-      substToRHS <- applySubstitution lawLHS substitutions contextVars
-      fvOrig <- getFreeVars subterm
-      fvTransformed <- getFreeVars substToRHS
+      substToRHS <- applySubstitution lawLHS substitutions forbiddenNames
+      let fvOrig = getFreeVariables subterm
+          fvTransformed = getFreeVariables substToRHS
       assert (fvOrig == fvTransformed) $ "The transformation should not make"
         ++"bound variables free."
       rhsTerm <- applyContext context substToRHS
       -- This shows that we could generate the next term ourselves instead.
       -- However, it is more important to typecheck rhsTerm if we generate it.
       checkRuleAlphaEquiv lawRHS rhsTerm term2
-
       -- This check below should not be needed. Quickcheck it later and maybe
       -- remove if it impedes performance.
       Log.logInfoN . pack $ "Checking that the resulting term of the transformation typechecks."
-      typeCheck rhsTerm freeVars
-      return undefined
+      checkTypedTerm rhsTerm varFreeVars
 
 -- | given C and M, returns N such that C[N] =alpha= M
 -- For now, this is the version that I implement:
@@ -237,45 +237,6 @@ applyContext context insertTerm = do
                      T.RPlusWeight t1 rw t2 ->
                         T.RPlusWeight (appCtx t1) rw (appCtx t2)
       in T.TRedWeight redWeight appRed
-
--- | Given a term, returns the set of all variable names used in that term,
--- regardless of if the variables are free or bound
-getAllVars :: T.Term -> Set.Set String
-getAllVars (T.TVar var) = Set.singleton var
-getAllVars (T.TNum integer) = Set.empty
-getAllVars (T.TLam var term) = Set.singleton var `Set.union` getAllVars term
-getAllVars (T.THole) = Set.empty
-getAllVars (T.TLet letBindings term) =
-  getLBSVars letBindings `Set.union` getAllVars term
-  where
-    getLBSVars = Set.unions . map getLBVars
-    getLBVars :: (String, T.StackWeight, T.HeapWeight, T.Term) -> Set.Set String
-    getLBVars (name, _sw, _hw, term) = let termSet = getAllVars term
-                                       in Set.insert name termSet
-getAllVars (T.TDummyBinds varSet term) = varSet `Set.union` getAllVars term
-getAllVars (T.TRedWeight _redWeight red) =
-  case red of
-    T.RApp term var -> let termSet = getAllVars term
-                       in Set.insert var termSet
-    T.RPlusWeight term1 _rw term2 ->
-      getAllVars term1 `Set.union` getAllVars term2
-
--- | Finds the names of the free variables of the term
-getFreeVars :: T.Term -> CheckM (Set.Set String)
-getFreeVars term = do
-  (_lnlTerm, freeVars) <- runToLocallyNameless term
-  return freeVars
-
--- | Checks whether the term type-checks, i.e. if all variables are bound or
--- declared free.
---
--- Status: one way is tp unpype it and run it through the normal typechecker.
--- It is ineffective, but it relies on the single implementation of
--- typechecking. A better approach might be to divide the typechecker into one
--- phase that converts and one that typechecks. TODO typechecker needs more
--- context to be able to typecheck a term instead of the whole program
-typeCheck :: T.Term -> T.FreeVars -> CheckM ()
-typeCheck term (T.DFreeVars termVars varVars) = checkTypedTerm term varVars
 
 class AlphaEq a where
   isAlphaEquiv :: a -> a -> CheckM Bool

@@ -75,6 +75,8 @@ checkBoundVariablesDistinct term =
 
 -- | Checks that all variables are declared free or bound.
 -- Also checks that no bound variable shadows a free variable.
+-- Given M and S, checks that:
+-- FV(M) `isSubsetOf` S && BV(M) `disjoint` S
 checkFreeVars :: (MonadError String m) => T.Term -> Set.Set String -> m ()
 checkFreeVars term expectedFreeVars = do
   let (_lnlTerm, actualFreeVars) = toLocallyNameless term
@@ -161,3 +163,27 @@ getAllMetaVars = \case
 getFreeVariables :: T.Term -> Set.Set String
 getFreeVariables term = let (_, freeVars) = toLocallyNameless term
                         in freeVars
+
+-- | Given a term, returns the set of all variable names used in that term,
+-- regardless of if the variables are free or bound
+getAllVariables :: T.Term -> Set.Set String
+getAllVariables (T.TVar var) = Set.singleton var
+getAllVariables (T.TNum integer) = Set.empty
+getAllVariables (T.TLam var term) = Set.singleton var
+                                    `Set.union` getAllVariables term
+getAllVariables (T.THole) = Set.empty
+getAllVariables (T.TLet letBindings term) =
+  getLBSVars letBindings `Set.union` getAllVariables term
+  where
+    getLBSVars = Set.unions . map getLBVars
+    getLBVars :: (String, T.StackWeight, T.HeapWeight, T.Term) -> Set.Set String
+    getLBVars (name, _sw, _hw, term) = let termSet = getAllVariables term
+                                       in Set.insert name termSet
+getAllVariables (T.TDummyBinds varSet term) = varSet
+                                              `Set.union` getAllVariables term
+getAllVariables (T.TRedWeight _redWeight red) =
+  case red of
+    T.RApp term var -> let termSet = getAllVariables term
+                       in Set.insert var termSet
+    T.RPlusWeight term1 _rw term2 ->
+      getAllVariables term1 `Set.union` getAllVariables term2
