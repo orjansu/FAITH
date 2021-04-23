@@ -74,7 +74,11 @@ getSubstitute metaVar = do
   case Map.lookup metaVar substMap of
     Just (subst, isUsed) ->
       case subst of
-        T.SLetBindings letBindings -> undefined
+        T.SLetBindings letBindings1 -> do
+          let asTerm = T.TLet letBindings1 (T.TNum 0)
+          preparedTerm <- prepareTermForSubstitution metaVar asTerm isUsed
+          T.TLet letBindings2 (T.TNum 0) <- return preparedTerm
+          return $ T.SLetBindings letBindings2
         T.SValue term -> do
           prepared <- prepareTermForSubstitution metaVar term isUsed
           return $ T.SValue prepared
@@ -83,7 +87,7 @@ getSubstitute metaVar = do
         T.SIntegerVar intExpr -> case intExpr of
           T.IENum _ -> return subst
         T.SVar string -> return $ T.SVar string
-        T.SVarSet varSet -> undefined
+        T.SVarSet varSet -> return $ T.SVarSet varSet
         T.STerm term -> do
           prepared <- prepareTermForSubstitution metaVar term isUsed
           return $ T.STerm prepared
