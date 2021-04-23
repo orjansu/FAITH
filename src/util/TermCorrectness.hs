@@ -156,3 +156,7 @@ getAllMetaVars = \case
     getIntExprMetas :: Law.IntExpr -> Set.Set String
     getIntExprMetas (Law.IEVar mv) = Set.singleton mv
     getIntExprMetas (Law.IENum _) = Set.empty
+
+getFreeVariables :: T.Term -> Set.Set String
+getFreeVariables term = let (_, freeVars) = toLocallyNameless term
+                        in freeVars

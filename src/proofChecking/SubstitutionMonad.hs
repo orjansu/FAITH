@@ -26,7 +26,7 @@ import Data.List (zip4, unzip4)
 
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
-import TermCorrectness (getBoundVariables, numHoles
+import TermCorrectness (getBoundVariables, numHoles, getFreeVariables
                        , checkBoundVariablesDistinct)
 import OtherUtils (applyOnSubTermsM)
 
@@ -93,28 +93,33 @@ prepareTermForSubstitution :: String -> T.Term -> Bool -> SubstM T.Term
 prepareTermForSubstitution metaVar term isUsed =
   if isUsed
     then do
-      forbidden <- gets forbiddenNames
-      renamed <- renameAllBound term forbidden
-      let newBoundVars = getBoundVariables renamed
-          forbidden' = newBoundVars `Set.union` forbidden
-      modify (\st -> st{forbiddenNames = forbidden'})
+      renamed <- renameAllBound term
       return renamed
     else do
-      forbidden <- gets forbiddenNames
-      let termBV = getBoundVariables term
-      assertInternal (termBV `Set.disjoint` forbidden)
-        $ "term or context M inserted the first time should only contain new "
-          ++"names for bound variables. M="++showTypedTerm term
-      substMap <- gets substitutions
-      let forbidden' = termBV `Set.union` forbidden
-          setToUsed = (\(t, False) -> (t, True))
-          substMap' = Map.adjust setToUsed metaVar substMap
-      modify (\st -> st{forbiddenNames = forbidden'
-                       , substitutions = substMap'})
+      setToUsed metaVar
+      addBVToForbiddenNames term
       return term
 
--- | given a name corresponding to a context C and a term M, returns C[M].
---
+-- | given a substitution name, sets the substitution to used.
+setToUsed :: String -> SubstM ()
+setToUsed metaVar = do
+  substMap <- gets substitutions
+  let flipToUsed = (\(t, False) -> (t, True))
+      substMap' = Map.adjust flipToUsed metaVar substMap
+  modify (\st -> st{ substitutions = substMap'})
+
+addBVToForbiddenNames :: T.Term -> SubstM ()
+addBVToForbiddenNames term = do
+  forbidden <- gets forbiddenNames
+  let termBV = getBoundVariables term
+  assertInternal (termBV `Set.disjoint` forbidden)
+    $ "term M inserted the first time should only contain new "
+      ++"names for bound variables. M="++showTypedTerm term
+  let forbidden' = termBV `Set.union` forbidden
+  modify (\st -> st{forbiddenNames = forbidden'})
+
+-- | given a name corresponding to a context C and a term M, returns C[M],
+-- properly renamed.
 applyContext :: String -> T.Term -> SubstM T.Term
 applyContext ctxName term = do
   assertInternal (numHoles term == 0)
@@ -124,9 +129,13 @@ applyContext ctxName term = do
   if isUsed
     then do
       appliedButWithOldNames <- applyContext1 ctx term
-      --appliedWithNewNames <- renameAllBound appliedButWithOldNames
-      undefined
-    else applyContext1 ctx term
+      appliedWithNewNames <- renameNeeded appliedButWithOldNames
+      return appliedWithNewNames
+    else do
+      res <- applyContext1 ctx term
+      addBVToForbiddenNames res
+      setToUsed ctxName
+      return res
 
   where
     applyContext1 :: T.Term -> T.Term -> SubstM T.Term
@@ -159,62 +168,91 @@ withSeparateSubstitutions simpleInternalSubstitutions monadic = do
   modify (\st -> st{substitutions = currSubstitutions})
   return res
 
--- | given M and S, renames all bound variables in M such that the new variables
--- are distinct from the set of forbidden names S. Does not rename or change
--- weights.
---
--- Note: a variation would be to return the new set of forbidden names, or the
--- set of new names, but running getAllMetaVars is O(n) anyways, so I skip this,
--- at least for now.
-renameAllBound :: (Log.MonadLogger m, MonadError String m) =>
-                  T.Term -> Set.Set String -> m T.Term
-renameAllBound term1 forbidden = do
-  checkBoundVariablesDistinct term1
+-- | given M, this function assumes (and checks) that all bound variables in M
+-- needs to be renamed, renames those terms, changes the forbiddenNames
+-- accordingly and returns the renamed term.
+renameAllBound :: T.Term -> SubstM T.Term
+renameAllBound term1 = do
   let initBV = getBoundVariables term1
-  term2 <- (flip evalStateT) Map.empty
-             $(flip runReaderT) forbidden
-               $ renameAllBoundMonadic term1
+  term2 <- renameNeeded term1
   let newBV = getBoundVariables term2
   assertInternal (initBV `Set.disjoint` newBV)
-    "Renaming all variables should change all bound variables."
+    "Renaming all bound variables should change all bound variables."
   return term2
 
-renameAllBoundMonadic :: (MonadState (Map.Map String String) m,
+-- | given M, renames all bound variables in M that need to be renamed,
+
+--does the same as renameAllBound, but does not rename variables that do not
+-- need to be renamed, so given M and S, it renames all bound variables in M
+-- that are in S.
+renameNeeded :: T.Term -> SubstM T.Term
+renameNeeded term1 = do
+  let initBV = getBoundVariables term1
+      initFV = getFreeVariables term1
+
+  forbiddenNames1 <- gets forbiddenNames
+  let shouldBeUnchanged = initBV Set.\\ forbiddenNames1
+  term2 <- runRenameNeeded term1 forbiddenNames1
+  let newBV = getBoundVariables term2
+      forbiddenNames2 = newBV `Set.union` forbiddenNames1
+  modify (\st -> st{forbiddenNames = forbiddenNames2})
+
+  let unchanged = newBV Set.\\ forbiddenNames1
+  assertInternal (unchanged == shouldBeUnchanged) $
+    "Renaming just needed variables should not rename variables that do not "
+    ++"need to be renamed."
+  assertInternal (newBV `Set.disjoint` forbiddenNames1) $
+    "Renaming needed variables should rename all variables that need to be "
+    ++"renamed."
+  let newFV = getFreeVariables term2
+  assertInternal (initFV == newFV)
+    "Renaming bound variables should not change free variables"
+  return term2
+  where
+    runRenameNeeded :: (Log.MonadLogger m, MonadError String m) =>
+                        T.Term -> Set.Set String -> m T.Term
+    runRenameNeeded term1 forbidden = do
+      checkBoundVariablesDistinct term1
+      (flip evalStateT) Map.empty
+        $(flip runReaderT) forbidden
+          $ renameNeededMonadic term1
+
+renameNeededMonadic :: (MonadState (Map.Map String String) m,
                           MonadReader (Set.Set String) m,
                           Log.MonadLogger m, MonadError String m) =>
                     T.Term -> m T.Term
-renameAllBoundMonadic = \case
+renameNeededMonadic = \case
   T.TVar var -> do
     var' <- toCorrectMentionedVar var
     return $ T.TVar var
   T.TNum integer -> return $ T.TNum integer
   T.TLam var term -> do
     var' <- toCorrectBoundVar var
-    term' <- renameAllBoundMonadic term
+    term' <- renameNeededMonadic term
     return $ T.TLam var' term
   T.THole -> return $ T.THole
   T.TLet letBindings1 mainTerm1 -> do
     let (bindingVars1, sWeights1, hWeights1, boundTerms1) = unzip4 letBindings1
     bindingVars2 <- mapM toCorrectBoundVar bindingVars1
-    boundTerms2 <- mapM renameAllBoundMonadic boundTerms1
-    mainTerm2 <- renameAllBoundMonadic mainTerm1
+    boundTerms2 <- mapM renameNeededMonadic boundTerms1
+    mainTerm2 <- renameNeededMonadic mainTerm1
     let letBindings2 = zip4 bindingVars2 sWeights1 hWeights1 boundTerms2
     return $ T.TLet letBindings2 mainTerm2
   T.TDummyBinds varSet1 term1 -> do
     let varList1 = Set.toList varSet1
     varList2 <- mapM toCorrectMentionedVar varList1
     let varSet2 = Set.fromList varList2
-    term2 <- renameAllBoundMonadic term1
+    term2 <- renameNeededMonadic term1
     return $ T.TDummyBinds varSet2 term2
   T.TRedWeight rw1 red1 -> do
     red2 <- case red1 of
               T.RApp term1 var1 -> do
                 var2 <- toCorrectMentionedVar var1
-                term2 <- renameAllBoundMonadic term1
+                term2 <- renameNeededMonadic term1
                 return $ T.RApp term2 var2
               T.RPlusWeight t1 rw2 t2 -> do
-                t1' <- renameAllBoundMonadic t1
-                t2' <- renameAllBoundMonadic t2
+                t1' <- renameNeededMonadic t1
+                t2' <- renameNeededMonadic t2
                 return $ T.RPlusWeight t1' rw2 t2'
     return $ T.TRedWeight rw1 red2
 
@@ -233,15 +271,16 @@ toCorrectBoundVar :: (MonadState (Map.Map String String) m,
                       => String -> m String
 toCorrectBoundVar oldName = do
   forbiddenNames <- ask
-  assertInternal (oldName `Set.member` forbiddenNames)
-    "All bound variables should need to be renamed."
-  newName <- freshName oldName forbiddenNames
-  renameMap <- get
-  assertInternal (oldName `Map.notMember` renameMap)
-    "Old names should not be renamed twice, since binders are unique"
-  let renameMap' = Map.insert oldName newName renameMap
-  put renameMap'
-  return newName
+  if (oldName `Set.member` forbiddenNames)
+    then do
+      newName <- freshName oldName forbiddenNames
+      renameMap <- get
+      assertInternal (oldName `Map.notMember` renameMap)
+        "Old names should not be renamed twice, since binders are unique"
+      let renameMap' = Map.insert oldName newName renameMap
+      put renameMap'
+      return newName
+    else return oldName
 
 -- | Given a variable name v and a set of forbidden names S, returns a new
 -- variable name v' that is similar to v, but not in S.
