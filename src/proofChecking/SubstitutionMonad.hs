@@ -21,6 +21,7 @@ import qualified Control.Monad.State as State (lift)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, ask, runReaderT, ReaderT)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal, internalException)
+import Data.Text (pack)
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import Control.Monad.Trans.Class (MonadTrans)
@@ -236,14 +237,16 @@ renameNeeded term1 = do
   forbiddenNames1 <- gets forbiddenNames
   let shouldBeUnchanged = initBV Set.\\ forbiddenNames1
   term2 <- runRenameNeeded term1 forbiddenNames1
+  Log.logInfoN . pack $ "Checking correctness of renaming "
+    ++showTypedTerm term1++" to "++showTypedTerm term2
   let newBV = getBoundVariables term2
       forbiddenNames2 = newBV `Set.union` forbiddenNames1
   modify (\st -> st{forbiddenNames = forbiddenNames2})
 
-  let unchanged = newBV Set.\\ forbiddenNames1
+  let unchanged = newBV Set.\\ forbiddenNames2
   assertInternal (unchanged == shouldBeUnchanged) $
     "Renaming just needed variables should not rename variables that do not "
-    ++"need to be renamed."
+    ++"need to be renamed. "++show unchanged++" /= "++show shouldBeUnchanged
   assertInternal (newBV `Set.disjoint` forbiddenNames1) $
     "Renaming needed variables should rename all variables that need to be "
     ++"renamed."
