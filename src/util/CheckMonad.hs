@@ -8,6 +8,7 @@ module CheckMonad (CheckM
                   , assertTerm
                   , noSupport
                   , internalException
+                  , throwCallstackError
                   ) where
 
 import qualified Control.Monad.Logger as Log

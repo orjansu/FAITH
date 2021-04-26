@@ -31,7 +31,8 @@ import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
                        , checkTypedTerm, numHoles, getFreeVariables)
-import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport)
+import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport
+                  , throwCallstackError)
 import Substitution (applySubstitution)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
@@ -105,7 +106,7 @@ checkStep globalImpRel
       -- TODO log messages
       substToLHS <- applySubstitution lawLHS substitutions forbiddenNames
       checkRuleAlphaEquiv lawLHS subterm substToLHS
-      substToRHS <- applySubstitution lawLHS substitutions forbiddenNames
+      substToRHS <- applySubstitution lawRHS substitutions forbiddenNames
       let fvOrig = getFreeVariables subterm
           fvTransformed = getFreeVariables substToRHS
       assert (fvOrig == fvTransformed) $ "The transformation should not make"
@@ -204,11 +205,10 @@ class AlphaEq a where
   checkAlphaEquiv :: HasCallStack => a -> a -> CheckM ()
 
 instance AlphaEq T.Term where
-  checkAlphaEquiv :: T.Term -> T.Term -> CheckM ()
   checkAlphaEquiv term1 term2 = do
     Log.logInfoN . pack $ "Checking that M and N are alpha equivalent"
     Log.logInfoN . pack $ "| where M = "++showTypedTerm term1
-    Log.logInfoN . pack $ "| and N = "++showTypedTerm term2
+    Log.logInfoN . pack $ "| and   N = "++showTypedTerm term2
     Log.logInfoN . pack $ "| see debug output for details."
     alphaEq <- isAlphaEquiv term1 term2
     assert alphaEq $ "| The locally-nameless representation "
@@ -219,10 +219,10 @@ instance AlphaEq T.Term where
                            | otherwise = do
     Log.logDebugN . pack $ "Determining wheter M and N are alpha equivalent,"
     Log.logDebugN . pack $ "| where M = "++ showTypedTerm term1
-    Log.logDebugN . pack $ "| and N = "++showTypedTerm term2
+    Log.logDebugN . pack $ "| and   N = "++showTypedTerm term2
     (lnlTerm1, _) <- runToLocallyNameless term1
     (lnlTerm2, _) <- runToLocallyNameless term2
-    Log.logDebugN . pack $ "| Locally nameless representation of M is  "
+    Log.logDebugN . pack $ "| Locally nameless representation of M is "
       ++showLNL lnlTerm1
     Log.logDebugN . pack $ "| Locally nameless representation of N is "
       ++ showLNL lnlTerm2
@@ -238,7 +238,7 @@ instance AlphaEq T.LetBindings where
           ++showTypedTerm (T.TLet lbs1 T.THole)
         Log.logDebugN . pack $ "second let-binding is"
           ++showTypedTerm (T.TLet lbs2 T.THole)
-        throwError "let bindings not alpha equivalent"
+        throwCallstackError "let bindings not alpha equivalent"
   -- | given { x1 = M1 ... xn = Mn} and { y1 = N1 ... yn = Nn }
   -- returns whether forall i . xi and yi have the same canonical name
   -- and forall i . Mi =alpha= Ni
@@ -265,7 +265,7 @@ instance AlphaEq T.LetBindings where
 -- that are saved. Some things may also easily be paralellizable.
 --
 -- Subfunctions may be moved to base level
-checkRuleAlphaEquiv :: Law.Term -> T.Term -> T.Term -> CheckM ()
+checkRuleAlphaEquiv :: HasCallStack => Law.Term -> T.Term -> T.Term -> CheckM ()
 checkRuleAlphaEquiv lawTerm m n = do
   orderedEq <- isAlphaEquiv m n
   if orderedEq
@@ -274,8 +274,10 @@ checkRuleAlphaEquiv lawTerm m n = do
       then let permutations = getAllLetPermutations m
            in if any (isOrderedAlphaEq n) permutations
                 then return ()
-                else throwError "Not alpha equivalent, even with reordering of let:s"
-      else throwError "Not alpha equivalent, and law term does not contain let."
+                else throwCallstackError $ "Not alpha equivalent, even with "
+                      ++ "reordering of let:s"
+      else throwCallstackError $ "Not alpha equivalent, and law term does not "
+                                 ++ "contain let."
   where
     containsLet :: Law.Term -> Bool
     containsLet (Law.TValueMetaVar _) = False
