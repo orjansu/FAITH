@@ -40,8 +40,8 @@ data MetaBindSet
     = MBSMetaVar String
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-data LetBinding = DLetBinding Var StackWeight HeapWeight Term
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
+type LetBinding = (Var, StackWeight, HeapWeight, Term)
+
 
 type StackWeight = IntExpr
 

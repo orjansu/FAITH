@@ -70,7 +70,7 @@ applySubstitution law substitutions forbiddenNames1 = do
     showSingle (name, subst) = name ++ " -> "++showSubstitute subst
     showSubstitute = \case
       T.SLetBindings letBindings ->
-        showTypedTerm (T.TLet letBindings (T.TNum 1)) -- for now
+        showTypedTerm letBindings
       T.SValue term -> showTypedTerm term
       T.SContext term -> showTypedTerm term
       T.SIntegerVar intExpr -> case intExpr of
@@ -94,7 +94,7 @@ getBoundSubstVars substitutions law = case law of
         Law.LBSBoth (Law.MBSMetaVar _) innerLetbinds ->
           Set.unions $ map getLBBound innerLetbinds
       getLBBound :: Law.LetBinding -> Set.Set String
-      getLBBound (Law.DLetBinding lawVar _ _ term) =
+      getLBBound (lawVar, _, _, term) =
         case Map.lookup lawVar substitutions of
           Just (T.SVar substVar) ->
             let otherBoundVars = getBoundSubstVars substitutions term
@@ -133,7 +133,7 @@ applyTermSubstM = \case
                 concreteRest <- mapM applyOnLB moreConcreteBindings
                 let concrete = concreteFirst ++ concreteRest
                 return concrete
-        applyOnLB (Law.DLetBinding lawVar lawSw lawHw lawTerm) = do
+        applyOnLB (lawVar, lawSw, lawHw, lawTerm) = do
           T.SVar var <- getSubstitute lawVar
           sw <- applyIntExprSubstM lawSw
           hw <- applyIntExprSubstM lawHw

@@ -154,7 +154,7 @@ getAllMetaVars = \case
         Law.LBSBoth (Law.MBSMetaVar mv1) concreteLets ->
           let metasFromConcrete = Set.unions $ map concreteLBMetas concreteLets
           in Set.insert mv1 metasFromConcrete
-      concreteLBMetas (Law.DLetBinding varMV sw hw lbterm) =
+      concreteLBMetas (varMV, sw, hw, lbterm) =
         Set.singleton varMV
           `Set.union` getIntExprMetas sw
           `Set.union` getIntExprMetas hw

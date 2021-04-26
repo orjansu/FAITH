@@ -123,7 +123,7 @@ instance Transformable UT.LetBindings where
               UT.BSNoWeight -> return (T.IENum 1,T.IENum 1)
             let varStr = getVarName var
             tTerm <- transform term
-            return $ T.DLetBinding varStr tsw thw tTerm
+            return $ (varStr, tsw, thw, tTerm)
       UT.MBSSubstitution mvBinds var1 var2 -> noSupport "MBSSubstitution"
     UT.LBSBoth metaBinds letBinds -> noSupport $ "multiple bind-sets in meta-"
       ++"variables (LBSBoth, general case)"
@@ -238,7 +238,7 @@ getTermsInsideRepeatedCtxs term = getInRepeated ++ getInInner
 getLetTerms :: T.LetBindings -> [T.Term]
 getLetTerms (T.LBSBoth _metabindset letBindings) = map getLetTerm letBindings
   where
-    getLetTerm (T.DLetBinding _var _sw _hw term) = term
+    getLetTerm (_var, _sw, _hw, term) = term
 
 -- | returns whether the term contains a context inside itself, like
 -- let x = M in C[C[x]] for example
@@ -265,7 +265,7 @@ contextRepeatedInside = \case
       where
         letCtxslbs (T.LBSBoth _meta concreteLbs) =
           Set.unions $ map getCtxLB concreteLbs
-        getCtxLB (T.DLetBinding _var _sw _hw lbTerm) = getCtxVars lbTerm
+        getCtxLB (_var, _sw, _hw, lbTerm) = getCtxVars lbTerm
     getCtxVars (T.TDummyBinds (T.VSConcrete _vs) term) = getCtxVars term
 
 isTermWithFreeVars :: T.Term -> Bool

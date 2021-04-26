@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module OtherUtils (applyOnSubTermsM) where
+module OtherUtils (applyOnSubTermsM, filterNoise) where
 
 import Control.Monad.Except (MonadError, throwError)
 import qualified MiniTypedAST as T
-import ShowTypedTerm (showTypedTerm)
 import Data.List (zip4, unzip4)
 import qualified Control.Monad.Logger as Log
+import Data.List.Extra (replace)
 
 -- | Given a monadic function on a term, applies it to all the subterms of a
 -- term. Does not do anything with the variables, throws an error on terms
@@ -40,3 +40,8 @@ applyOnSubTermsM f bigTerm = case bigTerm of
                 subterm2' <- f subterm2
                 return $ T.RPlusWeight subterm1' redWeight' subterm2'
     return $ T.TRedWeight redWeight red2
+
+filterNoise :: String -> String
+filterNoise = let removeChars = filter (\c -> c /='\"' && c /= '\n')
+                  lessWhiteSpace = replace "  " " "
+              in lessWhiteSpace . removeChars
