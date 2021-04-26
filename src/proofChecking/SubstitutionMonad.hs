@@ -49,8 +49,18 @@ instance MonadFail SubstM where
 -- along with the final set of forbidden names. It is still in the CheckM
 -- though, since most of the other parts of the program is.
 --
--- NOTE: the initial set of forbidden names must include the free variables
--- of the term about to be transformed.
+-- NOTE: The forbidden names set is used for making sure that new names that
+-- are used when a term is alpha-renamed doesn't accidentally clash with other
+-- names in the term. Therefore:
+--  > the initial set of forbidden names must include the free variables
+--    of the term about to be transformed.
+--  > The forbidden names must also include all the variables that should be
+--    substituted into a binding position, e.g. the name x, y, z and zs in the
+--    term
+--    \x . let y = x:[]
+--         in case y of
+--           z:zs -> 1
+--
 -- Since the typechecker should have checked that all substitutions are
 -- provided, the function throws internal exceptions if they are not.
 runSubstM :: Map.Map String T.Substitute -> Set.Set String -> SubstM a
@@ -59,16 +69,33 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
   let substMap = prepareSubstitutions substSimpleMap
       initSt = MkSubstSt {substitutions = substMap
                          , forbiddenNames = initForbiddenNames}
-  (a, finalState) <- (flip runStateT) initSt $ getSubstM $ monadic
+  (a, finalState) <- (flip runStateT) initSt $ getSubstM $ do
+    addContextBVToForbiddenNames
+    monadic
   return (a, forbiddenNames finalState)
+  where
+    addContextBVToForbiddenNames =
+      mapM addBVToForbiddenNames
+        $ map (\(T.SContext ctx) -> ctx)
+        $ Map.elems
+        $ Map.filter isContext substSimpleMap
+    isContext :: T.Substitute -> Bool
+    isContext (T.SLetBindings _) = False
+    isContext (T.SValue _) = False
+    isContext (T.SContext _) = True
+    isContext (T.SIntegerVar _) = False
+    isContext (T.SVar _) = False
+    isContext (T.SVarSet _) = False
+    isContext (T.STerm _) = False
 
 prepareSubstitutions :: Map.Map String T.Substitute
                         -> Map.Map String (T.Substitute, IsUsed)
 prepareSubstitutions substSimpleMap =
   Map.map (\substitution -> (substitution, False)) substSimpleMap
 
--- | Get the substitution corresponding to the name provided. Does not work for
--- contexts. If you would like to apply a context, use applyContext instead.
+-- | Get the substitution corresponding to the name provided.
+-- > Does not work for contexts. If you would like to apply a context, use
+--   applyContext instead.
 getSubstitute :: String -> SubstM T.Substitute
 getSubstitute metaVar = do
   substMap <- gets substitutions
@@ -102,6 +129,11 @@ prepareTermForSubstitution metaVar term isUsed =
       return renamed
     else do
       setToUsed metaVar
+      let termBV = getBoundVariables term
+      forbidden <- gets forbiddenNames
+      assertInternal (termBV `Set.disjoint` forbidden)
+        $ "term M inserted the first time should only contain new "
+          ++"names for bound variables. M="++showTypedTerm term
       addBVToForbiddenNames term
       return term
 
@@ -117,10 +149,7 @@ addBVToForbiddenNames :: T.Term -> SubstM ()
 addBVToForbiddenNames term = do
   forbidden <- gets forbiddenNames
   let termBV = getBoundVariables term
-  assertInternal (termBV `Set.disjoint` forbidden)
-    $ "term M inserted the first time should only contain new "
-      ++"names for bound variables. M="++showTypedTerm term
-  let forbidden' = termBV `Set.union` forbidden
+      forbidden' = termBV `Set.union` forbidden
   modify (\st -> st{forbiddenNames = forbidden'})
 
 -- | given a name corresponding to a context C and a term M, returns C[M],

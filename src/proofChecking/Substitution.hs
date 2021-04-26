@@ -6,7 +6,7 @@
 module Substitution (applySubstitution) where
 
 import Data.Text (pack, Text)
-import Data.List (intersperse)
+import Data.List (intersperse, unzip4, zip4)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
@@ -42,8 +42,10 @@ applySubstitution law substitutions forbiddenNames1 = do
   Log.logInfoN . pack $ "to law term"++show law
   Log.logInfoN . pack $ "With forbidden names "++ show forbiddenNames1
   -- TODO revise using SubstitutionMonad
-  res <- runSubstM substitutions forbiddenNames1 $ applyTermSubstM law
-  let (finalTerm, forbiddenNames2) = res
+  let boundSubstVars = getBoundSubstVars substitutions law
+      forbiddenNames2 = forbiddenNames1 `Set.union` boundSubstVars
+  res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM law
+  let (finalTerm, forBiddenNames3) = res
       finalBV = getBoundVariables finalTerm
   Log.logInfoN . pack $ "checking correctness of M after substitution , where "
     ++"M="++showTypedTerm finalTerm
@@ -54,10 +56,10 @@ applySubstitution law substitutions forbiddenNames1 = do
   assertInternal (numHoles finalTerm == 0) "| M should not be a context"
   let finalVariables = getAllVariables finalTerm
       expectedForbiddenNames = finalVariables `Set.union` forbiddenNames1
-  assertInternal (expectedForbiddenNames == forbiddenNames2)
+  assertInternal (expectedForbiddenNames == forBiddenNames3)
     $ "| M substituted wrt S -> S' => AllVars(M) union S == S', where "
     ++"AllVars(M) union S = "++show expectedForbiddenNames++" and "
-    ++"S' = "++show forbiddenNames2
+    ++"S' = "++show forBiddenNames3
 
   return finalTerm
   where
@@ -78,6 +80,29 @@ applySubstitution law substitutions forbiddenNames1 = do
         let listForm = concat . intersperse ", " . Set.toList $ stringSet
         in "{" ++ listForm ++"}"
       T.STerm term -> showTypedTerm term
+
+getBoundSubstVars :: T.Substitutions -> Law.Term -> Set.Set String
+getBoundSubstVars substitutions law = case law of
+  Law.TValueMetaVar _ -> Set.empty
+  Law.TVar _ -> Set.empty
+  Law.TAppCtx _ term -> getBoundSubstVars substitutions term
+  Law.TLet letBindings term ->
+    let mainBounds = getBoundSubstVars substitutions term
+    in mainBounds `Set.union` innerBounds
+    where
+      innerBounds = case letBindings of
+        Law.LBSBoth (Law.MBSMetaVar _) innerLetbinds ->
+          Set.unions $ map getLBBound innerLetbinds
+      getLBBound :: Law.LetBinding -> Set.Set String
+      getLBBound (Law.DLetBinding lawVar _ _ term) =
+        case Map.lookup lawVar substitutions of
+          Just (T.SVar substVar) ->
+            let otherBoundVars = getBoundSubstVars substitutions term
+            in Set.insert substVar otherBoundVars
+          _ -> error $ "Internal: substitution for"++lawVar++" is not bound to "
+                       ++"a variable. This was not discovered in the "
+                       ++"typechecker."
+  Law.TDummyBinds _ term -> getBoundSubstVars substitutions term
 
 applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
 applyTermSubstM = \case
@@ -105,16 +130,16 @@ applyTermSubstM = \case
                 return concrete
         applyOnLB (Law.DLetBinding lawVar lawSw lawHw lawTerm) = do
           T.SVar var <- getSubstitute lawVar
-          TODO
-          -- TODO Här behöver jag indikera till substitutions-monaden att
-          -- variabeln är bunden. Eventuellt är det bättre om jag alltid måste
-          -- indikera det när jag frågar efter en variabel.
           sw <- applyIntExprSubstM lawSw
           hw <- applyIntExprSubstM lawHw
           term <- applyTermSubstM lawTerm
           return (var, sw, hw, term)
-
-  Law.TDummyBinds varSet term -> undefined
+  Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
+    concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
+    let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
+        varSet = Set.fromList concreteVarList
+    term <- applyTermSubstM lawTerm
+    return $ T.TDummyBinds varSet term
 
 applyIntExprSubstM :: HasCallStack => Law.IntExpr -> SubstM Integer
 applyIntExprSubstM = \case

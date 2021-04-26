@@ -100,7 +100,7 @@ data Substitute
   | SContext Term
   | SIntegerVar IntExpr
   | SVar String
-  | SVarSet (Set String)
+  | SVarSet (Set String) -- Not used yet
   | STerm Term
 --  | SVarVect TODO support the following later:
 --  | SValueContext
