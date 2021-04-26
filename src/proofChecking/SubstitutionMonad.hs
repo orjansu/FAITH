@@ -74,7 +74,10 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
   (a, finalState) <- (flip runStateT) initSt $ getSubstM $ do
     addContextBVToForbiddenNames
     monadic
-  return (a, forbiddenNames finalState)
+  let finalForbiddenNames = forbiddenNames finalState
+  assertInternal (initForbiddenNames `Set.isSubsetOf` finalForbiddenNames)
+    "Substitution map should only accumulate forbidden names."
+  return (a, finalForbiddenNames)
   where
     addContextBVToForbiddenNames =
       mapM addBVToForbiddenNames
@@ -177,7 +180,10 @@ applyContext ctxName term = do
   where
     applyContext1 :: HasCallStack => T.Term -> T.Term -> SubstM T.Term
     applyContext1 ctx term = do
-      let substitutions = Map.singleton dummy (T.STerm term)
+      let substitutions = Map.singleton dummy (T.STerm term, True)
+      -- We set the inner term to used, so that the bound variables in the term
+      -- will be renamed, in case the term or some subterm of it is used
+      -- before or after the context is used.
       withSeparateSubstitutions substitutions $ applyContext2 ctx
 
     dummy :: String
@@ -194,16 +200,20 @@ applyContext ctxName term = do
 
 -- | Run the monadic computation with a new substitution set, and then
 -- switch back.
-withSeparateSubstitutions :: HasCallStack => Map.Map String T.Substitute
+withSeparateSubstitutions :: HasCallStack =>
+                     Map.Map String (T.Substitute, IsUsed)
                      -> SubstM a
                      -> SubstM a
-withSeparateSubstitutions simpleInternalSubstitutions monadic = do
+withSeparateSubstitutions internalSubstitutions monadic = do
   currSubstitutions <- gets substitutions
-  let internalSubstitutions = prepareSubstitutions simpleInternalSubstitutions
   modify (\st -> st{substitutions = internalSubstitutions})
   res <- monadic
   modify (\st -> st{substitutions = currSubstitutions})
   return res
+
+liftCheckM :: CheckM a -> SubstM a
+liftCheckM checkMonadic = MkSubstM{getSubstM = State.lift checkMonadic}
+
 
 -- | given M, this function assumes (and checks) that all bound variables in M
 -- needs to be renamed, renames those terms, changes the forbiddenNames
@@ -327,8 +337,8 @@ toCorrectBoundVar oldName = do
 freshName :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
              String -> Set.Set String -> m String
 freshName name forbiddenNames = do
-  assertInternal (Set.notMember name forbiddenNames) $ "Renaming was "
-    ++"attempted, but not needed"
+  assertInternal (Set.member name forbiddenNames) $ "Renaming was "
+    ++"attempted, but not needed. "++name++" is not in "++show forbiddenNames
   return $ freshName' 0
   where
     freshName' n = let tryName = freshNames !! n

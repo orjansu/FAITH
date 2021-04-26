@@ -40,7 +40,7 @@ applySubstitution :: HasCallStack =>
                   -> CheckM T.Term
 applySubstitution law substitutions forbiddenNames1 = do
   Log.logInfoN . pack $ "applying substitution {"++showSubstitutions++"}"
-  Log.logInfoN . pack $ "to law term"++show law
+  Log.logInfoN . pack $ "to law term"++showLaw law
   Log.logInfoN . pack $ "With forbidden names "++ show forbiddenNames1
   -- TODO revise using SubstitutionMonad
   let boundSubstVars = getBoundSubstVars substitutions law
@@ -123,9 +123,8 @@ applyTermSubstM bigLawTerm = do
         ++" to "++showTypedTerm concreteTerm
       applyContext mvName concreteTerm
     Law.TLet letBindings term -> do
-      Log.logInfoN . pack $ "applying Let"
-      concreteTerm <- applyTermSubstM term
       concreteBindings <- applyOnLBS
+      concreteTerm <- applyTermSubstM term
       return $ T.TLet concreteBindings concreteTerm
         where
           applyOnLBS = case letBindings of
@@ -143,14 +142,13 @@ applyTermSubstM bigLawTerm = do
             term <- applyTermSubstM lawTerm
             return (var, sw, hw, term)
     Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
-      Log.logInfoN . pack $ "applying dummy binds"
       concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
       let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
           varSet = Set.fromList concreteVarList
       term <- applyTermSubstM lawTerm
       return $ T.TDummyBinds varSet term
   where
-    logSubst mvName term = Log.logInfoN . pack $ "applying substitution"
+    logSubst mvName term = Log.logInfoN . pack $ "applying substitution "
                             ++mvName++" = "++showTypedTerm term
 
 applyIntExprSubstM :: HasCallStack => Law.IntExpr -> SubstM Integer
