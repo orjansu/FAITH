@@ -23,6 +23,7 @@ import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext)
+import ShowLaw (showLaw)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -105,47 +106,49 @@ getBoundSubstVars substitutions law = case law of
   Law.TDummyBinds _ term -> getBoundSubstVars substitutions term
 
 applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
-applyTermSubstM = \case
-  Law.TValueMetaVar mvName -> do
-    T.SValue value <- getSubstitute mvName
-    logSubst mvName value
-    return value
-  Law.TVar mvName -> do
-    T.SVar var <- getSubstitute mvName
-    logSubst mvName $ T.TVar var
-    return $ T.TVar var
-  Law.TAppCtx mvName lawTerm -> do
-    concreteTerm <- applyTermSubstM lawTerm
-    Log.logInfoN . pack $ "applying context "++mvName
-      ++" to "++showTypedTerm concreteTerm
-    applyContext mvName concreteTerm
-  Law.TLet letBindings term -> do
-    Log.logInfoN . pack $ "applying Let"
-    concreteTerm <- applyTermSubstM term
-    concreteBindings <- applyOnLBS
-    return $ T.TLet concreteBindings concreteTerm
-      where
-        applyOnLBS = case letBindings of
-          Law.LBSBoth metaBinds moreConcreteBindings -> do
-            case metaBinds of
-              Law.MBSMetaVar metaBindVar -> do
-                T.SLetBindings concreteFirst <- getSubstitute metaBindVar
-                concreteRest <- mapM applyOnLB moreConcreteBindings
-                let concrete = concreteFirst ++ concreteRest
-                return concrete
-        applyOnLB (lawVar, lawSw, lawHw, lawTerm) = do
-          T.SVar var <- getSubstitute lawVar
-          sw <- applyIntExprSubstM lawSw
-          hw <- applyIntExprSubstM lawHw
-          term <- applyTermSubstM lawTerm
-          return (var, sw, hw, term)
-  Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
-    Log.logInfoN . pack $ "applying dummy binds"
-    concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
-    let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
-        varSet = Set.fromList concreteVarList
-    term <- applyTermSubstM lawTerm
-    return $ T.TDummyBinds varSet term
+applyTermSubstM bigLawTerm = do
+  Log.logInfoN . pack $ "substituting into law "++showLaw bigLawTerm
+  case bigLawTerm of
+    Law.TValueMetaVar mvName -> do
+      T.SValue value <- getSubstitute mvName
+      logSubst mvName value
+      return value
+    Law.TVar mvName -> do
+      T.SVar var <- getSubstitute mvName
+      logSubst mvName $ T.TVar var
+      return $ T.TVar var
+    Law.TAppCtx mvName lawTerm -> do
+      concreteTerm <- applyTermSubstM lawTerm
+      Log.logInfoN . pack $ "applying context "++mvName
+        ++" to "++showTypedTerm concreteTerm
+      applyContext mvName concreteTerm
+    Law.TLet letBindings term -> do
+      Log.logInfoN . pack $ "applying Let"
+      concreteTerm <- applyTermSubstM term
+      concreteBindings <- applyOnLBS
+      return $ T.TLet concreteBindings concreteTerm
+        where
+          applyOnLBS = case letBindings of
+            Law.LBSBoth metaBinds moreConcreteBindings -> do
+              case metaBinds of
+                Law.MBSMetaVar metaBindVar -> do
+                  T.SLetBindings concreteFirst <- getSubstitute metaBindVar
+                  concreteRest <- mapM applyOnLB moreConcreteBindings
+                  let concrete = concreteFirst ++ concreteRest
+                  return concrete
+          applyOnLB (lawVar, lawSw, lawHw, lawTerm) = do
+            T.SVar var <- getSubstitute lawVar
+            sw <- applyIntExprSubstM lawSw
+            hw <- applyIntExprSubstM lawHw
+            term <- applyTermSubstM lawTerm
+            return (var, sw, hw, term)
+    Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
+      Log.logInfoN . pack $ "applying dummy binds"
+      concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
+      let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
+          varSet = Set.fromList concreteVarList
+      term <- applyTermSubstM lawTerm
+      return $ T.TDummyBinds varSet term
   where
     logSubst mvName term = Log.logInfoN . pack $ "applying substitution"
                             ++mvName++" = "++showTypedTerm term

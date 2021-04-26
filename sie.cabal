@@ -48,7 +48,8 @@ executable sie
                        OtherUtils,
                        Substitution,
                        SubstitutionMonad,
-                       ShowLaw
+                       ShowLaw,
+                       PrintSieLaws
 
   main-is:             Main.hs
   -- other-modules:

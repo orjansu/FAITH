@@ -42,7 +42,6 @@ data MetaBindSet
 
 type LetBinding = (Var, StackWeight, HeapWeight, Term)
 
-
 type StackWeight = IntExpr
 
 type HeapWeight = IntExpr
