@@ -22,6 +22,7 @@ import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, ask, runReaderT, ReaderT)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal, internalException)
 import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack)
 import Control.Monad.Trans.Class (MonadTrans)
 import Data.List (zip4, unzip4)
 
@@ -63,7 +64,8 @@ instance MonadFail SubstM where
 --
 -- Since the typechecker should have checked that all substitutions are
 -- provided, the function throws internal exceptions if they are not.
-runSubstM :: Map.Map String T.Substitute -> Set.Set String -> SubstM a
+runSubstM :: HasCallStack =>
+             Map.Map String T.Substitute -> Set.Set String -> SubstM a
              -> CheckM (a, Set.Set String)
 runSubstM substSimpleMap initForbiddenNames monadic = do
   let substMap = prepareSubstitutions substSimpleMap
@@ -88,7 +90,7 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
     isContext (T.SVarSet _) = False
     isContext (T.STerm _) = False
 
-prepareSubstitutions :: Map.Map String T.Substitute
+prepareSubstitutions :: HasCallStack => Map.Map String T.Substitute
                         -> Map.Map String (T.Substitute, IsUsed)
 prepareSubstitutions substSimpleMap =
   Map.map (\substitution -> (substitution, False)) substSimpleMap
@@ -96,7 +98,7 @@ prepareSubstitutions substSimpleMap =
 -- | Get the substitution corresponding to the name provided.
 -- > Does not work for contexts. If you would like to apply a context, use
 --   applyContext instead.
-getSubstitute :: String -> SubstM T.Substitute
+getSubstitute :: HasCallStack => String -> SubstM T.Substitute
 getSubstitute metaVar = do
   substMap <- gets substitutions
   case Map.lookup metaVar substMap of
@@ -121,7 +123,8 @@ getSubstitute metaVar = do
           return $ T.STerm prepared
     Nothing -> internalException $ "Substitution for "++metaVar++" not found"
 
-prepareTermForSubstitution :: String -> T.Term -> Bool -> SubstM T.Term
+prepareTermForSubstitution :: HasCallStack =>
+                              String -> T.Term -> Bool -> SubstM T.Term
 prepareTermForSubstitution metaVar term isUsed =
   if isUsed
     then do
@@ -138,14 +141,14 @@ prepareTermForSubstitution metaVar term isUsed =
       return term
 
 -- | given a substitution name, sets the substitution to used.
-setToUsed :: String -> SubstM ()
+setToUsed :: HasCallStack => String -> SubstM ()
 setToUsed metaVar = do
   substMap <- gets substitutions
   let flipToUsed = (\(t, False) -> (t, True))
       substMap' = Map.adjust flipToUsed metaVar substMap
   modify (\st -> st{ substitutions = substMap'})
 
-addBVToForbiddenNames :: T.Term -> SubstM ()
+addBVToForbiddenNames :: HasCallStack => T.Term -> SubstM ()
 addBVToForbiddenNames term = do
   forbidden <- gets forbiddenNames
   let termBV = getBoundVariables term
@@ -154,7 +157,7 @@ addBVToForbiddenNames term = do
 
 -- | given a name corresponding to a context C and a term M, returns C[M],
 -- properly renamed.
-applyContext :: String -> T.Term -> SubstM T.Term
+applyContext :: HasCallStack => String -> T.Term -> SubstM T.Term
 applyContext ctxName term = do
   assertInternal (numHoles term == 0)
     "You may not insert a context into a context"
@@ -172,7 +175,7 @@ applyContext ctxName term = do
       return res
 
   where
-    applyContext1 :: T.Term -> T.Term -> SubstM T.Term
+    applyContext1 :: HasCallStack => T.Term -> T.Term -> SubstM T.Term
     applyContext1 ctx term = do
       let substitutions = Map.singleton dummy (T.STerm term)
       withSeparateSubstitutions substitutions $ applyContext2 ctx
@@ -180,7 +183,7 @@ applyContext ctxName term = do
     dummy :: String
     dummy = ""
 
-    applyContext2 :: T.Term -> SubstM T.Term
+    applyContext2 :: HasCallStack => T.Term -> SubstM T.Term
     applyContext2 = \case
       T.TVar var -> return $ T.TVar var
       T.TNum integer -> return $ T.TNum integer
@@ -191,7 +194,7 @@ applyContext ctxName term = do
 
 -- | Run the monadic computation with a new substitution set, and then
 -- switch back.
-withSeparateSubstitutions :: Map.Map String T.Substitute
+withSeparateSubstitutions :: HasCallStack => Map.Map String T.Substitute
                      -> SubstM a
                      -> SubstM a
 withSeparateSubstitutions simpleInternalSubstitutions monadic = do
@@ -205,7 +208,7 @@ withSeparateSubstitutions simpleInternalSubstitutions monadic = do
 -- | given M, this function assumes (and checks) that all bound variables in M
 -- needs to be renamed, renames those terms, changes the forbiddenNames
 -- accordingly and returns the renamed term.
-renameAllBound :: T.Term -> SubstM T.Term
+renameAllBound :: HasCallStack => T.Term -> SubstM T.Term
 renameAllBound term1 = do
   let initBV = getBoundVariables term1
   term2 <- renameNeeded term1
@@ -215,7 +218,7 @@ renameAllBound term1 = do
   return term2
 
 -- | given M, renames all bound variables in M that need to be renamed.
-renameNeeded :: T.Term -> SubstM T.Term
+renameNeeded :: HasCallStack => T.Term -> SubstM T.Term
 renameNeeded term1 = do
   let initBV = getBoundVariables term1
       initFV = getFreeVariables term1
@@ -239,7 +242,7 @@ renameNeeded term1 = do
     "Renaming bound variables should not change free variables"
   return term2
   where
-    runRenameNeeded :: (Log.MonadLogger m, MonadError String m) =>
+    runRenameNeeded :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
                         T.Term -> Set.Set String -> m T.Term
     runRenameNeeded term1 forbidden = do
       checkBoundVariablesDistinct term1
@@ -249,7 +252,8 @@ renameNeeded term1 = do
 
 renameNeededMonadic :: (MonadState (Map.Map String String) m,
                           MonadReader (Set.Set String) m,
-                          Log.MonadLogger m, MonadError String m) =>
+                          Log.MonadLogger m, MonadError String m,
+                          HasCallStack) =>
                     T.Term -> m T.Term
 renameNeededMonadic = \case
   T.TVar var -> do
@@ -297,7 +301,8 @@ toCorrectMentionedVar var = do
 
 toCorrectBoundVar :: (MonadState (Map.Map String String) m,
                       MonadReader (Set.Set String) m,
-                      Log.MonadLogger m, MonadError String m)
+                      Log.MonadLogger m, MonadError String m,
+                      HasCallStack)
                       => String -> m String
 toCorrectBoundVar oldName = do
   forbiddenNames <- ask
@@ -319,7 +324,7 @@ toCorrectBoundVar oldName = do
 --
 -- TODO: might be more user friendly to add an increasing index at the end of
 -- the name. For now, I'll just get a fresh letter from the alphabet.
-freshName :: (Log.MonadLogger m, MonadError String m) =>
+freshName :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
              String -> Set.Set String -> m String
 freshName name forbiddenNames = do
   assertInternal (Set.notMember name forbiddenNames) $ "Renaming was "

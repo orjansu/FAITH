@@ -108,14 +108,19 @@ applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
 applyTermSubstM = \case
   Law.TValueMetaVar mvName -> do
     T.SValue value <- getSubstitute mvName
+    logSubst mvName value
     return value
   Law.TVar mvName -> do
     T.SVar var <- getSubstitute mvName
+    logSubst mvName $ T.TVar var
     return $ T.TVar var
   Law.TAppCtx mvName lawTerm -> do
     concreteTerm <- applyTermSubstM lawTerm
+    Log.logInfoN . pack $ "applying context "++mvName
+      ++" to "++showTypedTerm concreteTerm
     applyContext mvName concreteTerm
   Law.TLet letBindings term -> do
+    Log.logInfoN . pack $ "applying Let"
     concreteTerm <- applyTermSubstM term
     concreteBindings <- applyOnLBS
     return $ T.TLet concreteBindings concreteTerm
@@ -135,11 +140,15 @@ applyTermSubstM = \case
           term <- applyTermSubstM lawTerm
           return (var, sw, hw, term)
   Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
+    Log.logInfoN . pack $ "applying dummy binds"
     concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
     let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
         varSet = Set.fromList concreteVarList
     term <- applyTermSubstM lawTerm
     return $ T.TDummyBinds varSet term
+  where
+    logSubst mvName term = Log.logInfoN . pack $ "applying substitution"
+                            ++mvName++" = "++showTypedTerm term
 
 applyIntExprSubstM :: HasCallStack => Law.IntExpr -> SubstM Integer
 applyIntExprSubstM = \case
