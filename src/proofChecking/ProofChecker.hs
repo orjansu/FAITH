@@ -9,16 +9,9 @@ module ProofChecker where
 
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
-import Data.Functor.Identity (Identity, runIdentity)
-import Control.Monad.Except (MonadError, throwError)
-import Control.Monad.Extra (andM)
-
+import qualified Data.Map.Strict as Map
 import Data.Text (pack, Text)
-import Data.Maybe (Maybe(Just, Nothing), catMaybes)
-import Maybes (firstJusts)
 import Data.List (permutations, intersperse)
-import Data.List.Extra (firstJust)
-import Data.Char (isDigit)
 import qualified Data.Set as Set
 
 import qualified MiniTypedAST as T
@@ -29,10 +22,7 @@ import ToLocallyNameless (toLocallyNameless)
 import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
-import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
-                       , checkTypedTerm, numHoles, getFreeVariables
-                       , getHoleBoundVars)
-import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport
+import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
 import Substitution (applySubstitution)
 
@@ -99,111 +89,23 @@ checkStep globalImpRel
       assert (lawImpRel == localImpRel)
         $ "The improvement relation of the law must be the same as the "
         ++"improvement relation in the proof"
-      -- This ^ shows that the localImpRel could be generated
-      subterm <- getSubterm context term1
-      let contextBV = getBoundVariables context
-          forbiddenNames = contextBV `Set.union` varFreeVars
-          holeBV = getHoleBoundVars context
-          expectedFreeVars = holeBV `Set.union` varFreeVars
-      Log.logInfoN . pack $ "applying substitution from subterm to law"
-      -- TODO log messages
-      substToLHS <- applySubstitution lawLHS substitutions forbiddenNames
-                                      expectedFreeVars
-      checkRuleAlphaEquiv lawLHS subterm substToLHS
-      substToRHS <- applySubstitution lawRHS substitutions forbiddenNames
-                                      expectedFreeVars
-      let fvOrig = getFreeVariables subterm
-          fvTransformed = getFreeVariables substToRHS
-      assert (fvOrig == fvTransformed) $ "The transformation should not make"
-        ++"bound variables free."
-      rhsTerm <- applyContext context substToRHS
-      -- This shows that we could generate the next term ourselves instead.
-      -- However, it is more important to typecheck rhsTerm if we generate it.
-      checkRuleAlphaEquiv lawRHS rhsTerm term2
-      -- This check below should not be needed. Quickcheck it later and maybe
-      -- remove if it impedes performance.
-      Log.logInfoN . pack $ "Checking that the resulting term of the transformation typechecks."
-      checkTypedTerm rhsTerm varFreeVars
-
--- | given C and M, returns N such that C[N] =alpha= M
--- For now, this is the version that I implement:
--- C needs to be a syntactic copy of M, with exactly one of its subterms
--- replaced with a hole. For possible variations, see typecheckerNotes.
-getSubterm :: HasCallStack => T.Term -> T.Term -> CheckM T.Term
-getSubterm context term = do
-  Log.logInfoN $ pack $ "matching C="++showTypedTerm context
-    ++" on M="++showTypedTerm term++" to get the subterm"
-  assertInternal (numHoles context == 1) $ "Only a single hole in C is "
-    ++"currently supported"
-  assertInternal (numHoles term == 0) $ "M must not be a context"
-  returnPotentialTerm $ getSubterm' context term
-  where
-    getSubterm' :: T.Term -> T.Term -> Maybe T.Term
-    getSubterm' (T.TVar _) _ = Nothing
-    getSubterm' (T.TNum _) _ = Nothing
-    getSubterm' (T.TLam v1 t1) (T.TLam v2 t2)
-      | v1 == v2 = getSubterm' t1 t2
-    getSubterm' T.THole term = Just term
-    getSubterm' (T.TLet lbs1 term1) (T.TLet lbs2 term2) =
-      if lbs1 == lbs2
-        then getSubterm' term1 term2
-        else firstJust matchBinding $ zip lbs1 lbs2
-      where
-        matchBinding ((v1, sw1, hw1, t1), (v2, sw2, hw2, t2))
-          | v1 == v2 && sw1 == sw2 && hw1 == hw2 = getSubterm' t1 t2
-          | otherwise = Nothing
-    getSubterm' (T.TDummyBinds vs1 t1) (T.TDummyBinds vs2 t2)
-      | vs1 == vs2 = getSubterm' t1 t2
-    getSubterm' (T.TRedWeight rw1 red1) (T.TRedWeight rw2 red2)
-      | rw1 == rw2 = case (red1, red2) of
-        (T.RApp t1 v1, T.RApp t2 v2) | v1 == v2 -> getSubterm' t1 t2
-        (T.RPlusWeight t11 rw1 t12, T.RPlusWeight t21 rw2 t22)
-          | rw1 == rw2 -> firstJusts [getSubterm' t11 t21, getSubterm' t21 t22]
-        (_, _) -> Nothing
-    getSubterm' _ _ = Nothing
-
-    returnPotentialTerm :: Maybe T.Term -> CheckM T.Term
-    returnPotentialTerm Nothing = throwError contextDoesNotMatch
-    returnPotentialTerm (Just term) = return term
-
-    contextDoesNotMatch :: String
-    contextDoesNotMatch = "C does not match M."
-
-
--- | Given C and M, where C is a context and M is a term, returns C[M].
--- TODO Currently only supports contexts with a single hole
--- Note: This is kind of the same as applySubstitution.
-applyContext :: T.Term -> T.Term -> CheckM T.Term
-applyContext context insertTerm = do
-  Log.logInfoN . pack $ "applying the context C="++showTypedTerm context
-    ++ " to the term M="++showTypedTerm insertTerm
-  assertInternal (numHoles context == 1) $"only insertion with a single hole"
-    ++ "is currently supported."
-  assertInternal (numHoles insertTerm == 0)$"the inserted term must not have "
-    ++"any holes."
-  assertInternal
-    (getBoundVariables context `Set.disjoint` getBoundVariables insertTerm)
-    $ "C and M must not have bound variables with the same name"
-  return $ appCtx context
-  where
-    -- | applies the context by inserting insertTerm where there is a hole,
-    -- and is the identity function if no context is applied
-    appCtx (T.TVar var) = T.TVar var
-    appCtx (T.TNum integer) = T.TNum integer
-    appCtx (T.TLam var term) = T.TLam var $ appCtx term
-    appCtx (T.THole) = insertTerm
-    appCtx (T.TLet letBindings term) = let appLBS = map appLB letBindings
-                                           appTerm = appCtx term
-                                       in T.TLet appLBS appTerm
-      where
-        appLB (var, sw, hw, term) = (var, sw, hw, appCtx term)
-    appCtx (T.TDummyBinds varSet term) = T.TDummyBinds varSet $ appCtx term
-    appCtx (T.TRedWeight redWeight red) =
-      let appRed = case red of
-                     T.RApp term var -> T.RApp (appCtx term) var
-                     T.RPlusWeight t1 rw t2 ->
-                        T.RPlusWeight (appCtx t1) rw (appCtx t2)
-      in T.TRedWeight redWeight appRed
+      let ctxKey = "ctx"
+      assertInternal (Map.notMember ctxKey substitutions) $ "The substitution "
+        ++"map (i.e. substitutions from the law) should not contain a "
+        ++"substitution for "++ctxKey++", since it is used for the outer "
+        ++"context."
+      let lawLHSctx = Law.TAppCtx ctxKey lawLHS
+          lawRHSctx = Law.TAppCtx ctxKey lawRHS
+          substitutionsWctx = Map.insert ctxKey
+                                         (T.SContext context)
+                                         substitutions
+          forbiddenNames = varFreeVars
+      substToLHS <- applySubstitution lawLHSctx substitutionsWctx forbiddenNames
+                                      varFreeVars
+      checkRuleAlphaEquiv lawLHSctx term1 substToLHS
+      substToRHS <- applySubstitution lawRHSctx substitutionsWctx forbiddenNames
+                                      varFreeVars
+      checkRuleAlphaEquiv lawRHSctx substToRHS term2
 
 class AlphaEq a where
   isAlphaEquiv :: HasCallStack => a -> a -> CheckM Bool
@@ -225,40 +127,13 @@ instance AlphaEq T.Term where
     Log.logDebugN . pack $ "Determining wheter M and N are alpha equivalent,"
     Log.logDebugN . pack $ "| where M = "++ showTypedTerm term1
     Log.logDebugN . pack $ "| and   N = "++showTypedTerm term2
-    (lnlTerm1, _) <- runToLocallyNameless term1
-    (lnlTerm2, _) <- runToLocallyNameless term2
+    let (lnlTerm1, _) = toLocallyNameless term1
+    let (lnlTerm2, _) = toLocallyNameless term2
     Log.logDebugN . pack $ "| Locally nameless representation of M is "
       ++showLNL lnlTerm1
     Log.logDebugN . pack $ "| Locally nameless representation of N is "
       ++ showLNL lnlTerm2
     return (lnlTerm1 == lnlTerm2)
-
-instance AlphaEq T.LetBindings where
-  checkAlphaEquiv lbs1 lbs2 = do
-    bindingsAlphaEq <- isAlphaEquiv lbs1 lbs2
-    case bindingsAlphaEq of
-      True -> return ()
-      False -> do
-        Log.logDebugN . pack $ "first let-binding is "
-          ++showTypedTerm (T.TLet lbs1 T.THole)
-        Log.logDebugN . pack $ "second let-binding is"
-          ++showTypedTerm (T.TLet lbs2 T.THole)
-        throwCallstackError "let bindings not alpha equivalent"
-  -- | given { x1 = M1 ... xn = Mn} and { y1 = N1 ... yn = Nn }
-  -- returns whether forall i . xi and yi have the same canonical name
-  -- and forall i . Mi =alpha= Ni
-  --
-  -- That is, it does care about order and the names of variables.
-  -- The weights should also be the same.
-  isAlphaEquiv lbs1 lbs2 = let pairs = zip lbs1 lbs2
-                           in andM $ map checkEq pairs
-    where
-      checkEq :: ((String, Integer, Integer, T.Term)
-                , (String, Integer, Integer, T.Term))
-                -> CheckM Bool
-      checkEq ((n1, sw1, hw1, t1), (n2, sw2, hw2, t2))
-        | n1 == n2 && sw1 == sw2 && hw1 == hw2 = isAlphaEquiv t1 t2
-        | otherwise = return False
 
 -- | Given the law term L and two terms M and N,
 -- this function checks alpha equivalance of M and N. If L contains let-terms
@@ -322,10 +197,3 @@ checkRuleAlphaEquiv lawTerm m n = do
     isOrderedAlphaEq m n = let (mLNL, _) = toLocallyNameless m
                                (nLNL, _) = toLocallyNameless n
                            in mLNL == nLNL
-
-runToLocallyNameless :: T.Term -> CheckM (LNL.Term, Set.Set String)
-runToLocallyNameless term = return $ toLocallyNameless term
-
-liftEither :: Either String a -> CheckM a
-liftEither (Left errorMsg) = throwError errorMsg
-liftEither (Right a) = return a
