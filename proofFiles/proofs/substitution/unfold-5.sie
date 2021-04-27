@@ -1,0 +1,15 @@
+bindings{}
+
+proposition: |-
+  \a. \b. let {c =[0,0]= \d. a + b +d} in
+            let {e =[0,0]= \f. c} in e + c
+  |~>
+  \a. \b. let {c =[0,0]= \d. a + b +d} in
+            let {e =[0,0]= \f. \h. a + b +h}
+              in e + (\g. a + b +g);
+proof: -simple -single{
+  -unfold-5 ctx=(\a. \b. [.]) G= let {}
+    C=(let {e =[0,0]= [.]} in e + [.]) x=c V=(\h. a + b +h);
+  <~>
+}
+qed;
