@@ -32,32 +32,24 @@ initLNLSt = MkLNLSt { lambdaVars = Map.empty
                     , freeVars = Set.empty
                     }
 
-newtype LNLMonad a = Mk {getM :: (ExceptT String (StateT LNLSt Identity) a)}
-  deriving (Functor, Applicative, Monad, MonadState LNLSt, MonadError String)
-
-instance MonadFail LNLMonad where
-  fail str = throwError str
+newtype LNLMonad a = Mk {getM :: (StateT LNLSt Identity) a}
+  deriving (Functor, Applicative, Monad, MonadState LNLSt)
 
 -- | Converts the term to a locally nameless representation, as specified
 -- by the data structure in LocallyNameless.hs . Assumes that all named
 -- variables in the input term are distinct. Throws errors if there is an
 -- internal error in its implementation or the input data. Also returns the
 -- set of free variables found in the expression.
-toLocallyNameless :: T.Term -> Either String
-                               (LNL.Term, Set.Set String)
+toLocallyNameless :: T.Term -> (LNL.Term, Set.Set String)
 toLocallyNameless term =
-  let (res, state) = runIdentity (
+  let (lnlTerm, state) = runIdentity (
                        runStateT (
-                         runExceptT(
                           getM (
                             computeLNLTerm term
                           )
-                         )
                        ) initLNLSt
                      )
-  in case res of
-    Left errorMsg -> Left errorMsg
-    Right lnlTerm -> Right (lnlTerm, freeVars state)
+  in (lnlTerm, freeVars state)
 
 computeLNLTerm :: T.Term -> LNLMonad LNL.Term
 computeLNLTerm (T.TVar varName) = do
@@ -86,7 +78,7 @@ computeLNLTerm (T.TLam varName term) = do
   modify (\st -> st{lambdaVars = lambdaVars5})
   if lambdaVars0 == lambdaVars5
     then return ()
-    else fail "Internal error: assertion on lambda bindings failed."
+    else error "Internal error: assertion on lambda bindings failed."
   --6. Return a lnl lambda with the new lnl term
   return $ LNL.TLam lnlTerm
 computeLNLTerm (T.TLet letBinds mainTerm) = do
@@ -103,7 +95,7 @@ computeLNLTerm (T.TLet letBinds mainTerm) = do
   letVars2 <- gets letVars
   if newVar_set `Map.disjoint` letVars2
     then return ()
-    else fail "Internal error: let binding names are not unique"
+    else error "Internal error: let binding names are not unique"
   let letVars3 = letVars2 `Map.union` newVar_set
   modify (\st -> st{letVars = letVars3})
   -- 3. Convert the inner terms to lnl
@@ -124,7 +116,7 @@ computeLNLTerm (T.TLet letBinds mainTerm) = do
   modify (\st -> st{letVars = letVars7})
   if letVars0 == letVars7
     then return ()
-    else fail "Internal error: let-binding has faulty implementation"
+    else error "Internal error: let-binding has faulty implementation"
   -- 6. Create the new complete lnl term
   -- 6.1 Convert the weights. These should be equal in both representations.
   -- TODO convert the weight expressions when these are added to the language
@@ -160,7 +152,7 @@ computeLNLVar varName = do
       -- Add the free variable to the set of free variables
       modify (\st -> st{freeVars = Set.insert varName (freeVars st)})
       return $ LNL.FreeVar varName
-    (_, _, _) -> fail $ "Internal error: "++varName++" is bound to several "
+    (_, _, _) -> error $ "Internal error: "++varName++" is bound to several "
       ++"kinds of binding sites"
 
 computeLNLReduction :: T.Red -> LNLMonad LNL.Red

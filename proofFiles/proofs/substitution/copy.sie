@@ -1,0 +1,7 @@
+bindings{}
+
+proposition: |- \a. \b. \c. b + c |~> (\d. \e. \f. f + e) + \a. \b. \c. b + c ;
+proof: -simple -single{
+  -test-copy-1 ctx = [.] C=(\a. [.]) V=(\b.\c.b+c);
+  |~>
+}

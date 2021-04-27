@@ -1,4 +1,4 @@
-entrypoints LawList;
+entrypoints LawList, MetaVar;
 
 DLawList. LawList ::= [Law];
 
@@ -32,38 +32,50 @@ token MVTerm             ('M' | 'N');
 token MVPattern          ('p' 'a' 't');
 token MVCaseStm          ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
+-- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
+-- a way to share grammar between .cf files.
 
-TValueMetaVar.    Term1 ::= MVValue;
-TGeneralMetaVar.  Term1 ::= MVTerm;
-TVar.             Term1 ::= Var;
-TAppCtx.          Term1 ::= MVContext "[" Term "]";
-TAppValCtx.       Term1 ::= MVValueContext "[" Term "]";
-TNonTerminating.  Term1 ::= "@" ;
-TNum.             Term1 ::= Integer;
-TIndVar.          Term  ::= Var "^" IndExpr;
-TConstructor.     Term  ::= Constructor;
-TLam.             Term  ::= "\\" Var "." Term1 ;
-TLet.             Term  ::= "let" LetBindings "in" Term1;
-TStackSpike.      Term  ::= "s^" Term1;
-TStackSpikes.     Term  ::= "["StackWeight"]s^" Term1;
-THeapSpike.       Term  ::= "h^" Term1;
-THeapSpikes.      Term  ::= "["HeapWeight"]h^" Term1;
-TDummyBinds.      Term  ::= VarSet "d^" Term1;
-TRedWeight.       Term  ::= RedWeight "(" Red ")";
-TRedWeightMetaVar. Term ::= RedWeight MVReduction "[" Term "]";
-TRed.             Term  ::= Red;
-TSubstitution.    Term  ::= Term "[" Var "/" Var "]";
+rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVPattern | MVCaseStm | MVConstructorName;
 
-coercions Term 1;
+TValueMetaVar.    Term4 ::= MVValue;
+TGeneralMetaVar.  Term4 ::= MVTerm;
+TVar.             Term4 ::= Var;
+TAppCtx.          Term4 ::= MVContext "[" Term "]";
+TAppValCtx.       Term4 ::= MVValueContext "[" Term "]";
+TNonTerminating.  Term4 ::= "@" ;
+TNum.             Term4 ::= Integer;
+TIndVar.          Term4 ::= Var "^" IndExpr;
+TConstructor.     Term4 ::= Constructor;
+TStackSpike.      Term4  ::= "s^" Term4;
+TStackSpikes.     Term4  ::= "["StackWeight"]s^" Term4;
+THeapSpike.       Term4  ::= "h^" Term4;
+THeapSpikes.      Term4  ::= "["HeapWeight"]h^" Term4;
+TDummyBinds.      Term4  ::= VarSet "d^" Term4;
+TRedMetaVar.      Term4 ::= MVReduction "[" Term "]";
+TRedMetaVarW.     Term4 ::= RedWeight "^" MVReduction "[" Term "]" ;
 
-RMetaVar.    Red ::= MVReduction "[" Term "]";
-RCase.       Red ::= "case" Term "of" "{" [CaseStm] "}";
-RApp.        Red ::= Term Var;
-RAddConst.   Red ::= "add" Integer Term1;
-RIsZero.     Red ::= "iszero" Term1;
-RSeq.        Red  ::= "seq" Term1 Term1 ;
-RPlusWeight. Red  ::= Term "+" RedWeight Term1;
-RPlus.       Red  ::= Term "+" Term1;
+TSubstitution.    Term3  ::= Term4 "[" Var "/" Var "]";
+
+TRApp.        Term2 ::= Term2 Var;
+TRAppW.       Term2 ::= RedWeight "(" Term2 Var ")";
+
+TRPlus.    Term1    ::= Term1 "+" Term2;
+TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
+TRPlusW2.  Term1    ::= Term1 "+" RedWeight Term2;
+TRPlusWW.  Term1    ::= RedWeight "(" Term1 "+" RedWeight Term2 ")";
+
+TLam.             Term  ::= "\\" Var "." Term ;
+TLet.             Term  ::= "let" LetBindings "in" Term;
+
+TRCase.       Term ::= MaybeRedWeight "case" Term "of" "{" [CaseStm] "}";
+TRAddConst.   Term ::= MaybeRedWeight "add" Integer Term1;
+TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
+TRSeq.        Term ::= MaybeRedWeight "seq" Term4 Term4;
+
+coercions Term 4;
+
+WithRedWeight. MaybeRedWeight ::= RedWeight;
+NoRedWeight.   MaybeRedWeight ::= ;
 
 separator Var "";
 VSMetaVar.  VarSet ::= MVVarSet;

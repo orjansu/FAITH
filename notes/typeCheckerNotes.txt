@@ -54,7 +54,7 @@ FV -- Term or context -> Set(Var). Del av syntax och ej variabel
 Language notes, patternmatch:
 bara här används "?"
 
-Proofs:
+---------------Proofs:-----------
 Ide: om man vill kanske man kan ha en av variablerna från laws.sie här?
 t.ex.
   on "s^M" spike-algebra-13.
@@ -79,6 +79,12 @@ on repeat -def-unwindings base;
 -- Detta börjar likna ott rätt så rejält.
 -- Testa att försöka uttrycka detta i Ott, och se vad det ger.
 -- Ott har bara konkret syntax för variabler, så det blir krångligt.
+Kommentar SimplerProofScript:
+En sak som kan bli krångligt här är att man eventuellt vill
+referera till variabelnamn som tolkaren har skrivit ut i repl.
+Det kan göra bevisen mer svårlästa. Dock, om man bara skriver
+denna filen helt själv är detta nog ungefär så mycket som man
+skulle vilja skriva.
 
 Language notes, detailed:
 [.] som hole
@@ -93,18 +99,18 @@ kolla en expression mot en regel i laws.sie
 
 ---- Att kolla i typecheckern ---
 Typecheck 1
--Contexts används bara som argument
+x-Contexts används bara som argument
 -Bindingar i InContext är deklarerade i bindings
 -? används bara i on
 variabler är deklarerade
    -alla variabler kan vara:
-      -deklarerade som fria i början
-        -bindningar i bindings får ej innehålla fria variabler
-      -bundna till en letbindning som binder till termen den nämns i
+      x-deklarerade som fria i början
+        x-bindningar i bindings får ej innehålla fria variabler
+      x-bundna till en letbindning som binder till termen den nämns i
          dvs M i (let G in M)
-      -bundna till en konstruktor i en case-sats
-      -bundna till en annan let-bindning i samma let-sats
-      -bindna till en lambda som är relevant
+      x-bundna till en konstruktor i en case-sats
+      x-bundna till en annan let-bindning i samma let-sats
+      x-bindna till en lambda som är relevant
    -any(M) -> M behöver vara deklarerad fri? - ja
    -stack weights:
       -idents måste vara deklarerade fria?
@@ -114,7 +120,7 @@ variabler är deklarerade
 -Konstruktorer är deklarerade och fyllda
    -syntax för att deklarera dem saknas. (ngt i Bindings)
 -> kolla bara bevis fram till <==here-symbolen.
--alla bindande variabler är unika
+x-alla bindande variabler är unika
 
 -Korrekthet av bevis
   -Endast rätt relationssymbol får användas mellan varje term
@@ -168,3 +174,107 @@ prop_rename_equiv term1 =
   (Om jag gör en som renamear bara de som behövs, så borde jag kunna göra
   en variant när bara ett subset av variabler renameas)
 -även om ex \x\y\z(x+y+z) =def= \a\b\c(a+b+c) så x+y+z !=def= a+b+c
+prop_typechecking :: UT.Program -> Monad prop
+prop_typechecking p = typed <- typecheck p
+                      let untyped = ShowTypedTerm.toUntyped typed
+                      typed2 <- typecheck untyped
+                      return (typed == typed2) && (p == untyped)
+prop_get_subTerm_insert :: Context -> Term
+prop_get_subterm_insert C M = N <- getSubterm C M
+                              M' <- insert C N
+                              M `alphaEq` M'
+forall terms .
+  - getBoundVariables term `Set.intersection` getFreeVariables term = Set.empty
+  - getBoundVariables term `Set.union` getFreeVariables term
+      = getAllVariables term
+
+forall terms M, Sets S
+  M2 <- renameNeeded M S
+  getBoundVariables M2 `Set.disjoint` S
+------------ Övriga idéer --------------
+-Istället för att göra separata bevisregler som jobbar på enskilda bevis, gör bevisregler som jobbar mellan bevis som är i samma fil. Ge bevisen namn och ha sen en regel för induktion som är
+Grund -> M
+IH |- Induktion -> M
+eller en bevisprincip som går på case-satserna
+-Skriv explicit vilka regler som beviset använder genom att ge namnet på lagfilen de ligger i. Då kan man även lägga till egna regler, t.ex. induktiva hypotesen
+- Skippa att behöva implementera matching i detta fallet genom att be användaren specificera både subterm och kontext. Detta innebär att jag nog bara behöver implementera substitution/transformation på ett korrekt sätt.
+- Det borde gå att skapa termer utan att behöva oroa sig så mycket över typning om man tar bort applikation, konstruktörer och case-satser. Altså att man i princip bara har plus. Då kommer typen på allting vara Int. Risken är att den inte terminerar. Om det blir ett problem så kan man göra så att let-satser inte är rekursiva, men då tar man bort mycket av spacet av program.
+
+-------------- Alpha equivalence ------------
+När man bara kollar alpha-ekvivalens mellan bara let-bindings, skulle man kunna
+göra så att
+  -- | For now, the order of let-bindings does not matter,
+  -- but the names of the variables does matter. This means that
+  -- let {x = 1, y = 2} in 1 =alpha= let {y = 2, x = 1} in 1
+  -- but
+  -- let {x = 1, y = 2} in 1 =NotAlpha= let {y = 1, x = 2} in 1
+  -- This incurs a O(n! + n*t) complexity but  not O(n!*n*t*r), where
+  -- n=num(bindings), t is the time complexity for checking
+  -- alpha equivalence between two terms and r is the time complexity
+  -- for renaming a single term with the new ordering of bindings
+Vilket skulle vara bra för att kolla att en regel med subtitutioner
+skulle vara alpha-ekvivalent med starttermen. Ett par saker man kan uttnytja
+för att inte testa alla ordningar:
+- Det finns, i de nuvarande lagarna ingen C[let G in M], vilket gör att det
+  - Finns ett konstant antal let:s
+  - Är en konstant längd från start på regeltermen till alla let:s som är
+    specificerade.
+Om man skulle testa alla ordningar skulle man göra i princip, i en special, som
+bara är för att testa en substituerad regel mot en term:
+- Om inte alpha-eq
+- Om den o-substituerade regeltermen har en let:
+  - Skapa alla permutationer av första let:en i termen
+    - Om det inte är alpha-eq, skapa alla permutationer av andra let:en i termen
+    - osv
+  - Det skulle vara smart om man bara ändrar permutationer på let:s som finns i
+    den osubstituerade regeltermen och inte alla let:s i hela termen.
+En annan approach är att när man substituerar, så sparar man vilka ordningar man har bytt, och använder det för att skapa alpha-ekvivalens. Det blir lite krångligare och mindre generellt, och inte lika självklart att det blir likadant. Jag tror mer på approachen ovan.
+
+-------------- Matching Contexts on terms -------------------------
+Variationer:
+C may contain more than one hole. In that case, all subterms matching those
+holes in M has to be alpha-equivalent. However, C needs to be a syntactic
+copy of M, with some of its subterms replaced with holes. That is, the
+variable names has to match, so in C[N] =alpha= M, only the names of bound
+variables in N may vary, not the bound variables in C.
+
+Note: I could easily make it so that subterms that do not contain holes can
+be alpha-equivalent and not needing their variable names match.
+
+getSubterm' :: C M (potential N)
+The potential N is to make sure that if the term contains more than
+one hole, the terms in all of the holes should be alpha-equivalent.
+
+Jag är osäker på vilka implementationer och frihetsgrader som skulle vara korrekta.
+TODO: fråga om detta på måndag.
+
+TODO: Gör så att kontexter har et set av deras bundna variabler. På detta sättet blir alpha-ekvivalens av kontexter korrekta. Det är de inte nu tror jag.
+
+-------------- Saker att ta upp på presentationen -----------------------------
+-Först trodde att det fanns ngt verktyg som kan göra detta åt en - insåg nej
+-Sen trodde att UNIE enkelt kan expanderas - nej
+-Sen göra själv.
+  -Vision (kort)
+  -Status (demo av alpha-eq, och ev ev ev en enkel transformation)
+  -Variabel-representation
+    -Lösning: Unika namn och De Bruijn
+    -Endast de bruijn - krångligt vid alpha-eq av subtermer samt generell spec
+     av transformationer
+    -Endast unika namn - ingen alpha-ekvivalens, men enkel spec av
+     transformationer
+    -HOAS shallow embedding - krångligt att visa termer, modifiera dem, och
+     i allmänhet göra särskilt mycket annat än typ beta-reduktion tror jag...
+  -Set
+    -Case och Letrecs.
+      -Case: fastställ en ordning på konstruktorer
+      -Letrec
+        -Semantiken säger att varken ordning eller namn på variabler spelar roll
+          -Om namn skulle spela roll: Hitta snabbt (O(n!)) ordning på variabler
+          -Om ordning skulle spela roll: Kör bara alpha-eq rakt på.
+            -Detta är okej i alla fall förutom när man ska alpha-eq-kolla
+             substituerade regler mot termer
+  -Läs artikeln om matching
+
+-- TODO -- Glöm inte
+> Vid <~> som används med |~>, ha ngt sätt att indikera vilken riktning som
+används.

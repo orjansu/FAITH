@@ -1,46 +1,76 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module MiniTypeChecker where
+module MiniTypeChecker (typecheckProof, checkTypedTerm) where
 
+import qualified ParSieLaws (pMetaVar, myLexer)
+import qualified AbsSieLaws as UTLaw
 import qualified AbsSie as UT
+
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
+import qualified Common as Com (ImpRel(..))
 
+import Data.Text (pack)
+import qualified Control.Monad.Logger as Log
+import Data.List.Extra (firstJust)
+import Data.List (intercalate)
 import qualified Data.Set as Set
-import Control.Monad.Except
-import Control.Monad.State
-import Data.Functor.Identity
+import qualified Data.Map.Strict as Map
+import Data.Maybe (catMaybes)
+import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
+import Control.Monad.State (StateT, runStateT, gets, MonadState, modify)
+import Control.Monad.Extra (firstJustM)
+import Data.Functor.Identity (Identity, runIdentity)
+import GHC.Stack (HasCallStack)
 
-import Debug.Trace (trace)
+import ShowTypedTerm (showTypedTerm)
+import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
+  , checkFreeVars, getBoundVariables, isValue, getAllMetaVars)
+import ToLocallyNameless (toLocallyNameless)
+import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport)
 
 data MySt = MkSt {letContext :: Maybe T.LetBindings
                  , start :: T.Term
                  , goal :: T.Term
+                 , freeVarVars :: Set.Set String
+                 , lawMap :: Law.LawMap
                  }
 
-initSt :: MySt
-initSt = MkSt {letContext = undefined, start= undefined, goal = undefined}
+mkInitSt :: Law.LawMap -> MySt
+mkInitSt lawMap = MkSt {letContext = undefined
+                       , start= undefined
+                       , goal = undefined
+                       , freeVarVars = undefined
+                       , lawMap = lawMap
+                       }
 
-newtype CheckM a = Mk {getM :: (StateT MySt (ExceptT String Identity) a)}
-  deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String)
+newtype StCheckM a = Mk {getM :: (StateT MySt CheckM a)}
+  deriving (Functor, Applicative, Monad, MonadState MySt, MonadError String
+            , Log.MonadLogger)
 
-instance MonadFail CheckM where
+instance MonadFail StCheckM where
     fail str = throwError str
 
-typecheck :: UT.ProofScript -> Either String T.ProofScript
-typecheck untypedProofScript = do
-  let res = runIdentity (
-              runExceptT (
-                runStateT
-                  (getM (check untypedProofScript))
-                  initSt
-                )
-              )
+typecheckProof :: (HasCallStack) =>
+                  UT.ProofScript -> Law.LawMap -> Either String T.ProofScript
+typecheckProof proofScript lawMap =
+  let initSt = mkInitSt lawMap
+  in runStCheckM initSt $ check proofScript
+
+runStCheckM :: MySt -> StCheckM a -> Either String a
+runStCheckM initSt monadic = do
+  let res = runCheckM $
+              (flip runStateT) initSt $
+                  getM monadic
+
   case res of
-    Left errorMsg                    -> Left errorMsg
-    Right (typedProofScript, _state) -> Right typedProofScript
+    Left errorMsgs -> let combined = intercalate "\n" errorMsgs
+                      in Left combined
+    Right (a, _st) -> Right a
 
 --- Utility
 -- converts the term M to let G in M if G is the context of the proof.
@@ -52,7 +82,7 @@ typecheck untypedProofScript = do
 -- proposition |- M <~> N
 -- then this function is the identity function.
 -- Cannot be used before the context is parsed.
-withLetContext :: T.Term -> CheckM T.Term
+withLetContext :: T.Term -> StCheckM T.Term
 withLetContext startTerm = do
   context <- gets letContext
   case context of
@@ -60,7 +90,7 @@ withLetContext startTerm = do
     Just letBindings -> return $ T.TLet letBindings startTerm
 
 -- | the inverse of withLetContext
-removeImplicitLet :: T.Term -> CheckM T.Term
+removeImplicitLet :: HasCallStack => T.Term -> StCheckM T.Term
 removeImplicitLet startTerm = do
   context <- gets letContext
   case context of
@@ -69,9 +99,15 @@ removeImplicitLet startTerm = do
       T.TLet _ inner -> return inner
       _ -> fail "internal: Tried to remove implicit let but there is none."
 
+-- Checks correctness of a
 class Checkable a where
   type TypedVersion a
-  check :: a -> CheckM (TypedVersion a)
+  check :: HasCallStack => a -> StCheckM (TypedVersion a)
+
+-- Just transforms a to its typed version
+class Transformable a where
+  type TransformedVersion a
+  transform :: HasCallStack => a -> StCheckM (TransformedVersion a)
 
 instance Checkable UT.ProofScript where
   type TypedVersion UT.ProofScript = T.ProofScript
@@ -85,19 +121,20 @@ instance Checkable UT.Theorem where
   check (UT.DTheorem (UT.DProposition UT.NoContext
                                        freeVars
                                        start
-                                       UT.DefinedEqual
+                                       impRel
                                        goal) proof) = do
     modify (\st -> st{letContext = Nothing})
     tFreeVars <- check freeVars
-    -- TODO add freeVars to ctx
-    tStart <- check start
-    tGoal <- check goal
+    let T.DFreeVars termVars varVars = tFreeVars
+    modify (\st -> st{freeVarVars = varVars})
+    tStart <- checkTopLevelTerm start
+    tGoal <- checkTopLevelTerm goal
     modify (\st -> st{start = tStart, goal = tGoal})
     tProof <- check proof
-    let prop = T.DProposition tFreeVars tStart T.DefinedEqual tGoal
+    tImpRel <- check impRel
+    let prop = T.DProposition tFreeVars tStart tImpRel tGoal
     return $ T.DTheorem prop tProof
   check _ = fail "not implemented yet 2"
-
 
 instance Checkable UT.Free where
   type TypedVersion UT.Free = T.FreeVars
@@ -119,104 +156,105 @@ instance Checkable UT.Free where
       getString (UT.SmallVar (UT.Ident name)) = name
   check UT.NoFree = return $ T.DFreeVars Set.empty Set.empty
 
-instance Checkable UT.Term where
-  type TypedVersion UT.Term = T.Term
-  -- | Checks a term, which consists of the following:
-  -- - Converts to T.Term.
-  -- - Checks that all variable names are unique wrt the whole term (TODO)
-  -- - Does not: Checks typing of a typical lambda calculus
-  -- - Variables are declared or bound (TODO)
-  -- - General terms, i.e. any(M) are declare free (TODO)
-  -- - Stack weight expressions: See checkWeightExpr
-  check :: UT.Term -> CheckM T.Term
-  check (UT.TAny)                          = fail "not implemented yet 3"
-  check (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
-  check (UT.TNonTerminating)               = fail "not implemented yet 5"
-  check (UT.TVar var)                      = do
-    tVar <- checkMentionedVar var
-    return $ T.TVar tVar
-  check (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
-  check (UT.TNum integer)                  = return $ T.TNum integer
-  check (UT.THole)                         = return T.THole
-  check (UT.TConstructor constructor)      = fail "not implemented yet 7"
-  check (UT.TLam var term)                 = do
-    tVar <- checkBindingVarUnique var
-    -- TODO add the var to the binding list for lambdas
-    tTerm <- check term
-    return $ T.TLam tVar tTerm
-  check (UT.TLet letBindings term)         = do
-    tLetBindings <- check letBindings
-    tTerm <- check term
-    return $ T.TLet tLetBindings tTerm
-  check (UT.TStackSpike term)              = fail "not implemented yet 8"
-  check (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
-  check (UT.THeapSpike term)               = fail "not implemented yet 10"
-  check (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
-  check (UT.TDummyBinds varSet term)       = do
-    tVarSet <- check varSet
-    tTerm <- check term
-    return $ T.TDummyBinds tVarSet tTerm
-  check (UT.TRedWeight redWeight red)      = do
-    case redWeight of
-      UT.DRedWeight (UT.StackWeightExpr (UT.IENum n)) -> do
-        tRed <- check red
-        return $ T.TRedWeight n tRed
-      _ -> fail "not implemented yet"
-  check (UT.TRed red)                      = do
-    tRed <- check red
-    return $ T.TRedWeight 1 tRed
+-- | Checks a term, which consists of the following:
+-- - Converts to T.Term.
+-- - Adds the implicit let of derivations in context (if there is one)
+-- - Stack weight expressions: See checkWeightExpr
+checkTopLevelTerm :: UT.Term -> StCheckM T.Term
+checkTopLevelTerm term = do
+  transformed <- transform term
+  withLet <- withLetContext transformed
+  expectedFreeVars <- gets freeVarVars
+  checkTypedTerm withLet expectedFreeVars
+  return withLet
 
-instance Checkable UT.LetBindings where
-  type TypedVersion UT.LetBindings = T.LetBindings
-  check UT.LBSAny = fail "not implemented yet 12"
-  check (UT.LBSVar capitalIdent) = fail "not implemented yet"
-  check (UT.LBSSet bindingSetList) = do
-    tLetBindings <- mapM checkSingle bindingSetList
+instance Transformable UT.Term where
+  type TransformedVersion UT.Term = T.Term
+  transform :: UT.Term -> StCheckM T.Term
+  transform (UT.TAny)                          = fail "not implemented yet 3"
+  transform (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
+  transform (UT.TNonTerminating)               = fail "not implemented yet 5"
+  transform (UT.TVar var)                      = do
+    let tVar = getVarName var
+    return $ T.TVar tVar
+  transform (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
+  transform (UT.TNum integer)                  = return $ T.TNum integer
+  transform (UT.THole)                         = return T.THole
+  transform (UT.TConstructor constructor)      = fail "not implemented yet 7"
+  transform (UT.TLam var term)                 = do
+    let tVar = getVarName var
+    tTerm <- transform term
+    return $ T.TLam tVar tTerm
+  transform (UT.TLet letBindings term)         = do
+    tLetBindings <- transform letBindings
+    tTerm <- transform term
+    return $ T.TLet tLetBindings tTerm
+  transform (UT.TStackSpike term)              = fail "not implemented yet 8"
+  transform (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
+  transform (UT.THeapSpike term)               = fail "not implemented yet 10"
+  transform (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
+  transform (UT.TDummyBinds varSet term)       = do
+    tVarSet <- transform varSet
+    tTerm <- transform term
+    return $ T.TDummyBinds tVarSet tTerm
+  transform (UT.TRApp term var) = do
+    tTerm <- transform term
+    let tVar = getVarName var
+    return $ T.TRedWeight 1 $ T.RApp tTerm tVar
+  transform (UT.TRAppW redWeight term var) = noSupport "TRAppW"
+  transform (UT.TRPlus term1 term2) =
+    transformPlus Nothing term1 Nothing term2
+  transform (UT.TRPlusW1 redWeight term1 term2) =
+    transformPlus (Just redWeight) term1 Nothing term2
+  transform (UT.TRPlusW2 term1 redWeight term2) =
+    transformPlus Nothing term1 (Just redWeight) term2
+  transform (UT.TRPlusWW redWeight1 term1 redWeight2 term2) =
+    transformPlus (Just redWeight1) term1 (Just redWeight2) term2
+  transform (UT.TRCase maybeRedWeight term caseStms) = noSupport "TRCase"
+  transform (UT.TRAddConst maybeRedWeight integer term) = noSupport "TRAddConst"
+  transform (UT.TRIsZero maybeRedWeight term) = noSupport "TRIsZero"
+  transform (UT.TRSeq maybeRedWeight term1 term2) = noSupport "TRSeq"
+
+transformPlus :: Maybe UT.RedWeight
+                 -> UT.Term
+                 -> Maybe UT.RedWeight
+                 -> UT.Term
+                 -> StCheckM T.Term
+transformPlus rw1 t1 rw2 t2 = do
+  trans1 <- transform t1
+  trans2 <- transform t2
+  case (rw1, rw2) of
+    (Nothing, Nothing) ->
+      return $ T.TRedWeight 1 $ T.RPlusWeight trans1 1 trans2
+    _ -> fail "not implemented yet: weights on Plus"
+
+instance Transformable UT.LetBindings where
+  type TransformedVersion UT.LetBindings = T.LetBindings
+  transform UT.LBSAny = fail "not implemented yet 12"
+  transform (UT.LBSVar capitalIdent) = fail "not implemented yet"
+  transform (UT.LBSSet bindingSetList) = do
+    tLetBindings <- mapM transformSingle bindingSetList
     return tLetBindings
     where
-      checkSingle :: UT.LetBinding
-                     -> CheckM (T.Name, T.StackWeight, T.HeapWeight, T.Term)
-      checkSingle UT.LBAny = fail "not implemented yet 13"
-      checkSingle (UT.LBConcrete var UT.BSNoWeight term) = do
-        tVar <- checkBindingVarUnique var
-        -- TODO add var to let binding list
-        tTerm <- check term
+      transformSingle :: UT.LetBinding
+                     -> StCheckM (T.Name, T.StackWeight, T.HeapWeight, T.Term)
+      transformSingle UT.LBAny = fail "not implemented yet 13"
+      transformSingle (UT.LBConcrete var UT.BSNoWeight term) = do
+        let tVar = getVarName var
+        tTerm <- transform term
         return (tVar, 1,1, tTerm)
-      checkSingle (UT.LBConcrete var withWeight term) =
+      transformSingle (UT.LBConcrete var withWeight term) =
         fail "not implemented yet 14"
 
 
-instance Checkable UT.VarSet where
-  type TypedVersion UT.VarSet = T.VarSet
-  check (UT.DVarSet vars) = do
-    tVars <- mapM checkMentionedVar vars
+instance Transformable UT.VarSet where
+  type TransformedVersion UT.VarSet = T.VarSet
+  transform (UT.DVarSet vars) = do
+    let tVars = map getVarName vars
     return $ Set.fromList tVars
 
-instance Checkable UT.Red where
-  type TypedVersion UT.Red = T.Red
-  check (UT.RCase term caseStms)               = fail "not implemented yet 15"
-  check (UT.RApp term var)                     = do
-    tTerm <- check term
-    tVar <- checkMentionedVar var
-    return $ T.RApp tTerm tVar
-  check (UT.RAddConst integer term)            = fail "not implemented yet 16"
-  check (UT.RIsZero term)                      = fail "not implemented yet 17"
-  check (UT.RSeq term1 term2)                  = fail "not implemented yet 18"
-  check (UT.RPlusWeight term1 redWeight term2) = fail "not implemented yet 19"
-  check (UT.RPlus term1 term2)                 = do
-    tTerm1 <- check term1
-    tTerm2 <- check term2
-    return $ T.RPlusWeight tTerm1 1 tTerm2
-
--- | TODO check that the var is bound or declared free
-checkMentionedVar :: UT.Var -> CheckM T.Var
-checkMentionedVar (UT.DVar (UT.Ident name)) = return name
-
--- | TODO:
--- - Check that the binding var is not declared before
--- (in that case rename or return something else?)
-checkBindingVarUnique :: UT.Var -> CheckM T.Var
-checkBindingVarUnique (UT.DVar (UT.Ident name)) = return name
+getVarName :: UT.Var -> String
+getVarName (UT.DVar (UT.Ident name)) = name
 
 instance Checkable UT.Proof where
   type TypedVersion UT.Proof = T.Proof
@@ -232,61 +270,51 @@ instance Checkable UT.Proof where
       -- be (t1, t2), (t2', t3), (t3', t4)
       -- make sure that t2 and t2' point to the same values.
       -- TODO: HereMarker ($)
-      checkSteps1 :: [UT.ProofStep] -> CheckM T.SubProof
-      checkSteps1 ((UT.PSCmd subterm transCmd):(UT.PSImpRel imprel):[]) = do
+      checkSteps1 :: [UT.ProofStep] -> StCheckM T.SubProof
+      checkSteps1 ((UT.PSCmd transCmd):(UT.PSImpRel imprel):[]) = do
         -- Replace first term with start and last term with goal.
         tStart <- gets start
-        shownStart <- removeImplicitLet tStart
-        tSubTerm <- getSubTerm subterm shownStart
         tTransCmd <- check transCmd
         tImprel <- check imprel
         tEnd <- gets goal
-        return $ [T.PSMiddle tStart tSubTerm tTransCmd tImprel tEnd]
-      checkSteps1 ((UT.PSCmd subterm transCmd)
+        return $ [T.PSMiddle tStart tTransCmd tImprel tEnd]
+      checkSteps1 ((UT.PSCmd transCmd)
                    :(UT.PSImpRel imprel)
                    :(UT.PSTerm term2)
                    :cmds) = do
         -- If first term is not specified, substitute for the start term. note
         -- that this doesn't work in the inductive case.
         startTerm <- gets start
-        startTermRaw <- removeImplicitLet startTerm
         tTransCmd <- check transCmd
-        tSubterm <- getSubTerm subterm startTermRaw
         tImprel <- check imprel
-        tTerm2 <- withLetContext =<< check term2
-        let proofStep = T.PSMiddle startTerm tSubterm tTransCmd tImprel tTerm2
+        tTerm2 <- checkTopLevelTerm term2
+        let proofStep = T.PSMiddle startTerm tTransCmd tImprel tTerm2
         proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
         return $ proofStep:proofSteps
       checkSteps1 steps = checkSteps2 steps
 
-      checkSteps2 :: [UT.ProofStep] -> CheckM T.SubProof
+      checkSteps2 :: [UT.ProofStep] -> StCheckM T.SubProof
       checkSteps2 [] = return []
       checkSteps2 ((UT.PSTerm term1)
-                     :(UT.PSCmd subterm transCmd)
+                     :(UT.PSCmd transCmd)
                      :(UT.PSImpRel imprel)
                      :(UT.PSTerm term2)
                      :cmds) = do
-        proofStep <- checkProofStep term1 subterm transCmd imprel term2
+        proofStep <- checkProofStep term1 transCmd imprel term2
         proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
         return $ proofStep:proofSteps
       checkSteps2 ((UT.PSTerm term1)
-                   :(UT.PSCmd subterm transCmd)
+                   :(UT.PSCmd transCmd)
                    :(UT.PSImpRel impRel)
                    :[]) = do
         -- If the last term is skipped, the last term is implicitly the goal,
         -- so we put it after. Note that the last improvement relation is
         -- still needed (at least at this stage)
-        tTerm1 <- check term1
-        tTerm1wCtx <- withLetContext tTerm1
-        tSubterm <- getSubTerm subterm tTerm1
+        tTerm1 <- checkTopLevelTerm term1
         tTransCmd <- check transCmd
         tImpRel <- check impRel
-        tTerm2wCtx <- gets goal
-        let proofStep = T.PSMiddle tTerm1wCtx
-                                   tSubterm
-                                   tTransCmd
-                                   tImpRel
-                                   tTerm2wCtx
+        tTerm2 <- gets goal
+        let proofStep = T.PSMiddle tTerm1 tTransCmd tImpRel tTerm2
         return [proofStep]
       checkSteps2 ((UT.PSTerm _ ):[]) = return []
                    --The last term is in the next-to-last proof step too, so
@@ -296,51 +324,170 @@ instance Checkable UT.Proof where
         ++"and an improvement relation. Note that the HereMarker $ is not "
         ++"supported yet."
 
-      checkProofStep :: UT.Term -> UT.SubTerm -> UT.TransCmd -> UT.ImpRel
-                        -> UT.Term -> CheckM T.ProofStep
-      checkProofStep term1 subterm transCmd imprel term2 = do
-        tTerm1 <- check term1
-        tTerm1withCtx <- withLetContext tTerm1
+      checkProofStep :: UT.Term -> UT.TransCmd -> UT.ImpRel
+                        -> UT.Term -> StCheckM T.ProofStep
+      checkProofStep term1 transCmd imprel term2 = do
+        tTerm1 <- checkTopLevelTerm term1
         command <- check transCmd
-        tSubTerm <- getSubTerm subterm tTerm1
         tImprel <- check imprel
-        tTerm2 <- check term2
-        tTerm2withCtx <- withLetContext tTerm2
-        let proofStep = T.PSMiddle tTerm1withCtx
-                                   tSubTerm
-                                   command
-                                   tImprel
-                                   tTerm2withCtx
+        tTerm2 <- checkTopLevelTerm term2
+        let proofStep = T.PSMiddle tTerm1 command tImprel tTerm2
         return proofStep
   check (UT.PGeneral commandName cmdArgs subProofs UT.DQed) =
     fail "not implemented yet 20"
 
--- | Takes an expression (or command) for a subterm and the term it expresses
--- a subterm of, and returns the corresponding typed subterm if exactly one
--- such subterm exists. Throws an error otherwise.
--- Parameters: subterm-expression, term (without let-context)
--- returns: the term expressed by the subterm-expression.
-getSubTerm :: UT.SubTerm -> T.Term -> CheckM T.Term
-getSubTerm UT.STWholeWithCtx term = withLetContext term
-getSubTerm UT.STShown term = return term
-getSubTerm (UT.STTerm subtermExpr) term = fail "not implemented yet 21"
-getSubTerm UT.STGuess term = fail "not implemented yet 22"
-
 instance Checkable UT.ImpRel where
-  type TypedVersion UT.ImpRel = T.ImpRel
-  check UT.DefinedEqual        = return T.DefinedEqual
-  check UT.StrongImprovementLR = fail "not implemented yet 22.1"
-  check UT.WeakImprovementLR   = fail "not implemented yet 23"
+  type TypedVersion UT.ImpRel = Com.ImpRel
+  check UT.DefinedEqual        = return Com.DefinedEqual
+  check UT.StrongImprovementLR = return Com.StrongImprovementLR
+  check UT.WeakImprovementLR   = return Com.WeakImprovementLR
   check UT.StrongImprovementRL = fail "not implemented yet 24"
   check UT.WeakImprovementRL   = fail "not implemented yet 25"
-  check UT.StrongCostEquiv     = fail "not implemented yet 26"
-  check UT.WeakCostEquiv       = fail "not implemented yet 27"
+  check UT.StrongCostEquiv     = return Com.StrongCostEquiv
+  check UT.WeakCostEquiv       = return Com.WeakCostEquiv
 
 instance Checkable UT.TransCmd where
-  type TypedVersion UT.TransCmd = Law.Command
-  check (UT.CmdSpecial UT.STCAlphaEquiv) = return Law.AlphaEquiv
-  check (UT.CmdSpecial (UT.STCReorderLet varOrder)) =
-    fail "not implemented yet 28"
-  check (UT.CmdSpecial (UT.STCReorderCase varOrder)) =
-    fail "not implemented yet 29"
-  check (UT.CmdGeneral cmdName args)  = fail "not implemented yet 30"
+  type TypedVersion UT.TransCmd = T.Command
+  check (UT.CmdSpecial UT.STCAlphaEquiv) = return T.AlphaEquiv
+  check (UT.CmdGeneral (UT.CommandName commandName) args)  = do
+    laws <- gets lawMap
+    case Map.lookup commandName laws of
+      Nothing -> throwError $ "The law "++commandName++" does not correspond "
+                   ++"to a law in the law file."
+      Just law -> do
+        Log.logInfoN . pack $ "Checking arguments to transformation "
+                              ++commandName
+        context <- getContext args
+        checkedMaybeArgs <- mapM checkArg args
+        let checkedArgs = catMaybes checkedMaybeArgs
+            substitutions = Map.fromList checkedArgs
+        checkAllSubstitutionsProvided law substitutions
+        return $ T.Law context law substitutions
+
+instance Checkable UT.IntExpr where
+  type TypedVersion UT.IntExpr = T.IntExpr
+  check (UT.IEAny) = noSupport "IEAny"
+  check (UT.IEVar _) = noSupport "IEVar"
+  check (UT.IENum integer) = return $ T.IENum integer
+  check (UT.IEPlus _ _) = noSupport "IEPlus"
+  check (UT.IEMinus _ _) = noSupport "IEMinus"
+
+getContext :: HasCallStack => [UT.CmdArgument] -> StCheckM T.Term
+getContext args = do
+  case firstJust getCtx args of
+    Just utCtx -> do
+      transCtx <- transform utCtx
+      checkBoundVariablesDistinct transCtx
+      assert (numHoles transCtx == 1) $ "The context should contain exactly "
+        ++"one hole, for context "++showTypedTerm transCtx
+      -- Since the context should be with respect to the whole term, we should
+      -- be able to check free variables
+      expectedFreeVars <- gets freeVarVars
+      checkFreeVars transCtx expectedFreeVars
+      return transCtx
+    Nothing -> throwError $ "The law does not specify the context that it is applied in. SIE is currently not able to guess that."
+  where
+    getCtx :: UT.CmdArgument -> Maybe UT.Term
+    getCtx (UT.CAAssign assignee value) = case assignee of
+      UT.CAMetaVar _ -> Nothing
+      UT.CASubTerm -> case value of
+        UT.CVSubTerm UT.STWholeWithCtx -> Just UT.THole
+        _ -> Nothing
+      UT.CAContext -> case value of
+        UT.CVSubTerm (UT.STTerm term) -> Just term
+        _ -> Nothing
+    getCtx _ = Nothing
+
+
+checkArg :: HasCallStack => UT.CmdArgument
+                            -> StCheckM (Maybe (String, T.Substitute))
+checkArg (UT.CAValue _) = noSupport "CAValue"
+checkArg (UT.CAAssign assignee value) = case assignee of
+  UT.CASubTerm -> return Nothing
+  UT.CAContext -> return Nothing
+  UT.CAMetaVar metaVar -> do
+    let mvStr = case metaVar of
+                  UT.BigVar (UT.CapitalIdent str) -> str
+                  UT.SmallVar (UT.Ident str) -> str
+    logCheckArg mvStr
+    parMV <- case (ParSieLaws.pMetaVar (ParSieLaws.myLexer mvStr)) of
+               Left err -> throwError $ "Error when parsing metavariable: "++err
+               Right parsed -> return parsed
+    case parMV of
+      UTLaw.MetaVarMVLetBindings (UTLaw.MVLetBindings name) -> case value of
+        UT.CVLet letBindings -> do
+          transLet <- transform letBindings
+          let inTerm = T.TLet transLet (T.TNum 1)
+          checkArgumentTerm inTerm
+          assert (numHoles inTerm == 0) "Argument should not be a context."
+          return $ Just (name, T.SLetBindings transLet)
+        _ -> throwError $ "argument for "++mvStr++" is not a let-binding."
+      UTLaw.MetaVarMVValue (UTLaw.MVValue name) -> do
+        case value of
+          UT.CVSubTerm (UT.STTerm term) -> do
+            tTerm <- transform term
+            assertTerm (isValue tTerm) "should be a value" tTerm
+            checkArgumentTerm tTerm
+            assert (numHoles tTerm == 0) "Argument should not be a context"
+            return $ Just (name, T.SValue tTerm)
+          UT.CVSubTerm _ -> noSupport "non-explicit subterm"
+          _ -> throwError $ "value for "++name++" is not a term"
+      UTLaw.MetaVarMVContext (UTLaw.MVContext name) -> do
+        case value of
+          UT.CVSubTerm (UT.STTerm utCtx) -> do
+            tCtx <- transform utCtx
+            Log.logInfoN . pack $ "Checking the value; "++showTypedTerm tCtx
+            checkArgumentTerm tCtx
+            assert (numHoles tCtx > 0) "Argument should be a context."
+            return $ Just (name, T.SContext tCtx)
+          _ -> throwError "Not a context."
+      UTLaw.MetaVarMVIntegerVar (UTLaw.MVIntegerVar name) ->
+        case value of
+          UT.CVIntExpr intExpr -> do
+            tIntExpr <- check intExpr
+            return $ Just (name, T.SIntegerVar tIntExpr)
+          _ -> throwError $ "Argument "++mvStr++" is not an integer "
+                ++"expression. Use int ( Term ) to indicate that it is."
+      UTLaw.MetaVarMVVar (UTLaw.MVVar name) -> do
+        case value of
+          UT.CVSubTerm (UT.STTerm (UT.TVar (UT.DVar (UT.Ident varName)))) ->
+            return $ Just (name, T.SVar varName)
+          _ -> throwError "Not a variable"
+      UTLaw.MetaVarMVVarVect (UTLaw.MVVarVect name) -> noSupport "MVVarVect"
+      UTLaw.MetaVarMVValueContext (UTLaw.MVValueContext name) ->
+        noSupport "MVValueContext"
+      UTLaw.MetaVarMVReduction (UTLaw.MVReduction name) ->
+        noSupport "MVReduction"
+      UTLaw.MetaVarMVVarSet (UTLaw.MVVarSet name) -> do
+        case value of
+          UT.CVVarSet (UT.DVarSet varList) ->
+            let strList = map getVarName varList
+                strSet = Set.fromList strList
+            in return $ Just (name, T.SVarSet strSet)
+          _ -> throwError "Not a set of variables"
+      UTLaw.MetaVarMVTerm (UTLaw.MVTerm name) -> noSupport "MVTerm"
+      UTLaw.MetaVarMVPattern (UTLaw.MVPattern name) -> noSupport "MVPattern"
+      UTLaw.MetaVarMVCaseStm (UTLaw.MVCaseStm name) -> noSupport "MVCaseStm"
+      UTLaw.MetaVarMVConstructorName (UTLaw.MVConstructorName name) ->
+        noSupport "MVConstructorName"
+    where
+      logCheckArg name = Log.logInfoN . pack $ "Checking argument "++name
+
+checkArgumentTerm :: HasCallStack => T.Term -> StCheckM ()
+checkArgumentTerm term = do
+  checkBoundVariablesDistinct term
+  declaredFree <- gets freeVarVars
+  let boundVars = getBoundVariables term
+  assert (declaredFree `Set.disjoint` boundVars) $ "argument cannot "
+    ++"bind declared free variables."
+
+checkAllSubstitutionsProvided ::
+  (MonadError String m, Log.MonadLogger m, HasCallStack) =>
+  Law.Law -> T.Substitutions -> m ()
+checkAllSubstitutionsProvided (Law.DLaw _name term1 _impRel term2 _sideCond)
+                              substMap = do
+  let metaVars1 = getAllMetaVars term1
+      metaVars2 = getAllMetaVars term2
+      substitutedVars = Map.keysSet substMap
+  assert ((metaVars1 `Set.union` metaVars2) == substitutedVars)
+    "Currently, you need to specify all substitutions."

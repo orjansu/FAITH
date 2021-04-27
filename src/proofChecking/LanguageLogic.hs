@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+
 module LanguageLogic (impRelImplies) where
 
 {- This file contains logic specific to space improvement theory. It does
@@ -6,7 +8,7 @@ other files. It might be that these functions might be implemented as parsed
 in the laws file later.
 -}
 
-import qualified MiniTypedAST as T
+import qualified Common as Com
 import qualified AbsSie as UT
 
 class ImpRelRepresentation a where
@@ -16,8 +18,15 @@ class ImpRelRepresentation a where
   impRelImplies :: a -> a -> Bool
 
 -- TODO expand as T.ImpRel adds more relations
-instance ImpRelRepresentation T.ImpRel where
-  impRelImplies i1 i2 | i1 == i2 = True
+instance ImpRelRepresentation Com.ImpRel where
+  impRelImplies i1 i2 = toUT i1 `impRelImplies` toUT i2
+    where
+      toUT :: Com.ImpRel -> UT.ImpRel
+      toUT Com.DefinedEqual = UT.DefinedEqual
+      toUT Com.StrongImprovementLR = UT.StrongImprovementLR
+      toUT Com.WeakImprovementLR = UT.WeakImprovementLR
+      toUT Com.StrongCostEquiv = UT.StrongCostEquiv
+      toUT Com.WeakCostEquiv = UT.WeakCostEquiv
 
 instance ImpRelRepresentation UT.ImpRel where
   {-

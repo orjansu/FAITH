@@ -7,12 +7,10 @@ import qualified Data.Set as Set
 import qualified LocallyNameless as LNL
 import qualified AbsLNL as P
 import PrintLNL (printTree)
+import OtherUtils (filterNoise)
 
 showLNL :: LNL.Term -> String
 showLNL = filterNoise . printTree . toPrintable
-
-filterNoise :: String -> String
-filterNoise = filter (\c -> c /='\"' && c /= '\n')
 
 class Convertible a where
   type PrintVersion a

@@ -1,10 +1,10 @@
-bindings {}
+bindings{}
 
 proposition: |- let {x = 1} in x =def= let {y = 1} in y;
 proof: -simple
   -single{
   let {x = 1} in x;
-  on whole -alpha-equiv;
+  -alpha-equiv;
   =def= let {y = 1} in y;
   }
   qed;

@@ -1,0 +1,12 @@
+bindings{}
+
+--incorrect proof
+proposition: free(y) |- let {a = 1, x = (let {b = 2} in a + b)} in a + x
+                    |~> let {b = 2, x = (let {a = 1} in a + b)} in a + x;
+proof: -simple
+  -single{
+          -let-let-no-if ctx= [.] G1=let {a=1} x=x v=int(1) w=int(1)
+                         G2=let {b = 2} M=(a+b) N=(a+x);
+          |~>
+         }
+         qed;

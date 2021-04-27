@@ -1,0 +1,16 @@
+bindings{}
+
+--correct proof
+proposition: free(b) |- let {f = 2} in \e. let {d = \a.b, g = 1}
+                                           in (let {c = 1} in ((d c) + c))
+                      |~> let {g = 2} in \u.
+                            let {g' = 1, d = \a.b}
+                            in (let {c = 1} in ({d}d^(\e.b) c + c));
+proof: -simple
+  -single{
+          -unfold-1 ctx=(let {f = 2} in \e. [.])
+                    G=let {t = 1} x=d v=int(1) w=int(1) V=(\a.b)
+                             C=(let {z = 1} in (([.] z) + z));
+          |~>
+         }
+         qed;

@@ -11,6 +11,7 @@ import Data.Map.Strict (Map)
 import Data.Set (Set)
 
 import qualified TypedLawAST as Law
+import Common (ImpRel)
 
 type Var = Name
 type Name = String
@@ -33,15 +34,13 @@ type SubTerm = Term
 
 data Term
     = TVar Var
-    | TNum Integer --A
+    | TNum Integer
     | TLam Var Term
-    | THole --Ctx
-    | TLet LetBindings Term --A
-    | TDummyBinds VarSet Term --A
-    | TRedWeight RedWeight Red --A
+    | THole
+    | TLet LetBindings Term
+    | TDummyBinds VarSet Term
+    | TRedWeight RedWeight Red
   deriving (C.Eq, C.Ord, C.Show, C.Read)
--- TODO derive a better show function that converts to AbsSie and then uses
--- the pretty-printer (showTree)
 
 type VarSet = Set Var
 
@@ -76,15 +75,41 @@ data Proof
 
 type SubProof = [ProofStep]
 
+type Context = Term
 data ProofStep
-  = PSMiddle Term SubTerm Law.Command ImpRel Term
+  = PSMiddle Term Command ImpRel Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
--- Just deals with this one right now.
--- TODO as this is expanded, add clauses to LanguageLogic.hs
-data ImpRel
-    = DefinedEqual
+
+data Command
+  = AlphaEquiv
+  | Law Context Law.Law Substitutions
+  deriving (C.Eq, C.Ord, C.Read)
+-- Lägg till fler senare
+
+-- TODO add show in law later.
+instance C.Show Command where
+  show AlphaEquiv = "-alpha-equiv"
+  show (Law _ (Law.DLaw lawName _ _ _ _) _) = lawName
+
+type Substitutions = Map String Substitute
+
+data Substitute
+  = SLetBindings LetBindings
+  | SValue Term
+  | SContext Term
+  | SIntegerVar IntExpr
+  | SVar String
+  | SVarSet (Set String) -- Not used yet
+  | STerm Term
+--  | SVarVect TODO support the following later:
+--  | SValueContext
+--  | SReduction
+--  | SPattern
+--  | SCaseStm
+--  | SConstructorName
   deriving (C.Eq, C.Ord, C.Read)
 
-instance C.Show ImpRel where
-  show DefinedEqual = "=def="
+data IntExpr
+  = IENum Integer
+  deriving (C.Eq, C.Ord, C.Read)

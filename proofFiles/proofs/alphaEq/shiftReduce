@@ -1,0 +1,9 @@
+bindings{}
+
+proposition: |- \a. \b. \c. a b c =def= \x . \y. \z. x y z;
+proof: -simple
+  -single{
+  on whole -alpha-equiv;
+  =def=
+  }
+  qed;

@@ -1,0 +1,79 @@
+bindings {
+G = {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))};
+}
+
+-- kommentarer är tillåtna.
+proposition: G free(x xs M) |- let {xs = repeat x} in any(M)
+                               |~> let {xs = x : xs} in any(M);
+proof:
+  -fix-point-induction repeat
+    -base{
+      let {xs = repeat^0 x} in any(M);
+      on whole -def-unwindings-base f=repeat
+                                   w=0
+                                   v=0
+                                   Vctx=(\x. (let {ys = [.] x} in (x:ys)))
+                                   C=(let {xs = [.] x} in any(M));
+      =def= let {xs = {repeat}d^@ x} in any(M);
+      on ({repeat}d^@) -dummy-ref-algebra-8 {X}={repeat}
+                                            M=@;
+      |~> let {xs = @ x} in any(M);
+      on (@ x) -@-rules-3 R=([.] x);
+      <~> let {xs = {x}d^@} in any(M);
+      on ({x}d^@) -@-rules-1 {X}={x}
+                            M=(x:xs);
+      |~> let {xs = x:xs} in any(M);
+    }
+    -induction{
+      let {xs = repeat^(n+1) x} in any(M);
+      on whole -def-unwindings-induction f=repeat
+                                         w=0
+                                         v=0
+                                         Vctx=(\x. (let {ys = [.] x} in (x:ys)))
+                                         C=(let {xs = [.] x} in any(M))
+                                         n=n;
+      =def= let {xs = [0]s^(\x. (let {ys = repeat^n x
+                            } in (x : ys)
+                       )) x
+        } in any(M);
+      -spike-algebra-zero-stack-spike
+            ctx=(let {repeat =[0,0]= \x. (let {ys = repeat x} in (x:ys))} in (let {xs = [.]} in any(M)))
+            M=((\x. (let {ys = repeat^n x} in (x : ys))) x);
+      <~> let {xs = (\x. (let {ys = repeat^n x
+                            } in (x : ys))
+                    ) x
+          } in any(M);
+      on ((\x. (let {ys = repeat^n x
+                            } in (x : ys)
+          )) x)
+          -reduction w=1
+                     R=([.] x)
+                     V=(let {ys = repeat^n x} in (x : ys))
+                     X={};
+                     -- -reduction-rule=reduction-beta; -- not sure if needed.
+      <~> let {xs = s^(let {ys = repeat^n x
+                      } in (x : ys))
+
+          } in any(M);
+      on (s^(let {ys = repeat^n x} in (x : ys))) -spike-algebra-13
+          w=1
+          M=(let {ys = repeat^n x} in (x : ys));
+      |~> let {xs = let {ys = repeat^n x
+                    } in (x : ys)
+
+          } in any(M);
+      on (let {ys = repeat^n x} in (x : ys)) -ih xs=ys
+                                               x=x
+                                               M=(x:ys);
+      |~> let {xs = let {ys = x : ys
+                    } in (x : ys)
+
+          } in any(M);
+      on shown -value-merge' G={}
+                             x=xs
+                             y=ys
+                             V=(x:ys)
+                             M=any(M);
+      |~> let {xs = x:xs} in any(M);
+    }
+  qed;
