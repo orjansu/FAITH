@@ -1,13 +1,15 @@
 bindings{}
 
 --correct proof
-proposition: free(y) |- let {f = \a.y}
-                          in (let {z = 1} in ((f z) + z))
-                      |~> let {f = \a.y}
-                          in (let {z = 1} in ({f}d^(\b.y) z + z));
+proposition: free(b) |- let {f = 2} in \e. let {d = \a.b}
+                                           in (let {c = 1} in ((d c) + c))
+                      |~> let {g = 2} in \u.
+                            let {d = \a.b}
+                            in (let {c = 1} in ({d}d^(\e.b) c + c));
 proof: -simple
   -single{
-          -unfold-1 ctx= [.] G=let {} x=f v=int(1) w=int(1) V=(\a.y)
+          -unfold-1 ctx=(let {f = 2} in \e. [.])
+                    G=let {} x=d v=int(1) w=int(1) V=(\a.b)
                              C=(let {z = 1} in (([.] z) + z));
           |~>
          }

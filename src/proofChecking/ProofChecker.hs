@@ -30,7 +30,8 @@ import qualified LocallyNameless as LNL
 import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
-                       , checkTypedTerm, numHoles, getFreeVariables)
+                       , checkTypedTerm, numHoles, getFreeVariables
+                       , getHoleBoundVars)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport
                   , throwCallstackError)
 import Substitution (applySubstitution)
@@ -102,11 +103,15 @@ checkStep globalImpRel
       subterm <- getSubterm context term1
       let contextBV = getBoundVariables context
           forbiddenNames = contextBV `Set.union` varFreeVars
+          holeBV = getHoleBoundVars context
+          expectedFreeVars = holeBV `Set.union` varFreeVars
       Log.logInfoN . pack $ "applying substitution from subterm to law"
       -- TODO log messages
       substToLHS <- applySubstitution lawLHS substitutions forbiddenNames
+                                      expectedFreeVars
       checkRuleAlphaEquiv lawLHS subterm substToLHS
       substToRHS <- applySubstitution lawRHS substitutions forbiddenNames
+                                      expectedFreeVars
       let fvOrig = getFreeVariables subterm
           fvTransformed = getFreeVariables substToRHS
       assert (fvOrig == fvTransformed) $ "The transformation should not make"

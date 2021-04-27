@@ -198,6 +198,7 @@ IH |- Induktion -> M
 eller en bevisprincip som går på case-satserna
 -Skriv explicit vilka regler som beviset använder genom att ge namnet på lagfilen de ligger i. Då kan man även lägga till egna regler, t.ex. induktiva hypotesen
 - Skippa att behöva implementera matching i detta fallet genom att be användaren specificera både subterm och kontext. Detta innebär att jag nog bara behöver implementera substitution/transformation på ett korrekt sätt.
+- Det borde gå att skapa termer utan att behöva oroa sig så mycket över typning om man tar bort applikation, konstruktörer och case-satser. Altså att man i princip bara har plus. Då kommer typen på allting vara Int. Risken är att den inte terminerar. Om det blir ett problem så kan man göra så att let-satser inte är rekursiva, men då tar man bort mycket av spacet av program.
 
 -------------- Alpha equivalence ------------
 När man bara kollar alpha-ekvivalens mellan bara let-bindings, skulle man kunna

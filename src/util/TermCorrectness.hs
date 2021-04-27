@@ -11,6 +11,7 @@ import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
 import qualified Data.Set as Set
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
+import Data.List (unzip4)
 
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
@@ -194,3 +195,39 @@ getAllVariables (T.TRedWeight _redWeight red) =
                        in Set.insert var termSet
     T.RPlusWeight term1 _rw term2 ->
       getAllVariables term1 `Set.union` getAllVariables term2
+
+-- | given a context, returns the set of variables that are bound in every
+-- hole.
+getHoleBoundVars :: T.Term -> Set.Set String
+getHoleBoundVars ctx = (flip evalState) Set.empty $ getHoleBoundVarsM ctx
+  where
+    getHoleBoundVarsM :: T.Term -> State (Set.Set String) (Set.Set String)
+    getHoleBoundVarsM = \case
+      T.TVar var -> return Set.empty
+      T.TNum integer -> return Set.empty
+      T.TLam var term -> do
+        bound1 <- get
+        let bound2 = Set.insert var bound1
+        put bound2
+        innerHoleBounds <- getHoleBoundVarsM term
+        put bound1
+        return innerHoleBounds
+      T.THole -> get
+      T.TLet letBindings term -> do
+        let (bindingVars, _sw, _hw, terms) = unzip4 letBindings
+        bound1 <- get
+        let bound2 = (Set.fromList bindingVars) `Set.union` bound1
+        put bound2
+        innerHoleBoundsList <- mapM getHoleBoundVarsM $ term:terms
+        let innerHoleBounds = intersections innerHoleBoundsList
+        put bound1
+        return innerHoleBounds
+        where
+          intersections = foldl Set.intersection Set.empty
+      T.TDummyBinds _varSet term -> getHoleBoundVarsM term
+      T.TRedWeight _redWeight red -> case red of
+        T.RApp term _var -> getHoleBoundVarsM term
+        T.RPlusWeight term1 _rw term2 -> do
+          innerHoleBounds1 <- getHoleBoundVarsM term1
+          innerHoleBounds2 <- getHoleBoundVarsM term2
+          return $ innerHoleBounds1 `Set.intersection` innerHoleBounds2

@@ -1,2 +1,6 @@
 -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 -unfold-5: let G {x =[0,0]= V} in C[x] <~> let G {x =[0,0]= V} in C[V];
+
+-- The laws below are not valid, but should be checkable.
+-- -test-copy-1: C[V] |~> C[V] + C[V];
+-- -test-copy-2: let {x = V} in C[D[x]] |~> C[V + D[V]];

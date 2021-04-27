@@ -37,8 +37,9 @@ applySubstitution :: HasCallStack =>
                   Law.Term
                   -> T.Substitutions
                   -> Set.Set String
+                  -> Set.Set String
                   -> CheckM T.Term
-applySubstitution law substitutions forbiddenNames1 = do
+applySubstitution law substitutions forbiddenNames1 freeVars = do
   Log.logInfoN . pack $ "applying substitution {"++showSubstitutions++"}"
   Log.logInfoN . pack $ "to law term"++showLaw law
   Log.logInfoN . pack $ "With forbidden names "++ show forbiddenNames1
@@ -46,21 +47,21 @@ applySubstitution law substitutions forbiddenNames1 = do
   let boundSubstVars = getBoundSubstVars substitutions law
       forbiddenNames2 = forbiddenNames1 `Set.union` boundSubstVars
   res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM law
-  let (finalTerm, forBiddenNames3) = res
+  let (finalTerm, forbiddenNames3) = res
       finalBV = getBoundVariables finalTerm
   Log.logInfoN . pack $ "checking correctness of M after substitution , where "
     ++"M="++showTypedTerm finalTerm
+  checkTypedTerm finalTerm freeVars
   assertInternal (finalBV `Set.disjoint` forbiddenNames1) $ "The substituted "
     ++"term should not name the bound variables to forbidden names. \n"
     ++"Bound variables are: "++show finalBV
-  checkBoundVariablesDistinct finalTerm
   assertInternal (numHoles finalTerm == 0) "| M should not be a context"
   let finalVariables = getAllVariables finalTerm
       expectedForbiddenNames = finalVariables `Set.union` forbiddenNames1
-  assertInternal (expectedForbiddenNames == forBiddenNames3)
+  assertInternal (expectedForbiddenNames == forbiddenNames3)
     $ "| M substituted wrt S -> S' => AllVars(M) union S == S', where "
     ++"AllVars(M) union S = "++show expectedForbiddenNames++" and "
-    ++"S' = "++show forBiddenNames3
+    ++"S' = "++show forbiddenNames3
 
   return finalTerm
   where
