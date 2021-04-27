@@ -181,11 +181,29 @@ applyContext ctxName term = do
   where
     applyContext1 :: HasCallStack => T.Term -> T.Term -> SubstM T.Term
     applyContext1 ctx term = do
-      let substitutions = Map.singleton dummy (T.STerm term, True)
-      -- We set the inner term to used, so that the bound variables in the term
-      -- will be renamed, in case the term or some subterm of it is used
-      -- before or after the context is used.
-      withSeparateSubstitutions substitutions $ applyContext2 ctx
+      let holeSubstitution = Map.singleton dummy (T.STerm term, False)
+          termBV = getBoundVariables term
+      forbiddenNames1 <- gets forbiddenNames
+      assertInternal (termBV `Set.isSubsetOf` forbiddenNames1)
+        $ "The term to be inserted to a context should have added its bound "
+        ++"variables to the set of forbidden names."
+      let ctxForbiddenNames = forbiddenNames1 Set.\\ termBV
+      -- The reason that I remove the forbidden names of the term from the
+      -- forbidden names is that otherwise the monad will think that something
+      -- is wrong (specifically, the assertion in prepareTermForSubstitution
+      -- will fail) since we will insert something that we have gotten out of
+      -- the monad.
+      oldSubstitutions <- gets substitutions
+      modify (\st -> st{forbiddenNames = ctxForbiddenNames
+                       , substitutions = holeSubstitution})
+
+      appliedCtx <- applyContext2 ctx
+
+      modify  (\st -> st{substitutions = oldSubstitutions})
+      forbiddenNames2 <- gets forbiddenNames
+      assertInternal (termBV `Set.isSubsetOf` forbiddenNames2)
+        "The term should have been inserted and have its bound vars recorded."
+      return appliedCtx
 
     dummy :: String
     dummy = ""
