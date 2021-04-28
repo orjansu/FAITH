@@ -31,11 +31,8 @@ import Substitution (applySubstitution)
 -- if it is correct.
 --
 -- Assumes that the incoming proof script is typechecked.
-checkDetailedProof :: HasCallStack => T.ProofScript -> Maybe [String]
-checkDetailedProof proofScript =
-  case runCheckM $ check proofScript of
-    Right () -> Nothing
-    Left errorMsgs -> Just errorMsgs
+checkDetailedProof :: HasCallStack => T.ProofScript -> Either [String] ()
+checkDetailedProof proofScript = runCheckM $ check proofScript 
 
 class Checkable a where
   check :: HasCallStack => a -> CheckM ()

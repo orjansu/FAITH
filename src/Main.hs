@@ -17,18 +17,32 @@ import qualified TypedLawAST as TLaw (LawMap)
 import LawTypeChecker (typecheckLaws)
 import MiniTypeChecker (typecheckProof)
 import ProofChecker                 (checkDetailedProof)
+import Matcher (addProofDetails)
 
 -- | Main: read file passed by only command line argument and run compiler pipeline.
 main :: IO ()
 main = do
   (lawInput, proofInput) <- getInputs
-  putStrLn "Parsing law file"
+  putStr "Parsing law file..."
   lawTree <- parse lawInput (ParSieLaws.pLawList . ParSieLaws.myLexer)
   tLaws <- runTypecheckLaws lawTree
-  putStrLn "Parsing proof file"
+  parseAndCheckDetailedProof tLaws proofInput
+  --proofTree <- parse proofInput (ParSie.pProofScript . ParSie.myLexer)
+  --tAbstractProofScript <- runTypecheckProof proofTree tLaws
+  --tDetailedProofScripts <- undefined
+  --undefined
+
+
+-- | checking of a detailed proof where no matching or other guessing is
+-- involved. Inputs: the parsed laws and the unparsed proof script
+parseAndCheckDetailedProof :: TLaw.LawMap -> String -> IO ()
+parseAndCheckDetailedProof tLaws proofInput = do
+  putStr "Parsing detailed proof file..."
   proofTree <- parse proofInput (ParSie.pProofScript . ParSie.myLexer)
   tProofScript <- runTypecheckProof proofTree tLaws
   runCheckDetailedProof tProofScript
+  putStrLn "Proof is correct"
+
 
 getInputs :: IO (String, String)
 getInputs = do
@@ -49,38 +63,50 @@ parse :: String -> (String -> Either String a) -> IO a
 parse s parseFun =
   case parseFun s of
     Left err  -> do
-      hPutStrLn stderr "ERROR"
-      hPutStrLn stderr $ "Lexing error: " ++ err
+      putStrLn "ERROR"
+      putStrLn $ "Lexing error: " ++ err
       exitFailure
-    Right  tree -> return tree
+    Right  tree -> do
+      putStrLn "Successful"
+      return tree
 
 runTypecheckLaws :: UTLaw.LawList -> IO TLaw.LawMap
-runTypecheckLaws utLawList =
-  case typecheckLaws utLawList of
-    Left errors -> do
-      hPutStrLn stderr "Type error in law file:"
-      mapM (hPutStrLn stderr) errors
-      exitFailure
-    Right lawMap -> return lawMap
+runTypecheckLaws utLawList = do
+  putStr "Typechecking law file..."
+  handleResult (typecheckLaws utLawList) "proofLog.txt"
 
 runTypecheckProof :: UT.ProofScript -> TLaw.LawMap -> IO T.ProofScript
-runTypecheckProof proofScript lawMap =
+runTypecheckProof proofScript lawMap = do
+  putStr "Type-checking detailed proofFile..."
   case typecheckProof proofScript lawMap of
     Left err -> do
-      hPutStrLn stderr "ERROR"
-      hPutStrLn stderr $ "Type error: " ++ err
+      putStrLn "ERROR"
+      putStrLn $ "Type error: " ++ err
       exitFailure
-    Right tree' -> return tree'
+    Right tree' -> do
+      putStrLn "Successful"
+      return tree'
 
 runCheckDetailedProof :: T.ProofScript -> IO ()
-runCheckDetailedProof tTree =
-  case checkDetailedProof tTree of
-    Nothing -> hPutStrLn stderr "Proof is correct"
-    Just errorMsgs -> do
-      let relevantMsgs = drop (length errorMsgs - 11) errorMsgs
-      hPutStrLn stderr "Error when checking proof. Last 10 logs and error:"
-      mapM (hPutStrLn stderr) relevantMsgs
-      let fullLog = concat $ intersperse "\n " errorMsgs
-      let logFile = "proofLog.txt"
-      writeFile logFile fullLog
-      hPutStrLn stderr $ "Full logs can be found in "++logFile
+runCheckDetailedProof tTree = do
+  putStr "Checking detailed proof..."
+  handleResult (checkDetailedProof tTree) "proofLog.txt"
+
+printErrorMsgsAndExit :: [String] -> String -> IO a
+printErrorMsgsAndExit errorMsgs logFileName = do
+  let relevantMsgs = drop (length errorMsgs - 11) errorMsgs
+  putStrLn "Last 10 logs and error:"
+  mapM (putStrLn) relevantMsgs
+  let fullLog = concat $ intersperse "\n " errorMsgs
+  writeFile logFileName fullLog
+  putStrLn $ "Full logs can be found in "++logFileName
+  exitFailure
+
+handleResult :: Either [String] a -> String -> IO a
+handleResult result logFileName = case result of
+  Left errorMsgs -> do
+    putStrLn "ERROR"
+    printErrorMsgsAndExit errorMsgs logFileName
+  Right result -> do
+    putStrLn "Successful"
+    return result

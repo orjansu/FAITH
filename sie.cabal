@@ -20,7 +20,8 @@ executable sie
                        src/typeChecking,
                        src/prettyPrinting,
                        src/types,
-                       src/util
+                       src/util,
+                       src/matching
   other-modules:
                        ParSie,
                        ErrM,
@@ -49,7 +50,8 @@ executable sie
                        Substitution,
                        SubstitutionMonad,
                        ShowLaw,
-                       PrintSieLaws
+                       PrintSieLaws,
+                       Matcher
 
   main-is:             Main.hs
   -- other-modules:
