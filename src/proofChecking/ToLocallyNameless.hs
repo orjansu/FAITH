@@ -119,7 +119,6 @@ computeLNLTerm (T.TLet letBinds mainTerm) = do
     else error "Internal error: let-binding has faulty implementation"
   -- 6. Create the new complete lnl term
   -- 6.1 Convert the weights. These should be equal in both representations.
-  -- TODO convert the weight expressions when these are added to the language
   let lnlStackWeights = stackweights
   let lnlHeapWeights = heapweights
   -- 6.2 Return a new let, with all the lnl terms

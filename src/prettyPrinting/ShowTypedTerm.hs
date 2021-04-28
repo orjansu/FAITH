@@ -71,8 +71,8 @@ instance Convertible T.LetBindings where
           utTerm = toUntyped term
           utBindsymbol = case (sw, hw) of
             (1,1) -> UT.BSNoWeight
-            (_,_) -> let utSw = UT.StackWeightExpr $ UT.IENum sw
-                         utHw = UT.HeapWeightExpr $ UT.IENum hw
+            (_,_) -> let utSw = UT.StackWeightExpr $ sw
+                         utHw = UT.HeapWeightExpr $ hw
                      in UT.BSWeights utSw utHw
       in UT.LBConcrete utName utBindsymbol utTerm
 
@@ -80,4 +80,4 @@ toUntypedVar :: String -> UT.Var
 toUntypedVar name = UT.DVar $ UT.Ident name
 
 toUntypedRedWeight :: Integer -> UT.RedWeight
-toUntypedRedWeight rw = UT.DRedWeight $ UT.StackWeightExpr $ UT.IENum rw
+toUntypedRedWeight rw = UT.DRedWeight $ UT.StackWeightExpr $ rw

@@ -26,7 +26,7 @@ instance Convertible LNL.Term where
                                                    (toPrintable term)
     where
       convertLbs = map convertLB
-      convertLB (1,1,term) = P.LBNoWeight (toPrintable term)
+      convertLB (1, 1,term) = P.LBNoWeight (toPrintable term)
       convertLB (sw, hw, term) = P.LBWeight sw hw (toPrintable term)
   toPrintable (LNL.TDummyBinds varSet term) = P.TDummyBinds (convertVS varSet)
                                                             (toPrintable term)

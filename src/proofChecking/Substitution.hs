@@ -76,8 +76,7 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
         showTypedTerm letBindings
       T.SValue term -> showTypedTerm term
       T.SContext term -> showTypedTerm term
-      T.SIntegerVar intExpr -> case intExpr of
-        T.IENum n -> show n
+      T.SIntegerVar intExpr -> show intExpr
       T.SVar string -> string
       T.SVarSet stringSet ->
         let listForm = concat . intersperse ", " . Set.toList $ stringSet
@@ -212,7 +211,6 @@ applyTermSubstM bigLawTerm = do
 applyIntExprSubstM :: HasCallStack => Law.IntExpr -> SubstM Integer
 applyIntExprSubstM = \case
   Law.IEVar var -> do
-    T.SIntegerVar intExpr <- getSubstitute var
-    case intExpr of
-      T.IENum int -> return int
+    T.SIntegerVar int <- getSubstitute var
+    return int
   Law.IENum num -> return num

@@ -27,15 +27,8 @@ LBConcrete. LetBinding ::= Var BindSymbol Term;
 BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight. BindSymbol ::= "=";
 
-StackWeightExpr. StackWeight ::= IntExpr;
-HeapWeightExpr.  HeapWeight ::= IntExpr;
-
-IEAny.   IntExpr1 ::= "?";
-IEVar.   IntExpr1 ::= Ident;
-IENum.   IntExpr1 ::= Integer;
-IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
-IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
-coercions IntExpr 1;
+StackWeightExpr. StackWeight ::= Integer;
+HeapWeightExpr.  HeapWeight ::= Integer;
 
 DRedWeight. RedWeight ::= "[" StackWeight "]";
 
@@ -55,6 +48,7 @@ TDummyBinds.      Term3  ::= VarSet "d^" Term3;
 
 TRApp.     Term2    ::= Term2 Var;
 TRAppW.    Term2    ::= RedWeight "(" Term2 Var ")";
+TRAppNoW.  Term2    ::= Term2 "<>" Var ;
 
 TRPlus.    Term1    ::= Term1 "+" Term2;
 TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
@@ -73,6 +67,13 @@ coercions Term 3;
 
 WithRedWeight. MaybeRedWeight ::= RedWeight;
 NoRedWeight.   MaybeRedWeight ::= ;
+
+IEAny.   IntExpr1 ::= "?";
+IEVar.   IntExpr1 ::= Ident;
+IENum.   IntExpr1 ::= Integer;
+IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
+IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
+coercions IntExpr 1;
 
 DIndExpr. IndExpr ::= IntExpr1;
 CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
@@ -127,7 +128,7 @@ CAValue.          CmdArgument ::= CmdValue;
 CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
 CVSubTerm.        CmdValue    ::= SubTerm ;
 CVVarSet.         CmdValue    ::= VarSet;
-CVIntExpr.        CmdValue    ::= "int" "(" IntExpr ")";
+CVIntExpr.        CmdValue    ::= "int" "(" Integer ")";
 CVLet.            CmdValue    ::= "let" LetBindings;
 CAMetaVar.        CmdAssignee ::= VarAnyType;
 CASubTerm.        CmdAssignee ::= "subterm";

@@ -118,8 +118,7 @@ getSubstitute metaVar = do
           return $ T.SValue prepared
         T.SContext ctx -> internalException $ "use applyContext, not "
                             ++"getSubstitute for contexts"
-        T.SIntegerVar intExpr -> case intExpr of
-          T.IENum _ -> return subst
+        T.SIntegerVar intExpr -> return subst
         T.SVar string -> return $ T.SVar string
         T.SVarSet varSet -> return $ T.SVarSet varSet
         T.STerm term -> do

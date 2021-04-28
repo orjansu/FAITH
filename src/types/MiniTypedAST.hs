@@ -40,8 +40,8 @@ data Term
     | THole
     | TLet LetBindings Term
     | TDummyBinds VarSet Term
-    | TStackSpikes IntExpr Term
-    | THeapSpikes IntExpr Term
+    | TStackSpikes StackWeight Term
+    | THeapSpikes HeapWeight Term
     | TRedWeight RedWeight Red
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -101,7 +101,7 @@ data Substitute
   = SLetBindings LetBindings
   | SValue Term
   | SContext Term
-  | SIntegerVar IntExpr
+  | SIntegerVar Integer
   | SVar String
   | SVarSet (Set String) -- Not used yet
   | STerm Term
@@ -112,7 +112,3 @@ data Substitute
 --  | SCaseStm
 --  | SConstructorName
   deriving (C.Eq, C.Ord, C.Read)
-
-data IntExpr
-  = IENum Integer
-  deriving (C.Eq, C.Ord, C.Read, C.Show)

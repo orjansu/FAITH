@@ -47,4 +47,4 @@ data Red
     | RPlusWeight Term RedWeight Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-type RedWeight = Integer --I will add expressions here later
+type RedWeight = Integer

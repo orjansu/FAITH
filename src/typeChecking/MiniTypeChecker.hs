@@ -210,18 +210,16 @@ instance Transformable UT.Term where
     return $ T.TLet tLetBindings tTerm
   transform (UT.TStackSpike term)              = do
     tTerm <- transform term
-    return $ T.TStackSpikes (T.IENum 1) tTerm
+    return $ T.TStackSpikes 1 tTerm
   transform (UT.TStackSpikes (UT.StackWeightExpr sw) term) = do
-    tSw <- check sw
     tTerm <- transform term
-    return $ T.TStackSpikes tSw tTerm
+    return $ T.TStackSpikes sw tTerm
   transform (UT.THeapSpike term)               = do
     tTerm <- transform term
-    return $ T.THeapSpikes (T.IENum 1) tTerm
+    return $ T.THeapSpikes 1 tTerm
   transform (UT.THeapSpikes (UT.HeapWeightExpr hw) term)   = do
-    tHw <- check hw
     tTerm <- transform term
-    return $ T.THeapSpikes tHw tTerm
+    return $ T.THeapSpikes hw tTerm
   transform (UT.TDummyBinds varSet term)       = do
     tVarSet <- transform varSet
     tTerm <- transform term
@@ -231,6 +229,10 @@ instance Transformable UT.Term where
     let tVar = getVarName var
     return $ T.TRedWeight 1 $ T.RApp tTerm tVar
   transform (UT.TRAppW redWeight term var) = undefined
+  transform (UT.TRAppNoW term var) = do
+    tTerm <- transform term
+    let tVar = getVarName var
+    return $ T.TRedWeight 0 $ T.RApp tTerm tVar
   transform (UT.TRPlus term1 term2) =
     transformPlus Nothing term1 Nothing term2
   transform (UT.TRPlusW1 redWeight term1 term2) =
@@ -393,14 +395,6 @@ instance Checkable UT.TransCmd where
         checkAllSubstitutionsProvided law substitutions
         return $ T.Law context law substitutions
 
-instance Checkable UT.IntExpr where
-  type TypedVersion UT.IntExpr = T.IntExpr
-  check (UT.IEAny) = noSupport "IEAny"
-  check (UT.IEVar _) = noSupport "IEVar"
-  check (UT.IENum integer) = return $ T.IENum integer
-  check (UT.IEPlus _ _) = noSupport "IEPlus"
-  check (UT.IEMinus _ _) = noSupport "IEMinus"
-
 getContext :: HasCallStack => [UT.CmdArgument] -> StCheckM T.Term
 getContext args = do
   case firstJust getCtx args of
@@ -472,9 +466,8 @@ checkArg (UT.CAAssign assignee value) = case assignee of
           _ -> throwError "Not a context."
       UTLaw.MetaVarMVIntegerVar (UTLaw.MVIntegerVar name) ->
         case value of
-          UT.CVIntExpr intExpr -> do
-            tIntExpr <- check intExpr
-            return $ Just (name, T.SIntegerVar tIntExpr)
+          UT.CVIntExpr integer -> do
+            return $ Just (name, T.SIntegerVar integer)
           _ -> throwError $ "Argument "++mvStr++" is not an integer "
                 ++"expression. Use int ( Term ) to indicate that it is."
       UTLaw.MetaVarMVVar (UTLaw.MVVar name) -> do
