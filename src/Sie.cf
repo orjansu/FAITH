@@ -76,6 +76,7 @@ NoRedWeight.   MaybeRedWeight ::= ;
 
 DIndExpr. IndExpr ::= IntExpr1;
 CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
+CNil. Constructor ::= "[]";
 CCons. Constructor ::= Var ":" Var;
 CTrue. Constructor ::= "true";
 CFalse. Constructor ::= "false";

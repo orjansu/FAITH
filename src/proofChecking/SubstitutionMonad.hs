@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+-- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 -- | A monad with the invariant that all terms that you get out of the
 -- substitutionMonad are properly renamed so that their bound variables

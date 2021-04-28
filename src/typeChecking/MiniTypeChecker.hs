@@ -33,7 +33,8 @@ import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
 import ToLocallyNameless (toLocallyNameless)
 import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport)
 
-data MySt = MkSt {letContext :: Maybe T.LetBindings
+data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
+                 , letContext :: Maybe T.LetBindings
                  , start :: T.Term
                  , goal :: T.Term
                  , freeVarVars :: Set.Set String
@@ -41,7 +42,8 @@ data MySt = MkSt {letContext :: Maybe T.LetBindings
                  }
 
 mkInitSt :: Law.LawMap -> MySt
-mkInitSt lawMap = MkSt {letContext = undefined
+mkInitSt lawMap = MkSt { letBindings = undefined
+                       , letContext = undefined
                        , start= undefined
                        , goal = undefined
                        , freeVarVars = undefined
@@ -111,19 +113,37 @@ class Transformable a where
 
 instance Checkable UT.ProofScript where
   type TypedVersion UT.ProofScript = T.ProofScript
-  check (UT.DProofScript (UT.DProgBindings []) [t]) = do
-    tTheorem <- check t
-    return $ T.DProofScript [tTheorem]
-  check _ = fail "not implemented yet 1"
+  check (UT.DProofScript (UT.DProgBindings bindings) theorems) = do
+    entries <- mapM toEntry bindings
+    let letBindings = Map.fromList $ entries
+    modify (\st -> st{letBindings = letBindings})
+    tTheorems <- mapM check theorems
+    return $ T.DProofScript tTheorems
+    where
+      toEntry :: UT.ProgBinding -> StCheckM (String, T.LetBindings)
+      toEntry (UT.DProgBinding (UT.CapitalIdent name) utLetBinds) = do
+        tLetBindings <- transform utLetBinds
+        return (name, tLetBindings)
+        -- Correctness properties on the let bindings will be enforced when
+        -- inserted into the terms. Unused bindings will not be checked, but
+        -- that's fine.
 
 instance Checkable UT.Theorem where
   type TypedVersion UT.Theorem = T.Theorem
-  check (UT.DTheorem (UT.DProposition UT.NoContext
+  check (UT.DTheorem (UT.DProposition context
                                        freeVars
                                        start
                                        impRel
                                        goal) proof) = do
-    modify (\st -> st{letContext = Nothing})
+    letContext <- case context of
+      UT.WithContext (UT.CapitalIdent ctxVar) -> do
+        letBindings1 <- gets letBindings
+        case Map.lookup ctxVar letBindings1 of
+          Just letCtx -> return $ Just letCtx
+          Nothing -> throwError $ "Context "++ctxVar++" was specified but does "
+                      ++"not correspond to a binding."
+      UT.NoContext -> return Nothing
+    modify (\st -> st{letContext = letContext})
     tFreeVars <- check freeVars
     let T.DFreeVars termVars varVars = tFreeVars
     modify (\st -> st{freeVarVars = varVars})
@@ -134,7 +154,6 @@ instance Checkable UT.Theorem where
     tImpRel <- check impRel
     let prop = T.DProposition tFreeVars tStart tImpRel tGoal
     return $ T.DTheorem prop tProof
-  check _ = fail "not implemented yet 2"
 
 instance Checkable UT.Free where
   type TypedVersion UT.Free = T.FreeVars
@@ -171,16 +190,16 @@ checkTopLevelTerm term = do
 instance Transformable UT.Term where
   type TransformedVersion UT.Term = T.Term
   transform :: UT.Term -> StCheckM T.Term
-  transform (UT.TAny)                          = fail "not implemented yet 3"
-  transform (UT.TTermVar capitalIdent)         = fail "not implemented yet 4"
-  transform (UT.TNonTerminating)               = fail "not implemented yet 5"
+  transform (UT.TAny)                          = noSupport "TAny"
+  transform (UT.TTermVar capitalIdent)         = noSupport "TTermVar"
+  transform (UT.TNonTerminating)               = return T.TNonTerminating
   transform (UT.TVar var)                      = do
     let tVar = getVarName var
     return $ T.TVar tVar
-  transform (UT.TIndVar var indExpr)           = fail "not implemented yet 6"
+  transform (UT.TIndVar var indExpr)           = noSupport "TIndVar"
   transform (UT.TNum integer)                  = return $ T.TNum integer
   transform (UT.THole)                         = return T.THole
-  transform (UT.TConstructor constructor)      = fail "not implemented yet 7"
+  transform (UT.TConstructor constructor)      = noSupport "TConstructor"
   transform (UT.TLam var term)                 = do
     let tVar = getVarName var
     tTerm <- transform term
@@ -189,10 +208,20 @@ instance Transformable UT.Term where
     tLetBindings <- transform letBindings
     tTerm <- transform term
     return $ T.TLet tLetBindings tTerm
-  transform (UT.TStackSpike term)              = fail "not implemented yet 8"
-  transform (UT.TStackSpikes stackWeight term) = fail "not implemented yet 9"
-  transform (UT.THeapSpike term)               = fail "not implemented yet 10"
-  transform (UT.THeapSpikes heapWeight term)   = fail "not implemented yet 11"
+  transform (UT.TStackSpike term)              = do
+    tTerm <- transform term
+    return $ T.TStackSpikes (T.IENum 1) tTerm
+  transform (UT.TStackSpikes (UT.StackWeightExpr sw) term) = do
+    tSw <- check sw
+    tTerm <- transform term
+    return $ T.TStackSpikes tSw tTerm
+  transform (UT.THeapSpike term)               = do
+    tTerm <- transform term
+    return $ T.THeapSpikes (T.IENum 1) tTerm
+  transform (UT.THeapSpikes (UT.HeapWeightExpr hw) term)   = do
+    tHw <- check hw
+    tTerm <- transform term
+    return $ T.THeapSpikes tHw tTerm
   transform (UT.TDummyBinds varSet term)       = do
     tVarSet <- transform varSet
     tTerm <- transform term
@@ -201,7 +230,7 @@ instance Transformable UT.Term where
     tTerm <- transform term
     let tVar = getVarName var
     return $ T.TRedWeight 1 $ T.RApp tTerm tVar
-  transform (UT.TRAppW redWeight term var) = noSupport "TRAppW"
+  transform (UT.TRAppW redWeight term var) = undefined
   transform (UT.TRPlus term1 term2) =
     transformPlus Nothing term1 Nothing term2
   transform (UT.TRPlusW1 redWeight term1 term2) =

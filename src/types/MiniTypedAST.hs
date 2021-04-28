@@ -33,12 +33,15 @@ type HeapWeight = Integer
 type SubTerm = Term
 
 data Term
-    = TVar Var
+    = TNonTerminating
+    | TVar Var
     | TNum Integer
     | TLam Var Term
     | THole
     | TLet LetBindings Term
     | TDummyBinds VarSet Term
+    | TStackSpikes IntExpr Term
+    | THeapSpikes IntExpr Term
     | TRedWeight RedWeight Red
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -112,4 +115,4 @@ data Substitute
 
 data IntExpr
   = IENum Integer
-  deriving (C.Eq, C.Ord, C.Read)
+  deriving (C.Eq, C.Ord, C.Read, C.Show)
