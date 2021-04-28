@@ -7,5 +7,5 @@ import CheckMonad (CheckM)
 -- possible proofs with the details filled in, or throws an error in the CheckM
 -- monad. Currently, these details are the substitutions that are not specified
 -- by the user.
-addProofDetails :: T.ProofScript -> CheckM [T.ProofScript]
+addProofDetails :: T.ProofScript -> Either [String] [T.ProofScript]
 addProofDetails = undefined

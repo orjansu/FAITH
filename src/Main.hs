@@ -6,6 +6,8 @@ import System.Process     (callProcess)
 import System.IO (hPutStrLn, stderr, hGetLine, stdin, hGetContents, hPutStr,
                   stdout, writeFile)
 import Data.List (intersperse, concat)
+import Data.Either (rights, isRight)
+import Util (filterByList)
 
 import qualified ParSie (pProofScript, myLexer)
 import qualified ParSieLaws (pLawList, myLexer)
@@ -22,16 +24,60 @@ import Matcher (addProofDetails)
 -- | Main: read file passed by only command line argument and run compiler pipeline.
 main :: IO ()
 main = do
-  (lawInput, proofInput) <- getInputs
+  (lawInput, proofInput, proofFile) <- getInputs
   putStr "Parsing law file..."
   lawTree <- parse lawInput (ParSieLaws.pLawList . ParSieLaws.myLexer)
   tLaws <- runTypecheckLaws lawTree
   parseAndCheckDetailedProof tLaws proofInput
-  --proofTree <- parse proofInput (ParSie.pProofScript . ParSie.myLexer)
-  --tAbstractProofScript <- runTypecheckProof proofTree tLaws
-  --tDetailedProofScripts <- undefined
-  --undefined
+  proofTree <- parse proofInput (ParSie.pProofScript . ParSie.myLexer)
+  tAbstractProofScript <- runTypecheckProof proofTree tLaws
+  putStr "Adding details via matching..."
+  detailedUnchecked <- handleResult (addProofDetails tAbstractProofScript)
+                                    "proofLog.txt"
+  corrDetailedProofs <- getCorrectProofs detailedUnchecked
+  saveProofs corrDetailedProofs proofFile
+  putStrLn "There is a correct detailed version of your proof, but since I haven't implemented pretty-printing yet, I can't print the detailed proof yet."
 
+getCorrectProofs :: [T.ProofScript] -> IO [T.ProofScript]
+getCorrectProofs detailedUnchecked = do
+  let results = map checkDetailedProof detailedUnchecked
+  let correctResults = rights results
+  if correctResults == []
+    then do
+      let outFile = "proofLog.txt"
+      putStrLn $ "No correct proofs found. "
+        ++"Writing attempts and errors in "++outFile
+      let errorReport = concat
+                        . intersperse separator
+                        . map logProofErrors
+                        $ zip results detailedUnchecked
+      writeFile outFile errorReport
+      exitFailure
+    else return $ filterByList (map isRight results) detailedUnchecked
+  where
+    separator = "==================================================\n"
+    logProofErrors :: (Either [String] (), T.ProofScript) -> String
+    logProofErrors (Left errorMsgs, proof) =
+      "-----------POSSIBLE PROOF------------\n"
+      ++showProof proof++"\n"
+      ++"-------------ERRORS----------------\n"
+      ++"Final error: "++last errorMsgs++"\n"
+      ++"complete log: \n"
+      ++(concat . intersperse "\n" $ errorMsgs)
+
+showProof :: T.ProofScript -> String
+showProof proofScript = "for now: "++show proofScript
+
+saveProofs :: [T.ProofScript] -> String -> IO ()
+saveProofs (proofScript:[]) origFileName = do
+  let filename = origFileName ++"_detailed"
+  writeFile (showProof proofScript) filename
+  putStrLn $ "Detailed proof can be found in "++filename
+saveProofs proofScripts origFileName = do
+  let fileNames = map (\n -> origFileName++"_detailed"++show n)
+                      [1..length proofScripts]
+  mapM (\(p, fn) -> writeFile (showProof p) fn) $ zip proofScripts fileNames
+  putStrLn $ "Detailed proofs written to "++show fileNames
 
 -- | checking of a detailed proof where no matching or other guessing is
 -- involved. Inputs: the parsed laws and the unparsed proof script
@@ -44,7 +90,7 @@ parseAndCheckDetailedProof tLaws proofInput = do
   putStrLn "Proof is correct"
 
 
-getInputs :: IO (String, String)
+getInputs :: IO (String, String, String)
 getInputs = do
   args <- getArgs
   case args of
@@ -53,7 +99,7 @@ getInputs = do
                 ++" to check the proofs in "++proofFile
       lawInput <- readFile lawFile
       proofInput <- readFile proofFile
-      return (lawInput, proofInput)
+      return (lawInput, proofInput, proofFile)
     _ -> do
       putStrLn $ "usage: ./sie <law-file> <proof-file>"
       exitFailure
