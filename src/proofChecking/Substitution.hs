@@ -15,6 +15,7 @@ import CheckMonad (CheckM, runCheckM, assert, assertInternal, internalException)
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import Control.Monad.Except (MonadError, throwError)
+import Data.Foldable (foldlM)
 
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
@@ -43,9 +44,9 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
   Log.logInfoN . pack $ "applying substitution {"++showSubstitutions++"}"
   Log.logInfoN . pack $ "to law term"++showLaw law
   Log.logInfoN . pack $ "With forbidden names "++ show forbiddenNames1
-  -- TODO revise using SubstitutionMonad
   let boundSubstVars = getBoundSubstVars substitutions law
       forbiddenNames2 = forbiddenNames1 `Set.union` boundSubstVars
+  checkSubstBVDistinct substitutions forbiddenNames2
   res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM law
   let (finalTerm, forbiddenNames3) = res
       finalBV = getBoundVariables finalTerm
@@ -83,6 +84,62 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
         in "{" ++ listForm ++"}"
       T.STerm term -> showTypedTerm term
 
+-- | Checks that none of the substitutions has a bound variable that
+-- has a name that is forbidden (in the forbidden names) or that one bound
+-- variable in one substitution has the same name as a bound variable in
+-- another substitution.
+checkSubstBVDistinct :: T.Substitutions -> Set.Set String -> CheckM [()]
+checkSubstBVDistinct substitutions forbiddenNames = do
+  Log.logInfoN . pack $ "Checking that the names of the bound variables in the "
+    ++"substitutions are valid (i.e. distinct from each other and the free "
+    ++"variables)."
+  (flip evalStateT) forbiddenNames $
+    mapM checkBVSubstitution $ Map.elems substitutions
+  where
+    checkBVSubstitution :: T.Substitute -> StateT (Set.Set String) CheckM ()
+    checkBVSubstitution = \case
+      T.SLetBindings letBindings -> do
+        let (bindVars, _sw, _hw, terms) = unzip4 letBindings
+            innerBVs = map getBoundVariables terms
+            bindVarSet = Set.fromList bindVars
+        forbiddenNames1 <- get
+        let shouldBeDistinct = forbiddenNames1:bindVarSet:innerBVs
+        forbiddenNames2 <- assertDisjointAndMerge shouldBeDistinct
+        put forbiddenNames2
+      T.SValue term -> checkBVTerm term
+      T.SContext term -> checkBVTerm term
+      T.SIntegerVar intExpr -> return ()
+      T.SVar string -> return ()
+      T.SVarSet varSet -> return ()
+      T.STerm term -> checkBVTerm term
+
+    checkBVTerm :: T.Term -> StateT (Set.Set String) CheckM ()
+    checkBVTerm term = do
+      let bvSet = getBoundVariables term
+      forbiddenNames1 <- get
+      forbiddenNames2 <- assertDisjointAndMerge [bvSet, forbiddenNames1]
+      put forbiddenNames2
+
+    -- | asserts that every set in the list is disjoint from all other sets in
+    -- the list.
+    assertDisjointAndMerge :: (MonadError String m, Log.MonadLogger m,
+                              HasCallStack, Ord a, Show a) =>
+                      [Set.Set a] -> m (Set.Set a)
+    assertDisjointAndMerge sets = do
+      foldlM assertMerge2 Set.empty sets
+      where
+        assertMerge2 :: (MonadError String m, Log.MonadLogger m,
+                               HasCallStack, Ord a, Show a) =>
+                               Set.Set a -> Set.Set a -> m (Set.Set a)
+        assertMerge2 set1 set2 = do
+          assert (set1 `Set.disjoint` set2) $ "The variable(s) "
+            ++show (set1 `Set.intersection` set2)++" should not be used in "
+            ++"multiple bindings and should be distinct from the free "
+            ++"variables."
+          return $ set1 `Set.union` set2
+
+
+-- | returns the variables that are substituted into a binding position.
 getBoundSubstVars :: T.Substitutions -> Law.Term -> Set.Set String
 getBoundSubstVars substitutions law = case law of
   Law.TValueMetaVar _ -> Set.empty
