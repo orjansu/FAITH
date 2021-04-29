@@ -20,7 +20,17 @@ import ProofChecker                 (checkDetailedProof)
 
 -- | Main: read file passed by only command line argument and run compiler pipeline.
 main :: IO ()
-main = do
+main = test
+
+test :: IO ()
+test = do
+  (lawInput, proofInput) <- getInputs
+  lawTree <- parse lawInput (ParSieLaws.pLawList . ParSieLaws.myLexer)
+  tLaws <- runTypecheckLaws lawTree
+  return ()
+
+normalProcedure :: IO ()
+normalProcedure = do
   (lawInput, proofInput) <- getInputs
   putStrLn "Parsing law file"
   lawTree <- parse lawInput (ParSieLaws.pLawList . ParSieLaws.myLexer)
@@ -29,6 +39,7 @@ main = do
   proofTree <- parse proofInput (ParSie.pProofScript . ParSie.myLexer)
   tProofScript <- runTypecheckProof proofTree tLaws
   runCheckDetailedProof tProofScript
+
 
 getInputs :: IO (String, String)
 getInputs = do
