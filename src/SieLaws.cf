@@ -29,13 +29,14 @@ token MVValueContext     ('V' 'c' 't' 'x');
 token MVReduction        ('R');
 token MVVarSet           ('X');
 token MVTerm             ('M' | 'N');
-token MVPattern          ('p' 'a' 't');
+token MVTerms            ('N' '_' 'i');
+token MVPatterns         ('p' 'a' 't' '_' 'i');
 token MVCaseStm          ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
 -- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
 -- a way to share grammar between .cf files.
 
-rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVPattern | MVCaseStm | MVConstructorName;
+rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVPatterns | MVCaseStm | MVConstructorName;
 
 TValueMetaVar.    Term4 ::= MVValue;
 TGeneralMetaVar.  Term4 ::= MVTerm;
@@ -92,7 +93,7 @@ VCValueContext.   VarContainer ::= MVValueContext;
 
 -- TODO indexing
 CSAlts.     CaseStm ::= MVCaseStm;
-CSPattern.  CaseStm ::= MVPattern "->" Term;
+CSPattern.  CaseStm ::= MVPatterns "->" Term;
 CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 

@@ -54,11 +54,21 @@ data Constructor
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type Var = String
+type MVLetBindings = String
 
 data VarSet
   = VSConcrete (Set Var)
+  | VSMetaVar String
+  | VSFreeVars VarContainer
+  | VSDomain MVLetBindings
   deriving (C.Eq, C.Ord, C.Show, C.Read)
-  -- TODO expand
+
+data VarContainer
+  = VCTerm Term
+  | VCMetaVarContext String
+  | VCMetaVarRed String
+  | VCValueContext String
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data LetBindings
     = LBSBoth [MetaBindSet] [LetBinding]

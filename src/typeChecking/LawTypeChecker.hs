@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module LawTypeChecker (typecheckLaws) where
@@ -124,6 +124,8 @@ instance Transformable UT.Term where
       tTerm <- transform term
       return $ T.TLet tLbs tTerm
     UT.TRCase mRw term caseStms -> noSupport "TRCase"
+      -- To do this, you must include the MVTerms N_i, and you must check that
+      -- N_i is only used in terms inside case statements.
     UT.TRAddConst mRw intExpr term -> do
       tRw <- transform mRw
       tIE <- transform intExpr
@@ -220,12 +222,27 @@ instance Transformable UT.MaybeRedWeight where
 
 instance Transformable UT.VarSet where
   type TypedVersion UT.VarSet = T.VarSet
-  transform (UT.VSMetaVar mv) = noSupport "VSMetaVar"
+  transform (UT.VSMetaVar (UT.MVVarSet mv)) = return $ T.VSMetaVar mv
   transform (UT.VSConcrete varList) = let strList = map getVarName varList
                                           strSet = Set.fromList strList
                                       in return $ T.VSConcrete strSet
-  transform (UT.VSFreeVars varContainer) = noSupport "VSFreeVars"
-  transform (UT.VSDomain mVLetBindings) = noSupport "VSDomain"
+  transform (UT.VSFreeVars varContainer) = do
+    tVarContainer <- transform varContainer
+    return $ T.VSFreeVars tVarContainer
+  transform (UT.VSDomain (UT.MVLetBindings str)) =
+    return $ T.VSDomain str
+
+instance Transformable UT.VarContainer where
+  type TypedVersion UT.VarContainer = T.VarContainer
+  transform (UT.VCTerm term) = do
+    tTerm <- transform term
+    return $ T.VCTerm tTerm
+  transform (UT.VCMetaVarContext (UT.MVContext str)) =
+    return $ T.VCMetaVarContext str
+  transform (UT.VCMetaVarRed (UT.MVReduction str)) =
+    return $ T.VCMetaVarRed str
+  transform (UT.VCValueContext (UT.MVValueContext str)) =
+    return $ T.VCValueContext str
 
 instance Transformable UT.SideCond where
   type TypedVersion UT.SideCond = T.SideCond
@@ -239,123 +256,7 @@ getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 
 -- | Checks if laws are supported, but does not check if they are sound wrt
 -- space improvement.
+--
+-- TODO: Check that N_i is only used inside Case statements
 checkLaw :: T.Law -> CheckM ()
-checkLaw = contextsValidInLaw
-
--- | Checks that contexts are only used in the way that is currently supported.
--- See error text for explanation.
-contextsValidInLaw :: T.Law -> CheckM ()
-contextsValidInLaw (T.DLaw _name term1 _imprel term2 _sidecond) =
-  assert (contextsValid term1 && contextsValid term2) $ "Contexts should only "
-    ++"be used in a way that is currently supported.\n"
-    ++"> If a context is mentioned more than once, the context may not\n"
-    ++"  capture variables.\n"
-    ++"> If a context is inside another context, the term inside the inner\n"
-    ++"  context may not capture variables. For example, the term C[D[M]] is\n"
-    ++"  not allowed, but the term let x = M in C[D[x]] is allowed.\n"
-    ++"> A context may not be repeated inside itself, like \n"
-    ++"  let x = M in C[C[x]] for example\n"
-    ++"The way SIE checks if a term captures variables is that it checks if "
-    ++"the inner term may have free variables. Since all variable names are "
-    ++"unique, variables, constructors et cetera do not contain free "
-    ++"variables, but general term meta-variables (M, V, N, C[N], et cetera) " ++"may do so."
-
-contextsValid :: T.Term -> Bool
-contextsValid term =
-  let innerPotentialFail = getTermsInsideRepeatedCtxs term
-      innerNotCapturing = all (\t -> not (isTermWithFreeVars t))
-                              innerPotentialFail
-      contextNotRepeatedInside = not (contextRepeatedInside term)
-  in innerNotCapturing && contextNotRepeatedInside
-
--- | If the term mentions a context twice or inside another context
--- (as described in checkLaw), this function returns a list of the terms inside
--- the repeated contexts.
-getTermsInsideRepeatedCtxs :: T.Term -> [T.Term]
-getTermsInsideRepeatedCtxs term = getInRepeated ++ getInInner
-  where
-    getInRepeated = evalState (getInRepeated' term) Map.empty
-
-    -- | If the law term mentions a context twice, this function returns the
-    -- value inside that context. For example, if the term is
-    -- let {x = C[M1], y = C[M2]} in C[M3] + C[M4]
-    -- This function should return M1, M2, M3 and M4.
-    -- The state is the currently mentioned contexts.
-    -- getInRepeated'  term    (Currently mentioned contexts)
-    getInRepeated' :: T.Term -> State (Map.Map String T.Term) [T.Term]
-    getInRepeated' (T.TValueMetaVar _) = return []
-    getInRepeated' (T.TVar _) = return []
-    getInRepeated' (T.TAppCtx ctxVar term) = do
-      mentionedCtxs <- get
-      case Map.lookup ctxVar mentionedCtxs of
-        Just oldTerm -> return [term, oldTerm]
-        Nothing -> do
-          let mentionedCtxs' = Map.insert ctxVar term mentionedCtxs
-          put mentionedCtxs'
-          return [] -- We are only looking at the base level here.
-    getInRepeated' (T.TLet letBinds term) = do
-      letBindRepeats <- mapM getInRepeated' $ getLetTerms letBinds
-      let letBindRepeats' = concat letBindRepeats
-      inRepeats <- getInRepeated' term
-      return $ letBindRepeats' ++ inRepeats
-    getInRepeated' (T.TDummyBinds (T.VSConcrete _vs) term) = getInRepeated' term
-
-    -- | If there is a context inside a context, this function returns the
-    -- term(s) inside the inner context. For example, in C[D[M]], the function
-    -- should return M.
-    getInInner = getInInner' False term
-    --         IsInsideCtx  term
-    getInInner' :: Bool -> T.Term -> [T.Term]
-    getInInner' _ (T.TValueMetaVar _) = []
-    getInInner' _ (T.TVar _) = []
-    getInInner' False (T.TAppCtx _ term) = getInInner' True term
-    getInInner' True (T.TAppCtx _ term) = [term]
-    getInInner' isInsideCtx (T.TLet lets term) =
-      let letInners = concat $ map (getInInner' isInsideCtx) $ getLetTerms lets
-          inInners = getInInner' isInsideCtx term
-      in letInners ++ inInners
-    getInInner' isInsideCtx (T.TDummyBinds (T.VSConcrete _vs) term) =
-      getInInner' isInsideCtx term
-
-getLetTerms :: T.LetBindings -> [T.Term]
-getLetTerms (T.LBSBoth _metabindset letBindings) = map getLetTerm letBindings
-  where
-    getLetTerm (_var, _sw, _hw, term) = term
-
--- | returns whether the term contains a context inside itself, like
--- let x = M in C[C[x]] for example
-contextRepeatedInside :: T.Term -> Bool
-contextRepeatedInside = \case
-  T.TValueMetaVar _ -> False
-  T.TVar _ -> False
-  T.TAppCtx ctxMV term -> let ctxVars = getCtxVars term
-                              repeatedHere = Set.member ctxMV ctxVars
-                              repeatedInside = contextRepeatedInside term
-                          in repeatedHere || repeatedInside
-  T.TLet lbs term ->
-    let repeatedLet = any contextRepeatedInside $ getLetTerms lbs
-        repeatedIn = contextRepeatedInside term
-    in repeatedLet || repeatedIn
-  T.TDummyBinds (T.VSConcrete varSet) term -> contextRepeatedInside term
-  where
-    getCtxVars :: T.Term -> Set.Set String
-    getCtxVars (T.TValueMetaVar _) = Set.empty
-    getCtxVars (T.TVar _) = Set.empty
-    getCtxVars (T.TAppCtx ctxVar term) = Set.union (Set.singleton ctxVar)
-                                                   (getCtxVars term)
-    getCtxVars (T.TLet lbs term) = Set.union (letCtxslbs lbs) (getCtxVars term)
-      where
-        letCtxslbs (T.LBSBoth _meta concreteLbs) =
-          Set.unions $ map getCtxLB concreteLbs
-        getCtxLB (_var, _sw, _hw, lbTerm) = getCtxVars lbTerm
-    getCtxVars (T.TDummyBinds (T.VSConcrete _vs) term) = getCtxVars term
-
-isTermWithFreeVars :: T.Term -> Bool
-isTermWithFreeVars = \case
-  T.TValueMetaVar str -> True -- V may contain FV
-  T.TVar _ -> False
-  T.TAppCtx str term -> True -- C may contain FV
-  T.TLet letBindings term -> isTermWithFreeVars term || lbsIsWithFV letBindings
-    where
-      lbsIsWithFV (T.LBSBoth _ _) = True -- in "let G {} in N", G may conain FV
-  T.TDummyBinds (T.VSConcrete _varSet) term -> isTermWithFreeVars term
+checkLaw _ = return ()
