@@ -35,8 +35,6 @@ instance ImpRelRepresentation UT.ImpRel where
   <~> =def= = False
   <~> _     = True
   |~> |~~>  = True
-  <~| <~~|  = True
-  <~~> <~~| = True
   <~~> |~~> = True
   _ _ = False
   -}
@@ -45,8 +43,6 @@ instance ImpRelRepresentation UT.ImpRel where
   impRelImplies UT.StrongCostEquiv UT.DefinedEqual = False
   impRelImplies UT.StrongCostEquiv _ = True
   impRelImplies UT.StrongImprovementLR UT.WeakImprovementLR = True
-  impRelImplies UT.StrongImprovementRL UT.WeakImprovementRL = True
   impRelImplies UT.WeakCostEquiv UT.StrongCostEquiv = False
   impRelImplies UT.WeakCostEquiv UT.WeakImprovementLR = True
-  impRelImplies UT.WeakCostEquiv UT.WeakImprovementRL = True
   impRelImplies _ _ = False

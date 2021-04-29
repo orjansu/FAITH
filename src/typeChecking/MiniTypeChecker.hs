@@ -228,7 +228,12 @@ instance Transformable UT.Term where
     tTerm <- transform term
     let tVar = getVarName var
     return $ T.TRedWeight 1 $ T.RApp tTerm tVar
-  transform (UT.TRAppW redWeight term var) = undefined
+  transform (UT.TRAppW (UT.DRedWeight (UT.StackWeightExpr redWeight))
+                       term
+                       var) = do
+    tTerm <- transform term
+    let varName = getVarName var
+    return $ T.TRedWeight redWeight $ T.RApp tTerm varName
   transform (UT.TRAppNoW term var) = do
     tTerm <- transform term
     let tVar = getVarName var
@@ -242,9 +247,19 @@ instance Transformable UT.Term where
   transform (UT.TRPlusWW redWeight1 term1 redWeight2 term2) =
     transformPlus (Just redWeight1) term1 (Just redWeight2) term2
   transform (UT.TRCase maybeRedWeight term caseStms) = noSupport "TRCase"
-  transform (UT.TRAddConst maybeRedWeight integer term) = noSupport "TRAddConst"
-  transform (UT.TRIsZero maybeRedWeight term) = noSupport "TRIsZero"
-  transform (UT.TRSeq maybeRedWeight term1 term2) = noSupport "TRSeq"
+  transform (UT.TRAddConst maybeRedWeight integer term) = do
+    rw <- transform maybeRedWeight
+    tTerm <- transform term
+    return $ T.TRedWeight rw $ T.RAddConst integer tTerm
+  transform (UT.TRIsZero maybeRedWeight term) = do
+    rw <- transform maybeRedWeight
+    tTerm <- transform term
+    return $ T.TRedWeight rw $ T.RIsZero tTerm
+  transform (UT.TRSeq maybeRedWeight term1 term2) = do
+    rw <- transform maybeRedWeight
+    tTerm1 <- transform term1
+    tTerm2 <- transform term2
+    return $ T.TRedWeight rw $ T.RSeq tTerm1 tTerm2
 
 transformPlus :: Maybe UT.RedWeight
                  -> UT.Term
@@ -286,6 +301,12 @@ instance Transformable UT.VarSet where
 
 getVarName :: UT.Var -> String
 getVarName (UT.DVar (UT.Ident name)) = name
+
+instance Transformable UT.MaybeRedWeight where
+  type TransformedVersion UT.MaybeRedWeight = Integer
+  transform (UT.WithRedWeight (UT.DRedWeight (UT.StackWeightExpr int))) =
+    return int
+  transform UT.NoRedWeight = return 1
 
 instance Checkable UT.Proof where
   type TypedVersion UT.Proof = T.Proof
@@ -372,8 +393,6 @@ instance Checkable UT.ImpRel where
   check UT.DefinedEqual        = return Com.DefinedEqual
   check UT.StrongImprovementLR = return Com.StrongImprovementLR
   check UT.WeakImprovementLR   = return Com.WeakImprovementLR
-  check UT.StrongImprovementRL = fail "not implemented yet 24"
-  check UT.WeakImprovementRL   = fail "not implemented yet 25"
   check UT.StrongCostEquiv     = return Com.StrongCostEquiv
   check UT.WeakCostEquiv       = return Com.WeakCostEquiv
 

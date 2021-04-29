@@ -50,6 +50,9 @@ type VarSet = Set Var
 data Red
     = RApp Term Var
     | RPlusWeight Term RedWeight Term
+    | RAddConst Integer Term
+    | RIsZero Term
+    | RSeq Term Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type RedWeight = Integer --I will add expressions here later

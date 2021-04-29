@@ -116,10 +116,9 @@ separator VarAnyType " ";
 DefinedEqual.        ImpRel ::= "=def=";
 StrongImprovementLR. ImpRel ::= "|~>";
 WeakImprovementLR.   ImpRel ::= "|~~>";
-StrongImprovementRL. ImpRel ::= "<~|";
-WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
+-- right-left variants do not make sense in the proof language
 
 token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 -- copied to SieLaws
