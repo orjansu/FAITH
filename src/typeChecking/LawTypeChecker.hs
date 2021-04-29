@@ -167,28 +167,36 @@ transformImpRel UT.Reduction = noSupport "Reduction"
 instance Transformable UT.LetBindings where
   type TypedVersion UT.LetBindings = T.LetBindings
   transform = \case
-    UT.LBSOnlyMeta metaBinds -> noSupport "LBSOnlyMeta"
-    UT.LBSBoth (metaBinds:[]) letBinds -> case metaBinds of
-      UT.MBSMetaVar mvBinds -> do
-        let (UT.MVLetBindings str) = mvBinds
-        tLetBinds <- mapM transformLB letBinds
-        return $ T.LBSBoth [T.MBSMetaVar str] tLetBinds
-        where
-          transformLB (UT.DLetBinding var bindSym term) = do
-            (tsw,thw) <- case bindSym of
-              UT.BSWeights sw hw -> do
-                let (UT.DStackWeight swIexpr) = sw
-                let (UT.DHeapWeight hwIexpr) = hw
-                tsw' <- transform swIexpr
-                thw' <- transform hwIexpr
-                return (tsw', thw')
-              UT.BSNoWeight -> return (T.IENum 1,T.IENum 1)
-            let varStr = getVarName var
-            tTerm <- transform term
-            return $ (varStr, tsw, thw, tTerm)
-      UT.MBSSubstitution mvBinds var1 var2 -> noSupport "MBSSubstitution"
-    UT.LBSBoth metaBinds letBinds -> noSupport $ "multiple bind-sets in meta-"
-      ++"variables (LBSBoth, general case)"
+    UT.LBSOnlyMeta metaBinds -> do
+      tMetaBinds <- mapM transform metaBinds
+      return $ T.LBSBoth tMetaBinds []
+    UT.LBSBoth metaBinds letBinds -> do
+      tMetaBinds <- mapM transform metaBinds
+      tLetBinds <- mapM transformLB letBinds
+      return $ T.LBSBoth tMetaBinds tLetBinds
+      where
+        transformLB (UT.DLetBinding var bindSym term) = do
+          (tsw,thw) <- case bindSym of
+            UT.BSWeights sw hw -> do
+              let (UT.DStackWeight swIexpr) = sw
+              let (UT.DHeapWeight hwIexpr) = hw
+              tsw' <- transform swIexpr
+              thw' <- transform hwIexpr
+              return (tsw', thw')
+            UT.BSNoWeight -> return (T.IENum 1,T.IENum 1)
+          let varStr = getVarName var
+          tTerm <- transform term
+          return $ (varStr, tsw, thw, tTerm)
+
+instance Transformable UT.MetaBindSet where
+  type TypedVersion UT.MetaBindSet = T.MetaBindSet
+  transform (UT.MBSMetaVar (UT.MVLetBindings mv)) = return $ T.MBSMetaVar mv
+  transform (UT.MBSSubstitution mvLet var1 var2) =
+    let (UT.MVLetBindings mvLetName) = mvLet
+        (UT.DVar (UT.MVVar var1Name)) = var1
+        (UT.DVar (UT.MVVar var2Name)) = var2
+    in return $ T.MBSSubstitution mvLetName var1Name var2Name
+
 
 instance Transformable UT.IntExpr where
   type TypedVersion UT.IntExpr = T.IntExpr

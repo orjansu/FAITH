@@ -61,11 +61,12 @@ data VarSet
   -- TODO expand
 
 data LetBindings
-    = LBSBoth [MetaBindSet] [LetBinding] --TODO expand to [MetaBindSet]
+    = LBSBoth [MetaBindSet] [LetBinding]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data MetaBindSet
     = MBSMetaVar String
+    | MBSSubstitution String Var Var
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type LetBinding = (Var, StackWeight, HeapWeight, Term)
