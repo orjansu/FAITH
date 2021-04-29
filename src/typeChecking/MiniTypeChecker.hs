@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module MiniTypeChecker (typecheckProof, checkTypedTerm) where
@@ -26,14 +27,18 @@ import Control.Monad.State (StateT, runStateT, gets, MonadState, modify)
 import Control.Monad.Extra (firstJustM)
 import Data.Functor.Identity (Identity, runIdentity)
 import GHC.Stack (HasCallStack)
+import GHC.Base (maxInt)
+import qualified Prelude.SafeEnum as Safe (fromEnum)
 
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
   , checkFreeVars, getBoundVariables, isValue, getAllMetaVars)
 import ToLocallyNameless (toLocallyNameless)
-import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport)
+import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport
+                  , throwCallstackError)
 
 data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
+                 , constructors :: Map.Map String Int
                  , letContext :: Maybe T.LetBindings
                  , start :: T.Term
                  , goal :: T.Term
@@ -41,8 +46,17 @@ data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
                  , lawMap :: Law.LawMap
                  }
 
+nilName = "[]"
+consName = "(:)"
+trueName = "true"
+falseName = "false"
+
 mkInitSt :: Law.LawMap -> MySt
-mkInitSt lawMap = MkSt { letBindings = undefined
+mkInitSt lawMap = MkSt { letBindings = Map.empty
+                       , constructors = Map.fromList [(nilName, 0)
+                                                     , (consName, 2)
+                                                     , (trueName, 0)
+                                                     , (falseName, 0)]
                        , letContext = undefined
                        , start= undefined
                        , goal = undefined
@@ -114,19 +128,27 @@ class Transformable a where
 instance Checkable UT.ProofScript where
   type TypedVersion UT.ProofScript = T.ProofScript
   check (UT.DProofScript (UT.DProgBindings bindings) theorems) = do
-    entries <- mapM toEntry bindings
-    let letBindings = Map.fromList $ entries
-    modify (\st -> st{letBindings = letBindings})
+    mapM addEntry bindings
     tTheorems <- mapM check theorems
     return $ T.DProofScript tTheorems
     where
-      toEntry :: UT.ProgBinding -> StCheckM (String, T.LetBindings)
-      toEntry (UT.DProgBinding (UT.CapitalIdent name) utLetBinds) = do
+      -- Correctness properties on the let bindings will be
+      -- enforced when inserted into the terms. Unused bindings will not be
+      -- checked, but that's fine.
+      addEntry :: UT.ProgBinding -> StCheckM ()
+      addEntry (UT.PBLet (UT.CapitalIdent name) utLetBinds) = do
         tLetBindings <- transform utLetBinds
-        return (name, tLetBindings)
-        -- Correctness properties on the let bindings will be enforced when
-        -- inserted into the terms. Unused bindings will not be checked, but
-        -- that's fine.
+        letBindings1 <- gets letBindings
+        let letBindings2 = Map.insert name tLetBindings letBindings1
+        modify (\st -> st{letBindings = letBindings2})
+      addEntry (UT.PBConstructor (UT.CapitalIdent name) numArgs) = do
+        constructors1 <- gets constructors
+        safeNumArgs <- case Safe.fromEnum numArgs of
+          Just n -> return n
+          Nothing -> throwError $ "There is no support for constructors with "
+            ++"more than "++show maxInt++" number of arguments."
+        let constructors2 = Map.insert name safeNumArgs constructors1
+        modify (\st -> st{constructors = constructors2})
 
 instance Checkable UT.Theorem where
   type TypedVersion UT.Theorem = T.Theorem
@@ -199,7 +221,9 @@ instance Transformable UT.Term where
   transform (UT.TIndVar var indExpr)           = noSupport "TIndVar"
   transform (UT.TNum integer)                  = return $ T.TNum integer
   transform (UT.THole)                         = return T.THole
-  transform (UT.TConstructor constructor)      = noSupport "TConstructor"
+  transform (UT.TConstructor constructor)      = do
+    (name, args) <- transform constructor
+    return $ T.TConstructor name args
   transform (UT.TLam var term)                 = do
     let tVar = getVarName var
     tTerm <- transform term
@@ -246,7 +270,16 @@ instance Transformable UT.Term where
     transformPlus Nothing term1 (Just redWeight) term2
   transform (UT.TRPlusWW redWeight1 term1 redWeight2 term2) =
     transformPlus (Just redWeight1) term1 (Just redWeight2) term2
-  transform (UT.TRCase maybeRedWeight term caseStms) = noSupport "TRCase"
+  transform (UT.TRCase maybeRedWeight term caseStms) = do
+    rw <- transform maybeRedWeight
+    tTerm <- transform term
+    alts <- mapM transAlt caseStms
+    return $ T.TRedWeight rw $ T.RCase tTerm alts
+    where
+      transAlt (UT.CSConcrete constructor term) = do
+        (name, args) <- transform constructor
+        tTerm <- transform term
+        return (name, args, tTerm)
   transform (UT.TRAddConst maybeRedWeight integer term) = do
     rw <- transform maybeRedWeight
     tTerm <- transform term
@@ -266,18 +299,26 @@ transformPlus :: Maybe UT.RedWeight
                  -> Maybe UT.RedWeight
                  -> UT.Term
                  -> StCheckM T.Term
-transformPlus rw1 t1 rw2 t2 = do
+transformPlus mrw1 t1 mrw2 t2 = do
   trans1 <- transform t1
   trans2 <- transform t2
-  case (rw1, rw2) of
-    (Nothing, Nothing) ->
-      return $ T.TRedWeight 1 $ T.RPlusWeight trans1 1 trans2
-    _ -> fail "not implemented yet: weights on Plus"
+  let rw1 = toWeight mrw1
+      rw2 = toWeight mrw2
+  return $ T.TRedWeight rw1 $ T.RPlusWeight trans1 rw2 trans2
+  where
+    toWeight :: Maybe UT.RedWeight -> Integer
+    toWeight Nothing = 1
+    toWeight (Just (UT.DRedWeight (UT.StackWeightExpr n))) = n
+
 
 instance Transformable UT.LetBindings where
   type TransformedVersion UT.LetBindings = T.LetBindings
   transform UT.LBSAny = fail "not implemented yet 12"
-  transform (UT.LBSVar capitalIdent) = fail "not implemented yet"
+  transform (UT.LBSVar (UT.CapitalIdent name)) = do
+    letBindings <- gets letBindings
+    case Map.lookup name letBindings of
+      Just letBinds -> return letBinds
+      Nothing -> throwError $ "LetBinding "++name++" not declared."
   transform (UT.LBSSet bindingSetList) = do
     tLetBindings <- mapM transformSingle bindingSetList
     return tLetBindings
@@ -289,8 +330,12 @@ instance Transformable UT.LetBindings where
         let tVar = getVarName var
         tTerm <- transform term
         return (tVar, 1,1, tTerm)
-      transformSingle (UT.LBConcrete var withWeight term) =
-        fail "not implemented yet 14"
+      transformSingle (UT.LBConcrete var withWeight term) = do
+        let UT.BSWeights (UT.StackWeightExpr sw)
+                         (UT.HeapWeightExpr hw) = withWeight
+            varName = getVarName var
+        tTerm <- transform term
+        return (varName, sw, hw, tTerm)
 
 
 instance Transformable UT.VarSet where
@@ -307,6 +352,31 @@ instance Transformable UT.MaybeRedWeight where
   transform (UT.WithRedWeight (UT.DRedWeight (UT.StackWeightExpr int))) =
     return int
   transform UT.NoRedWeight = return 1
+
+instance Transformable UT.Constructor where
+  type TransformedVersion UT.Constructor = (String, [String])
+  transform = \case
+    UT.CGeneral (UT.CapitalIdent name) vars -> do
+      constructors <- gets constructors
+      case Map.lookup name constructors of
+        Just numArgs -> do
+          actualNumArgs <- case Safe.fromEnum (length vars) of
+            Just n -> return n
+            Nothing -> throwCallstackError $ "We do not support constructors "
+              ++"more than "++show maxInt++" arguments."
+          assert (actualNumArgs == numArgs) $ "All constructors must be fully "
+            ++"applied, so "++show name++" must have "++show numArgs
+            ++" arguments."
+          let varNames = map getVarName vars
+          return (name, varNames)
+        Nothing -> throwError $ "Constructor "++name++" is not declared. "
+          ++"If it has "++show(length vars)++" arguments, declare it by typing "
+          ++name++" ("++show(length vars)++"); in the bindings list."
+    UT.CNil -> return $ (nilName, [])
+    UT.CCons var1 var2 -> return $ (consName, [getVarName var1
+                                              , getVarName var2])
+    UT.CTrue -> return $ (trueName, [])
+    UT.CFalse -> return $ (falseName, [])
 
 instance Checkable UT.Proof where
   type TypedVersion UT.Proof = T.Proof

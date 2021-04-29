@@ -7,7 +7,8 @@ DProofScript. ProofScript ::= ProgBindings [Theorem];
 DProgBindings. ProgBindings ::= "bindings" "{" [ProgBinding] "}";
 terminator ProgBinding ";";
 
-DProgBinding. ProgBinding ::= CapitalIdent "="  LetBindings  ;
+PBLet. ProgBinding ::= CapitalIdent "="  LetBindings;
+PBConstructor. ProgBinding ::= CapitalIdent "(" Integer ")";
 
 token CapitalIdent (upper letter*);
 

@@ -36,6 +36,7 @@ data Term
     = TNonTerminating
     | TVar Var
     | TNum Integer
+    | TConstructor String [Var]
     | TLam Var Term
     | THole
     | TLet LetBindings Term
@@ -49,6 +50,7 @@ type VarSet = Set Var
 
 data Red
     = RApp Term Var
+    | RCase Term [(String, [Var], Term)]
     | RPlusWeight Term RedWeight Term
     | RAddConst Integer Term
     | RIsZero Term
