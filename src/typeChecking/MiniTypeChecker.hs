@@ -577,7 +577,7 @@ checkArg (UT.CAAssign assignee value) = case assignee of
             in return $ Just (name, T.SVarSet strSet)
           _ -> throwError "Not a set of variables"
       UTLaw.MetaVarMVTerm (UTLaw.MVTerm name) -> noSupport "MVTerm"
-      UTLaw.MetaVarMVPattern (UTLaw.MVPattern name) -> noSupport "MVPattern"
+      UTLaw.MetaVarMVPatterns (UTLaw.MVPatterns name) -> noSupport "MVPatterns"
       UTLaw.MetaVarMVCaseStm (UTLaw.MVCaseStm name) -> noSupport "MVCaseStm"
       UTLaw.MetaVarMVConstructorName (UTLaw.MVConstructorName name) ->
         noSupport "MVConstructorName"
