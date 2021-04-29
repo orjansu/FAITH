@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+-- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module LawTypeChecker (typecheckLaws) where
@@ -50,44 +50,106 @@ instance Transformable UT.Term where
   transform = \case
     UT.TValueMetaVar mvValue -> let (UT.MVValue str) = mvValue
                                 in return $ T.TValueMetaVar str
-    UT.TGeneralMetaVar mvTerm -> noSupport "TGeneralMetaVar"
+    UT.TGeneralMetaVar (UT.MVTerm mvTerm) -> return $ T.TGeneralMetaVar mvTerm
     UT.TVar var -> let varStr = getVarName var
                    in return $ T.TVar varStr
     UT.TAppCtx mvContext term -> do
       let (UT.MVContext str) = mvContext
       tTerm <- transform term
       return $ T.TAppCtx str tTerm
-    UT.TAppValCtx mVValueContext term -> noSupport "TAppValCtx"
-    UT.TNonTerminating -> noSupport "TNonTerminating"
-    UT.TNum integer -> noSupport "TNum"
+    UT.TAppValCtx (UT.MVValueContext mvValCtx) term -> do
+      tTerm <- transform term
+      return $ T.TAppValCtx mvValCtx tTerm
+    UT.TNonTerminating -> return T.TNonTerminating
+    UT.TNum integer -> return $ T.TNum integer
     UT.TIndVar var indExpr -> noSupport "TIndVar"
-    UT.TConstructor constructor -> noSupport "TConstructor"
-    UT.TStackSpike term -> noSupport "TStackSpike"
-    UT.TStackSpikes stackWeight term -> noSupport "TStackSpikes"
-    UT.THeapSpike term -> noSupport "THeapSpike"
-    UT.THeapSpikes heapWeight term -> noSupport "THeapSpikes"
+    UT.TConstructor constructor -> case constructor of
+        UT.CGeneral (UT.MVConstructorName name) (UT.MVVarVect args) ->
+          return $ T.TConstructor $ T.CGeneral name args
+        UT.CTrue -> return $ T.TConstructor T.CTrue
+        UT.CFalse -> return $ T.TConstructor T.CFalse
+    UT.TStackSpike term -> do
+      tTerm <- transform term
+      return $ T.TStackSpikes (T.IENum 1) tTerm
+    UT.TStackSpikes (UT.DStackWeight stackWeight) term -> do
+      tTerm <- transform term
+      tSw <- transform stackWeight
+      return $ T.TStackSpikes tSw tTerm
+    UT.THeapSpike term -> do
+      tTerm <- transform term
+      return $ T.THeapSpikes (T.IENum 1) tTerm
+    UT.THeapSpikes (UT.DHeapWeight hw) term -> do
+      tHw <- transform hw
+      tTerm <- transform term
+      return $ T.THeapSpikes tHw tTerm
     UT.TDummyBinds varSet term -> do
       tTerm <- transform term
       tVarSet <- transform varSet
       return $ T.TDummyBinds tVarSet tTerm
-    UT.TRedMetaVar mvReduction term -> noSupport "TRedMetaVar"
-    UT.TRedMetaVarW redWeight mvReduction term -> noSupport "TRedMetaVarW"
-    UT.TSubstitution term v1 v2 -> noSupport "TSubstitution"
-    UT.TRApp term var -> noSupport "TRApp"
-    UT.TRAppW rw term var -> noSupport "TRAppW"
-    UT.TRPlus term1 term2 -> noSupport "TRPlus"
-    UT.TRPlusW1 rw term1 term2 -> noSupport "TRPlusW1"
-    UT.TRPlusW2 term1 rw term2 -> noSupport "TRPlusW2"
-    UT.TRPlusWW rw1 term1 rw2 term2 -> noSupport "TRPlusWW"
-    UT.TLam var term -> noSupport "TLam"
+    UT.TRedMetaVar mvReduction term -> do
+      tTerm <- transform term
+      let (UT.MVReduction str) = mvReduction
+      return $ T.TRedWeight (T.IENum 1) $ T.RMetaVar str tTerm
+    UT.TRedMetaVarW redWeight mvReduction term -> do
+      let (UT.DRedWeight (UT.DStackWeight rw)) = redWeight
+      tRW <- transform rw
+      let (UT.MVReduction str) = mvReduction
+      tTerm <- transform term
+      return $ T.TRedWeight tRW $ T.RMetaVar str tTerm
+    UT.TSubstitution term v1 v2 -> do
+      tTerm <- transform term
+      let (UT.DVar (UT.MVVar v1str)) = v1
+          (UT.DVar (UT.MVVar v2str)) = v2
+      return $ T.TSubstitution tTerm v1str v2str
+    UT.TRApp term (UT.DVar (UT.MVVar varName)) -> do
+      tTerm <- transform term
+      return $ T.TRedWeight (T.IENum 1) $ T.RApp tTerm varName
+    UT.TRAppW (UT.DRedWeight (UT.DStackWeight rw)) term var -> do
+      trw <- transform rw
+      tTerm <- transform term
+      let (UT.DVar (UT.MVVar vName)) = var
+      return $ T.TRedWeight trw $ T.RApp tTerm vName
+    UT.TRPlus term1 term2 -> transformPlus Nothing term1 Nothing term2
+    UT.TRPlusW1 rw term1 term2 ->
+      transformPlus (Just rw) term1 Nothing term2
+    UT.TRPlusW2 term1 rw term2 ->
+      transformPlus Nothing term1 (Just rw) term2
+    UT.TRPlusWW rw1 term1 rw2 term2 ->
+      transformPlus (Just rw1) term1 (Just rw2) term2
+    UT.TLam (UT.DVar (UT.MVVar var)) term -> do
+      tTerm <- transform term
+      return $ T.TLam var tTerm
     UT.TLet lbs term -> do
       tLbs <- transform lbs
       tTerm <- transform term
       return $ T.TLet tLbs tTerm
     UT.TRCase mRw term caseStms -> noSupport "TRCase"
-    UT.TRAddConst mRw integer term -> noSupport "TRAddConst"
-    UT.TRIsZero mRw term -> noSupport "TRIsZero"
-    UT.TRSeq mRw term1 term2 -> noSupport "TRSeq"
+    UT.TRAddConst mRw intExpr term -> do
+      tRw <- transform mRw
+      tIE <- transform intExpr
+      tTerm <- transform term
+      return $ T.TRedWeight tRw $ T.RAddConst tIE tTerm
+    UT.TRIsZero mRw term -> do
+      tRW <- transform mRw
+      tTerm <- transform term
+      return $ T.TRedWeight tRW $ T.RIsZero tTerm
+    UT.TRSeq mRw term1 term2 -> do
+      tRW <- transform mRw
+      tTerm1 <- transform term1
+      tTerm2 <- transform term2
+      return $ T.TRedWeight tRW $ T.RSeq tTerm1 tTerm2
+
+transformPlus :: Maybe UT.RedWeight -> UT.Term -> Maybe UT.RedWeight -> UT.Term
+                 -> CheckM T.Term
+transformPlus mrw1 t1 mrw2 t2 = do
+  tRW1 <- transMrw mrw1
+  tTerm1 <- transform t1
+  tRW2 <- transMrw mrw2
+  tTerm2 <- transform t2
+  return $ T.TRedWeight tRW1 $ T.RPlusW tTerm1 tRW2 tTerm2
+  where
+    transMrw Nothing = return $ T.IENum 1
+    transMrw (Just (UT.DRedWeight (UT.DStackWeight expr))) = transform expr
 
 -- | Given an improvement relation, returns the corresponding left-to right
 -- improvement relation and a boolean being True if the arguments should be
@@ -133,8 +195,20 @@ instance Transformable UT.IntExpr where
   transform (UT.IEVar (UT.DIntegerVar (UT.MVIntegerVar varStr))) =
     return $ T.IEVar varStr
   transform (UT.IENum integer) = return $ T.IENum integer
-  transform (UT.IEPlus intExpr1 intExpr2) = noSupport "IEPlus"
-  transform (UT.IEMinus intExpr1 intExpr2) = noSupport "IEMinus"
+  transform (UT.IEPlus intExpr1 intExpr2) = do
+    tIntExpr1 <- transform intExpr1
+    tIntExpr2 <- transform intExpr2
+    return $ T.IEPlus tIntExpr1 tIntExpr2
+  transform (UT.IEMinus intExpr1 intExpr2) = do
+    tIntExpr1 <- transform intExpr1
+    tIntExpr2 <- transform intExpr2
+    return $ T.IEMinus tIntExpr1 tIntExpr2
+
+instance Transformable UT.MaybeRedWeight where
+  type TypedVersion UT.MaybeRedWeight = T.IntExpr
+  transform (UT.WithRedWeight (UT.DRedWeight (UT.DStackWeight expr))) =
+    transform expr
+  transform UT.NoRedWeight = return $ T.IENum 1
 
 instance Transformable UT.VarSet where
   type TypedVersion UT.VarSet = T.VarSet

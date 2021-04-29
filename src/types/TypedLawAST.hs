@@ -19,10 +19,38 @@ data Law = DLaw LawName Term ImpRel Term SideCond
 
 data Term
     = TValueMetaVar String
+    | TGeneralMetaVar String
+    | TNonTerminating
+    | TNum Integer
+    | TConstructor Constructor
     | TVar String
     | TAppCtx String Term
+    | TAppValCtx String Term
     | TLet LetBindings Term
+    | TLam String Term
     | TDummyBinds VarSet Term
+    | TStackSpikes IntExpr Term
+    | THeapSpikes IntExpr Term
+    | TSubstitution Term String String
+    | TRedWeight IntExpr Reduction
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data Reduction
+  = RMetaVar String Term
+  | RApp Term String
+  | RPlusW Term IntExpr Term
+  | RAddConst IntExpr Term
+  | RIsZero Term
+  | RSeq Term Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type Name = String
+type Arguments = String
+
+data Constructor
+  = CGeneral Name Arguments
+  | CTrue
+  | CFalse
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type Var = String
@@ -49,6 +77,8 @@ type HeapWeight = IntExpr
 data IntExpr
   = IEVar String
   | IENum Integer
+  | IEPlus IntExpr IntExpr
+  | IEMinus IntExpr IntExpr
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data SideCond = NoSideCond

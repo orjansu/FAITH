@@ -68,7 +68,7 @@ TLam.             Term  ::= "\\" Var "." Term ;
 TLet.             Term  ::= "let" LetBindings "in" Term;
 
 TRCase.       Term ::= MaybeRedWeight "case" Term "of" "{" [CaseStm] "}";
-TRAddConst.   Term ::= MaybeRedWeight "add" Integer Term1;
+TRAddConst.   Term ::= MaybeRedWeight "add" IntExpr Term1;
 TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
 TRSeq.        Term ::= MaybeRedWeight "seq" Term4 Term4;
 
@@ -96,10 +96,8 @@ CSPattern.  CaseStm ::= MVPattern "->" Term;
 CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 
-DConstructor. Constructor ::= MVConstructorName MVVarVect;
-
+CGeneral.     Constructor ::= MVConstructorName MVVarVect;
 CTrue.        Constructor ::= "true";
-
 CFalse.       Constructor ::= "false";
 
 LBSOnlyMeta. LetBindings ::= [MetaBindSet];
