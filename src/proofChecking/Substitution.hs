@@ -149,7 +149,11 @@ getBoundSubstVars substitutions law = case law of
     in mainBounds `Set.union` innerBounds
     where
       innerBounds = case letBindings of
-        Law.LBSBoth (Law.MBSMetaVar _) innerLetbinds ->
+        -- It only makes sense to substitute bound varibles, so even though
+        -- metaBinds may contain a substitution, that substitution is not
+        -- allowed to be on a variable in a binding position. Therefore, we
+        -- can ignore _MetaBinds.
+        Law.LBSBoth _MetaBinds innerLetbinds ->
           Set.unions $ map getLBBound innerLetbinds
       getLBBound :: Law.LetBinding -> Set.Set String
       getLBBound (lawVar, _, _, term) =
@@ -186,12 +190,13 @@ applyTermSubstM bigLawTerm = do
         where
           applyOnLBS = case letBindings of
             Law.LBSBoth metaBinds moreConcreteBindings -> do
-              case metaBinds of
-                Law.MBSMetaVar metaBindVar -> do
-                  T.SLetBindings concreteFirst <- getSubstitute metaBindVar
-                  concreteRest <- mapM applyOnLB moreConcreteBindings
-                  let concrete = concreteFirst ++ concreteRest
-                  return concrete
+              concreteFirsts <- mapM applyMBS metaBinds
+              concreteRest <- mapM applyOnLB moreConcreteBindings
+              let concrete = concat concreteFirsts ++ concreteRest
+              return concrete
+          applyMBS (Law.MBSMetaVar metaBindVar) = do
+              T.SLetBindings concreteFirst <- getSubstitute metaBindVar
+              return concreteFirst
           applyOnLB (lawVar, lawSw, lawHw, lawTerm) = do
             T.SVar var <- getSubstitute lawVar
             sw <- applyIntExprSubstM lawSw

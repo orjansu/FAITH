@@ -151,10 +151,12 @@ getAllMetaVars = \case
     Set.singleton mvName `Set.union` getAllMetaVars term
   Law.TLet letBindings term -> lbsMetas `Set.union` getAllMetaVars term
     where
+      getMV (Law.MBSMetaVar mv) = mv
       lbsMetas = case letBindings of
-        Law.LBSBoth (Law.MBSMetaVar mv1) concreteLets ->
-          let metasFromConcrete = Set.unions $ map concreteLBMetas concreteLets
-          in Set.insert mv1 metasFromConcrete
+        Law.LBSBoth mVars concreteLets ->
+          let lawMVs = Set.fromList $ map getMV mVars
+              metasFromConcrete = Set.unions $ map concreteLBMetas concreteLets
+          in lawMVs `Set.union` metasFromConcrete
       concreteLBMetas (varMV, sw, hw, lbterm) =
         Set.singleton varMV
           `Set.union` getIntExprMetas sw

@@ -137,6 +137,8 @@ x-alla bindande variabler är unika
 -typning av variabler? nej, inte nu.
 -I och med att man har en metod som skapar en LNL-representation och den används endast för att jämföra, kommer hela representationen endast räknas ut om de två termerna är lika, pga lazyness. Detta borde man kunna testa genom att jämföra två oändliga termer som är olika efter ett ändligt antal steg.
 
+- Det är bara rimligt att substituera fria variabler. Om man vi ll byta namn på bundna variabler får man göra det via alpha-equiv.
+
 --- checking detailed proof: ---
 substitutions, alpha equivalence, check subterm in main term
 -apply the substitutions to the left side of the law

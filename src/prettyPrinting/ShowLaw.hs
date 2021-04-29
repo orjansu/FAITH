@@ -38,11 +38,12 @@ toUntypedVar mvName = UT.DVar $ UT.MVVar mvName
 
 instance Convertible T.LetBindings where
   type UntypedVersion T.LetBindings = UT.LetBindings
-  toUntyped (T.LBSBoth (T.MBSMetaVar mv) letBindings) =
-    let mbs = [UT.MBSMetaVar (UT.MVLetBindings mv)]
+  toUntyped (T.LBSBoth tMBS letBindings) =
+    let mbs = map toMBS tMBS
         lbs = map toLB letBindings
     in UT.LBSBoth mbs lbs
     where
+      toMBS (T.MBSMetaVar mv) = UT.MBSMetaVar (UT.MVLetBindings mv)
       toLB (var, sw, hw, term) =
         let utVar = toUntypedVar var
             utSw = toUntyped sw

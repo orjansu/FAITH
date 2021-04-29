@@ -172,7 +172,7 @@ instance Transformable UT.LetBindings where
       UT.MBSMetaVar mvBinds -> do
         let (UT.MVLetBindings str) = mvBinds
         tLetBinds <- mapM transformLB letBinds
-        return $ T.LBSBoth (T.MBSMetaVar str) tLetBinds
+        return $ T.LBSBoth [T.MBSMetaVar str] tLetBinds
         where
           transformLB (UT.DLetBinding var bindSym term) = do
             (tsw,thw) <- case bindSym of

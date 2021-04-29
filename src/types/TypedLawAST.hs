@@ -61,7 +61,7 @@ data VarSet
   -- TODO expand
 
 data LetBindings
-    = LBSBoth MetaBindSet [LetBinding] --TODO expand to [MetaBindSet]
+    = LBSBoth [MetaBindSet] [LetBinding] --TODO expand to [MetaBindSet]
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data MetaBindSet
