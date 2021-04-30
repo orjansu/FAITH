@@ -40,6 +40,7 @@ rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | M
 
 TValueMetaVar.    Term4 ::= MVValue;
 TGeneralMetaVar.  Term4 ::= MVTerm;
+TMVTerms.         Term4 ::= MVTerms;
 TVar.             Term4 ::= Var;
 TAppCtx.          Term4 ::= MVContext "[" Term "]";
 TAppValCtx.       Term4 ::= MVValueContext "[" Term "]";
@@ -91,9 +92,8 @@ VCMetaVarContext. VarContainer ::= MVContext;
 VCMetaVarRed.     VarContainer ::= MVReduction;
 VCValueContext.   VarContainer ::= MVValueContext;
 
--- TODO indexing
 CSAlts.     CaseStm ::= MVCaseStm;
-CSPattern.  CaseStm ::= MVPatterns "->" Term;
+CSPatterns. CaseStm ::= MVPatterns "->" Term;
 CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 

@@ -51,6 +51,7 @@ instance Transformable UT.Term where
     UT.TValueMetaVar mvValue -> let (UT.MVValue str) = mvValue
                                 in return $ T.TValueMetaVar str
     UT.TGeneralMetaVar (UT.MVTerm mvTerm) -> return $ T.TGeneralMetaVar mvTerm
+    UT.TMVTerms (UT.MVTerms str) -> return $ T.TMVTerms str
     UT.TVar var -> let varStr = getVarName var
                    in return $ T.TVar varStr
     UT.TAppCtx mvContext term -> do
@@ -63,11 +64,9 @@ instance Transformable UT.Term where
     UT.TNonTerminating -> return T.TNonTerminating
     UT.TNum integer -> return $ T.TNum integer
     UT.TIndVar var indExpr -> noSupport "TIndVar"
-    UT.TConstructor constructor -> case constructor of
-        UT.CGeneral (UT.MVConstructorName name) (UT.MVVarVect args) ->
-          return $ T.TConstructor $ T.CGeneral name args
-        UT.CTrue -> return $ T.TConstructor T.CTrue
-        UT.CFalse -> return $ T.TConstructor T.CFalse
+    UT.TConstructor constructor -> do
+      tConstructor <- transform constructor
+      return $ T.TConstructor tConstructor
     UT.TStackSpike term -> do
       tTerm <- transform term
       return $ T.TStackSpikes (T.IENum 1) tTerm
@@ -123,9 +122,23 @@ instance Transformable UT.Term where
       tLbs <- transform lbs
       tTerm <- transform term
       return $ T.TLet tLbs tTerm
-    UT.TRCase mRw term caseStms -> noSupport "TRCase"
-      -- To do this, you must include the MVTerms N_i, and you must check that
-      -- N_i is only used in terms inside case statements.
+    UT.TRCase mRw term caseStms -> do
+      rw <- transform mRw
+      tTerm <- transform term
+      tCaseStms <- mapM transCase caseStms
+      undefined
+      -- Correctness in terms of what case statement patterns that are allowed
+      -- are checked in checkLaw.
+      where
+        transCase (UT.CSAlts (UT.MVCaseStm str)) = return $ T.CSAlts str
+        transCase (UT.CSPatterns (UT.MVPatterns str) term) = do
+          tTerm <- transform term
+          return $ T.CSPatterns str tTerm
+        transCase (UT.CSConcrete constr term) = do
+          tConstr <- transform constr
+          tTerm <- transform term
+          return $ T.CSConcrete tConstr tTerm
+
     UT.TRAddConst mRw intExpr term -> do
       tRw <- transform mRw
       tIE <- transform intExpr
@@ -247,7 +260,43 @@ instance Transformable UT.VarContainer where
 instance Transformable UT.SideCond where
   type TypedVersion UT.SideCond = T.SideCond
   transform (UT.NoSideCond) = return T.NoSideCond
-  transform (UT.WithSideCond boolTerm) = noSupport "side conditions"
+  transform (UT.WithSideCond boolTerm) = case boolTerm of
+    UT.BTSizeEq mVLetBindings1 mVLetBindings2 ->
+      let (UT.MVLetBindings str1) = mVLetBindings1
+          (UT.MVLetBindings str2) = mVLetBindings2
+      in return $ T.WithSideCond $ T.BTSizeEq str1 str2
+    UT.BTSetEq setTerm1 setTerm2 -> do
+      tsetTerm1 <- transform setTerm1
+      tSetTerm2 <- transform setTerm2
+      return $ T.WithSideCond $ T.BTSetEq tsetTerm1 tSetTerm2
+    UT.BTSubsetOf setTerm1 setTerm2 -> do
+      tsetTerm1 <- transform setTerm1
+      tSetTerm2 <- transform setTerm2
+      return $ T.WithSideCond $ T.BTSubsetOf tsetTerm1 tSetTerm2
+    UT.BTIn var setTerm -> do
+      let tvar = getVarName var
+      tSetTerm <- transform setTerm
+      return $ T.WithSideCond $ T.BTIn tvar tSetTerm
+
+instance Transformable UT.SetTerm where
+  type TypedVersion UT.SetTerm = T.SetTerm
+  transform (UT.STMetaBindSet metaBindSet) = do
+    tmetaBindSet <- transform metaBindSet
+    return $ T.STMetaBindSet tmetaBindSet
+  transform (UT.STVarSet varSet) = do
+    tvarSet <- transform varSet
+    return $ T.STVarSet tvarSet
+  transform (UT.STUnion setTerm1 setTerm2) = do
+    tSetTerm1 <- transform setTerm1
+    tSetTerm2 <- transform setTerm2
+    return $ T.STUnion tSetTerm1 tSetTerm2
+
+instance Transformable UT.Constructor where
+  type TypedVersion UT.Constructor = T.Constructor
+  transform (UT.CGeneral (UT.MVConstructorName name) (UT.MVVarVect args)) =
+    return $ T.CGeneral name args
+  transform UT.CTrue = return T.CTrue
+  transform UT.CFalse = return T.CFalse
 
 getVarName :: UT.Var -> String
 getVarName (UT.DVar (UT.MVVar varStr)) = varStr
@@ -257,6 +306,31 @@ getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 -- | Checks if laws are supported, but does not check if they are sound wrt
 -- space improvement.
 --
--- TODO: Check that N_i is only used inside Case statements
+-- TODO: Check that
+-- -N_i is only used inside Case statements
+-- -letbinding-metavariables are not copied
+-- -Metavariables in binding positions are not copied
+-- -Case statements are either
+--   {alts, [Concrete]}
+--   {pat_i -> C[N_i]} or {pat_i -> M}
+--   {[Concrete]}
+--   (The c_i ys_i -> N_i is just for reduction, and I think that I will
+--   implement reduction manually)
 checkLaw :: T.Law -> CheckM ()
-checkLaw _ = return ()
+checkLaw (T.DLaw _name term1 _imprel term2 _sidecond) = do
+  mapM checkTerm [term1, term2]
+  return ()
+  where
+    checkTerm t = do
+      checkLetBindingsNotCopied t
+      checkMetaBindVarsNotCopied t
+      checkCaseStatements t
+
+checkLetBindingsNotCopied :: T.Term -> CheckM ()
+checkLetBindingsNotCopied = undefined
+
+checkMetaBindVarsNotCopied :: T.Term -> CheckM ()
+checkMetaBindVarsNotCopied = undefined
+
+checkCaseStatements :: T.Term -> CheckM ()
+checkCaseStatements = undefined

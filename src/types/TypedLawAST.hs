@@ -15,23 +15,23 @@ type LawMap = Map LawName Law
 
 data Law = DLaw LawName Term ImpRel Term SideCond
   deriving (C.Eq, C.Ord, C.Show, C.Read)
--- -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 
 data Term
     = TValueMetaVar String
     | TGeneralMetaVar String
-    | TNonTerminating
-    | TNum Integer
-    | TConstructor Constructor
+    | TMVTerms String
     | TVar String
     | TAppCtx String Term
     | TAppValCtx String Term
-    | TLet LetBindings Term
-    | TLam String Term
-    | TDummyBinds VarSet Term
+    | TNonTerminating
+    | TNum Integer
+    | TConstructor Constructor
     | TStackSpikes IntExpr Term
     | THeapSpikes IntExpr Term
+    | TDummyBinds VarSet Term
     | TSubstitution Term String String
+    | TLam String Term
+    | TLet LetBindings Term
     | TRedWeight IntExpr Reduction
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -39,6 +39,7 @@ data Reduction
   = RMetaVar String Term
   | RApp Term String
   | RPlusW Term IntExpr Term
+  | RCase Term [CaseStm]
   | RAddConst IntExpr Term
   | RIsZero Term
   | RSeq Term Term
@@ -85,6 +86,12 @@ type StackWeight = IntExpr
 
 type HeapWeight = IntExpr
 
+data CaseStm
+  = CSAlts String
+  | CSPatterns String Term
+  | CSConcrete Constructor Term
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
 data IntExpr
   = IEVar String
   | IENum Integer
@@ -92,5 +99,20 @@ data IntExpr
   | IEMinus IntExpr IntExpr
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-data SideCond = NoSideCond
+data SideCond
+  = NoSideCond
+  | WithSideCond BoolTerm
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data BoolTerm
+  = BTSizeEq MVLetBindings MVLetBindings
+  | BTSetEq SetTerm SetTerm
+  | BTSubsetOf SetTerm SetTerm
+  | BTIn Var SetTerm
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+data SetTerm
+  = STMetaBindSet MetaBindSet
+  | STVarSet VarSet
+  | STUnion SetTerm SetTerm
   deriving (C.Eq, C.Ord, C.Show, C.Read)
