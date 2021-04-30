@@ -135,6 +135,7 @@ BTSizeEq.   BoolTerm ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
 BTSetEq.    BoolTerm ::= SetTerm "=" SetTerm;
 BTSubsetOf. BoolTerm ::= SetTerm "subsetof" SetTerm;
 BTIn.       BoolTerm ::= Var "in" SetTerm;
+BTNot.      BoolTerm ::= "not" BoolTerm ;
 
 STMetaBindSet.  SetTerm1 ::= MetaBindSet;
 STVarSet.       SetTerm1 ::= VarSet;

@@ -1,2 +1,69 @@
--- This includes as many laws as possible, but WITHOUT SIDE CONDITIONS. It is
--- for testing the law typechecker
+-- This should contain all laws that are part of space improvement except reduction.
+
+-unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
+-unfold-2: let G {x =[v,w]= V} in C[x]
+       <~| let G {x =[v,w]= V} in C[{x}d^[v]s^V];
+-unfold-3: let G {x =[v,w]= V} in C[x] <~> let G {x =[v,w]= V} in C[[v]s^V]
+                                                 if x in FV(V);
+-unfold-4: let G {x =[0,w]= V} in C[x] <~> let G {x =[0,w]= V} in C[{x}d^V];
+-unfold-5: let G {x =[0,0]= V} in C[x] <~> let G {x =[0,0]= V} in C[V];
+
+-let-elim: let {x =[v,w]= M} in x <~> [w]h^M if not x in FV(M);
+  -- Side condition is a bug I found.
+-let-R: let G in [w]R[M] <~> [w]R[let G in M] if dom G subsetof FV(M);
+
+-let-flatten: let G1 in let G2 in M <~> let G1 G2 in M
+  if dom G2 subsetof FV(M);
+
+-let-let: let G1 {x =[v,w]= let G2 in M} in N
+      <~> let G2 {x =[v,w]= let G1 in M} in N
+  if dom G1 union dom G2 subsetof FV(M) && |G1| = |G2|;
+  --parenthesis needed?
+
+-let-alts: let G1 in [w] case M of {pat_i -> let G2 in N_i}
+       <~> let G2 in [w] case M of {pat_i -> let G1 in N_i}
+  if dom G1 union dom G2 subsetof FV(N_i) && |G1| = |G2|;
+
+-let-let': let G1 {x =[v,w]= M} in N
+       <~> let G2 {x =[v,w]= {dom G2}d^(let G1 in M)} in N
+  if dom G1 subsetof FV(M) && |G1| = |G2|;
+
+-let-alts': let G1 in [w] case M of {pat_i -> N_i}
+        <~> let G2 in [w] case M of {pat_i -> {dom G2}d^let G1 in N_i}
+  if dom G1 subsetof FV(N_i) && |G1| = |G2|
+
+-value-merge: let G {x = V, y = V} in M |~> let G[x/y] {x = V[x/y]} in M[x/y];
+
+-value-copy:  let G {x = V, y = V} in M
+          <~| let G[x/y] {x =[1,2]= V[x/y]} in M[x/y];
+
+-------------------------------
+
+-value-merge': let G {x = let {y = V} in V} in M
+           |~> let G {x = V[x/y]} in M;
+
+
+-case-fold: let{x =[v,w]= M} in C[case x of
+                                  {alts, c ys -> D[{x}d^([v]s^(c ys))]}]
+       |~> let{x =[v,w]= M} in C[case x of {alts, c ys -> D[x]}];
+
+-def-unwindings-base: let {f =[w,v]= Vctx[f]} in C[f^0]
+               =def= let {f =[w,v]= Vctx[f]} in C[{f}d^@];
+-def-unwindings-induction: let {f =[w,v]= Vctx[f]} in C[f^(n+1)]
+                    =def= let {f =[w,v]= Vctx[f]} in C[[w]s^Vctx[f^n]];
+
+-dummy-ref-algebra-8: {X}d^M |~> M;
+-@-rules-1: {X}d^@ |~> M            if FV(M) subsetof X;
+-@-rules-3: R[@] <~> {FV(R)}d^@;
+-spike-algebra-zero-stack-spike: [0]s^M <~> M;
+-spike-algebra-13: [w]s^M |~> M;
+
+-- SieLaws currently parses all transformational laws until here.
+-R-case: [w]R[[v](case M of {pat_i -> N_i})]
+     <~> [w+v](case M of {pat_i -> [w]R[N_i]});
+
+-- For complex if-statements
+-gc: let G1 G2 in M <~> {X}d^(let G1 in M)
+      if FV(let G1 G2 in M) = FV({X}d^(let G1 in M));
+-@-rules-2: let G {x = {X}d^@} in N |~> let G {x = M} in N
+      if FV(M) subsetof X union {x};
