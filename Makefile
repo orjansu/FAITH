@@ -17,7 +17,7 @@ gen/AbsSie.hs : src/Sie.cf $(stackFiles)
 sie : gen/AbsSie.hs gen/AbsLNL.hs gen/AbsSieLaws.hs $(mainfiles) $(prettyPrinting) $(proofChecking) $(typeChecking) $(types) $(util) $(stackFiles)
 	stack build --copy-bins --local-bin-path="."
 
-testLaws : proofFiles/laws/miniLaws.sie gen/TestSie
+testLaws : proofFiles/laws/miniLaws.sie gen/AbsSieLaws.hs
 	./gen/TestSieLaws < proofFiles/laws/miniLaws.sie
 
 testProof :

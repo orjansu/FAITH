@@ -2,7 +2,6 @@
 
 -reduction: [w]^R[V] <~> [w]s^{X}d^N if (R[V] ~~> N) && (FV(R[V]) = FV({X}d^N));
 --the reduction ~~> is implemented in code. It will be in LanguageLogic.hs.
-
 -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 -unfold-2: let G {x =[v,w]= V} in C[x]
        <~| let G {x =[v,w]= V} in C[{x}d^[v]s^V];
@@ -13,7 +12,7 @@
 
 -let-elim: let {x =[v,w]= M} in x <~> [w]h^M if not x in FV(M);
   -- Side condition is a bug I found.
--let-R: let G in [w]R[M] <~> [w]R[let G in M] if dom G subsetof FV(M);
+-let-R: let G in [w]^R[M] <~> [w]^R[let G in M] if dom G subsetof FV(M);
 
 -let-flatten: let G1 in let G2 in M <~> let G1 G2 in M
   if dom G2 subsetof FV(M);
@@ -32,7 +31,7 @@
   if dom G1 subsetof FV(M) && |G1| = |G2|;
 
 -let-alts': let G1 in [w] case M of {pat_i -> N_i}
-        <~> let G2 in [w] case M of {pat_i -> {dom G2}d^let G1 in N_i}
+        <~> let G2 in [w] case M of {pat_i -> {dom G2}d^(let G1 in N_i)}
   if dom G1 subsetof FV(N_i) && |G1| = |G2|;
 
 -value-merge: let G {x = V, y = V} in M |~> let G[x/y] {x = V[x/y]} in M[x/y];
@@ -51,11 +50,11 @@
 
 -empty-let: let {} in N <~> N;
 
--R-case: [w]R[[v] case M of {pat_i -> N_i}]
-     <~> [w+v] case M of {pat_i -> [w]R[N_i]} ;
+-R-case: [w]^R[[v] case M of {pat_i -> N_i}]
+     <~> [w+v] case M of {pat_i -> [w]^R[N_i]} ;
 
 -case-unfold: case x of {alts, c ys -> D[x]}
-          |~> case x of {alst, c ys -> D[{x}d^c ys];
+          |~> case x of {alts, c ys -> D[{x}d^c ys]};
 
 -case-fold: let{x =[v,w]= M} in C[case x of {alts, c ys -> D[x]}]
  <~| let{x =[v,w]= M} in C[case x of {alts, c ys -> D[{x}d^[v]s^c ys]}];
@@ -67,13 +66,13 @@
 -@-rules-4: let G in {X}d^@ <~> {Y}d^@ if Y = FV(let G in {X}d^@);
 -@-rules-5: [w]s^@ <~> @;
 -@-rules-6: [w]h^@ <~> @;
--@-rules-7: let G {x =[v,w]= @} in C[x] <~> let G {x =v,w]= @} in C[{x}d^@];
+-@-rules-7: let G {x =[v,w]= @} in C[x] <~> let G {x =[v,w]= @} in C[{x}d^@];
 
 -spike-algebra-1:    [w]^R[[v]s^M] <~> [w+v]s^[w]^R[M];
 -spike-algebra-2:    [w]^R[[v]h^M] <~> [v]h^[w]^R[M];
--spike-algebra-3:  let G in [v]s^M <~> [v]s^ let G in M
+-spike-algebra-3:  let G in [v]s^M <~> [v]s^(let G in M)
   if dom G subsetof FV(M);
--spike-algebra-4:  let G in [v]h^M <~>  [v+|G|]h^let G in M
+-spike-algebra-4:  let G in [v]h^M <~>  [v+|G|]h^(let G in M)
   if dom G subsetof FV(M);
 -spike-algebra-5:  [w] case M of {pat_i -> [w]s^N_i}
               <~> [w] case M of {pat_i -> N_i};
@@ -90,14 +89,14 @@
 -spike-algebra-zero-stack-spike: [0]s^M <~> M; -- Just used in proof.
 
 -dummy-ref-algebra-1: [w]^R[{X}d^M] <~> [w]s^{X}d^[w]^R[M];
--dummy-ref-algebra-2: let G in {X}d^M <~> [|G|]h^{X}d^let G in M
+-dummy-ref-algebra-2: let G in {X}d^M <~> [|G|]h^{X}d^(let G in M)
                                           if dom G subsetof FV(M);
 -dummy-ref-algebra-3: let G {x =[w,0]=V} in C[{x}d^M]
-                  <~> let G {x =[w,0]=V} in C[{FV(V)\{x}}d^M];
+                  <~> let G {x =[w,0]=V} in C[{FV(V)\\{x}}d^M];
 -dummy-ref-algebra-4: [w]^R[{X}d^M] <~> [w]^R[M] if X subsetof FV(R);
 -dummy-ref-algebra-5: {}d^M <~> M;
 -dummy-ref-algebra-6: {X union Y}d^M <~> {X}d^M if Y subsetof FV(M);
--dummy-ref-algebra-7: {X}d^{Y}d^M <~> {X union Y}d^M
+-dummy-ref-algebra-7: {X}d^{Y}d^M <~> {X union Y}d^M;
 -dummy-ref-algebra-8: {X}d^M |~> M;
 
 -dummy-ref-def: {xs}d^M =def= let {ys = xs} in M if ys are fresh;
@@ -113,9 +112,10 @@
 -lemma-5-5-3: let G {x =[w,v]=M} in N |~> let G{ x =[w1,v1]= M } in N
   if w >= w1 && v >= v1;
 
-lemma-5-6-1: R[M] <~~> [w]^R[M] if w > 0;
-lemma-5-6-2: (M + N) <~~> [w](M + [v] N) if w > 0 && v > 0;
-lemma-5-6-3: let G {x = M} in N <~~> let G {x =[w,v]= M} in N if v > 0 && w > 0;
+-lemma-5-6-1: R[M] <~~> [w]^R[M] if w > 0;
+-lemma-5-6-2: (M + N) <~~> [w](M + [v] N) if w > 0 && v > 0;
+-lemma-5-6-3: let G {x = M} in N <~~> let G {x =[w,v]= M} in N
+  if v > 0 && w > 0;
 
 -balloon-intro-1: (\x.M) y <~~> (\x.M) <> y;
 -balloon-intro-2: let {x = V} in N <~~> let {x =[0,1]= V} in N;
