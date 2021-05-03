@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module ToLocallyNameless
     (
@@ -52,11 +52,15 @@ toLocallyNameless term =
   in (lnlTerm, freeVars state)
 
 computeLNLTerm :: T.Term -> LNLMonad LNL.Term
+computeLNLTerm T.TNonTerminating = return $ LNL.TNonTerminating
 computeLNLTerm (T.TVar varName) = do
   lnlVar <- computeLNLVar varName
   return $ LNL.TVar lnlVar
 computeLNLTerm (T.TNum n) = return $ LNL.TNum n
 computeLNLTerm (T.THole) = return $ LNL.THole
+computeLNLTerm (T.TConstructor name vars) = do
+  lnlVars <- mapM computeLNLVar vars
+
 computeLNLTerm (T.TLam varName term) = do
   -- 1. Increase the distance on all current lambdas
   lambdaVars0 <- gets lambdaVars
