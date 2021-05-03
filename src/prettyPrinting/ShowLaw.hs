@@ -44,13 +44,20 @@ instance Convertible T.LetBindings where
     in UT.LBSBoth mbs lbs
     where
       toMBS (T.MBSMetaVar mv) = UT.MBSMetaVar (UT.MVLetBindings mv)
-      toLB (var, sw, hw, term) =
+      toLB (T.LBConcrete var sw hw term) =
         let utVar = toUntypedVar var
             utSw = toUntyped sw
             utHw = toUntyped hw
             utTerm = toUntyped term
             bindSym = toBindSym utSw utHw
         in UT.LBConcrete utVar bindSym utTerm
+      toLB (T.LBVectorized varVect1 sw hw varVect2) =
+        let utSw = toUntyped sw
+            utHw = toUntyped hw
+            bindSym = toBindSym utSw utHw
+        in UT.LBVectorized (UT.MVVarVect varVect1)
+                           bindSym
+                           (UT.MVVarVect varVect2)
 
       toBindSym (UT.IENum 1) (UT.IENum 1) = UT.BSNoWeight
       toBindSym sw hw = UT.BSWeights (UT.DStackWeight sw) (UT.DHeapWeight hw)

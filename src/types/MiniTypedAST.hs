@@ -110,7 +110,7 @@ data Substitute
   | SVar String
   | SVarSet (Set String) -- Not used yet
   | STerm Term
---  | SVarVect TODO support the following later:
+  | SVarVect [String]
 --  | SValueContext
 --  | SReduction
 --  | SPattern

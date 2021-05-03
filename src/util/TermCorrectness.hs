@@ -157,11 +157,15 @@ getAllMetaVars = \case
           let lawMVs = Set.fromList $ map getMV mVars
               metasFromConcrete = Set.unions $ map concreteLBMetas concreteLets
           in lawMVs `Set.union` metasFromConcrete
-      concreteLBMetas (varMV, sw, hw, lbterm) =
+      concreteLBMetas (Law.LBConcrete varMV sw hw lbterm) =
         Set.singleton varMV
           `Set.union` getIntExprMetas sw
           `Set.union` getIntExprMetas hw
           `Set.union` getAllMetaVars lbterm
+      concreteLBMetas (Law.LBVectorized varVect1 sw hw varVect2) =
+        Set.fromList [varVect1, varVect2]
+          `Set.union` getIntExprMetas sw
+          `Set.union` getIntExprMetas hw
   Law.TDummyBinds (Law.VSConcrete varSet) term ->
     varSet `Set.union` getAllMetaVars term
   where

@@ -109,6 +109,9 @@ instance Transformable UT.Term where
       tTerm <- transform term
       let (UT.DVar (UT.MVVar vName)) = var
       return $ T.TRedWeight trw $ T.RApp tTerm vName
+    UT.TRAppNoW term (UT.DVar (UT.MVVar varName)) -> do
+      tTerm <- transform term
+      return $ T.TRedWeight (T.IENum 0) $ T.RApp tTerm varName
     UT.TRPlus term1 term2 -> transformPlus Nothing term1 Nothing term2
     UT.TRPlusW1 rw term1 term2 ->
       transformPlus (Just rw) term1 Nothing term2
@@ -190,19 +193,26 @@ instance Transformable UT.LetBindings where
       tLetBinds <- mapM transformLB letBinds
       return $ T.LBSBoth tMetaBinds tLetBinds
       where
-        -- TODO LBVect
         transformLB (UT.LBConcrete var bindSym term) = do
-          (tsw,thw) <- case bindSym of
-            UT.BSWeights sw hw -> do
-              let (UT.DStackWeight swIexpr) = sw
-              let (UT.DHeapWeight hwIexpr) = hw
-              tsw' <- transform swIexpr
-              thw' <- transform hwIexpr
-              return (tsw', thw')
-            UT.BSNoWeight -> return (T.IENum 1,T.IENum 1)
+          (tsw,thw) <- transform bindSym
           let varStr = getVarName var
           tTerm <- transform term
-          return $ (varStr, tsw, thw, tTerm)
+          return $ T.LBConcrete varStr tsw thw tTerm
+        transformLB (UT.LBVectorized vect1 bindSym vect2) = do
+          (tsw, thw) <- transform bindSym
+          let (UT.MVVarVect vectStr1) = vect1
+              (UT.MVVarVect vectStr2) = vect2
+          return $ T.LBVectorized vectStr1 tsw thw vectStr2
+
+instance Transformable UT.BindSymbol where
+  type TypedVersion UT.BindSymbol = (T.IntExpr, T.IntExpr)
+  transform (UT.BSWeights sw hw) = do
+    let (UT.DStackWeight swIexpr) = sw
+    let (UT.DHeapWeight hwIexpr) = hw
+    tsw' <- transform swIexpr
+    thw' <- transform hwIexpr
+    return (tsw', thw')
+  transform UT.BSNoWeight = return (T.IENum 1,T.IENum 1)
 
 instance Transformable UT.MetaBindSet where
   type TypedVersion UT.MetaBindSet = T.MetaBindSet

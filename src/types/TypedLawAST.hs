@@ -81,7 +81,12 @@ data MetaBindSet
     | MBSSubstitution String Var Var
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
-type LetBinding = (Var, StackWeight, HeapWeight, Term)
+type VarVect = String
+
+data LetBinding
+  = LBConcrete Var StackWeight HeapWeight Term
+  | LBVectorized VarVect StackWeight HeapWeight VarVect
+  deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type StackWeight = IntExpr
 

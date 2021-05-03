@@ -156,14 +156,24 @@ getBoundSubstVars substitutions law = case law of
         Law.LBSBoth _MetaBinds innerLetbinds ->
           Set.unions $ map getLBBound innerLetbinds
       getLBBound :: Law.LetBinding -> Set.Set String
-      getLBBound (lawVar, _, _, term) =
+      getLBBound (Law.LBConcrete lawVar _ _ term) =
         case Map.lookup lawVar substitutions of
           Just (T.SVar substVar) ->
             let otherBoundVars = getBoundSubstVars substitutions term
             in Set.insert substVar otherBoundVars
-          _ -> error $ "Internal: substitution for"++lawVar++" is not bound to "
-                       ++"a variable. This was not discovered in the "
-                       ++"typechecker."
+          _ -> substitutionNotfound lawVar
+      getLBBound (Law.LBVectorized varVect1 sw hw varVect2) =
+        let lookup1 = Map.lookup varVect1 substitutions
+            lookup2 = Map.lookup varVect2 substitutions
+        in case (lookup1, lookup2) of
+            (Just (T.SVarVect vars1), Just (T.SVarVect vars2)) ->
+              Set.fromList (vars1 ++ vars2)
+            _ -> substitutionNotfound $ varVect1++" and/or "++varVect2
+
+      substitutionNotfound lawVar = error $
+                     "Internal: substitution for"++lawVar++" is not bound to "
+                   ++"a variable. This was not discovered in the "
+                   ++"typechecker."
   Law.TDummyBinds _ term -> getBoundSubstVars substitutions term
 
 applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
@@ -192,17 +202,25 @@ applyTermSubstM bigLawTerm = do
             Law.LBSBoth metaBinds moreConcreteBindings -> do
               concreteFirsts <- mapM applyMBS metaBinds
               concreteRest <- mapM applyOnLB moreConcreteBindings
-              let concrete = concat concreteFirsts ++ concreteRest
+              let concrete = concat (concreteFirsts ++ concreteRest)
               return concrete
           applyMBS (Law.MBSMetaVar metaBindVar) = do
-              T.SLetBindings concreteFirst <- getSubstitute metaBindVar
-              return concreteFirst
-          applyOnLB (lawVar, lawSw, lawHw, lawTerm) = do
+            T.SLetBindings concreteFirst <- getSubstitute metaBindVar
+            return concreteFirst
+          applyOnLB (Law.LBConcrete lawVar lawSw lawHw lawTerm) = do
             T.SVar var <- getSubstitute lawVar
             sw <- applyIntExprSubstM lawSw
             hw <- applyIntExprSubstM lawHw
             term <- applyTermSubstM lawTerm
-            return (var, sw, hw, term)
+            return [(var, sw, hw, term)]
+          applyOnLB (Law.LBVectorized varVect1 lawSw lawHw varVect2) = do
+            T.SVarVect vars1 <- getSubstitute varVect1
+            T.SVarVect vars2 <- getSubstitute varVect2
+            sw <- applyIntExprSubstM lawSw
+            hw <- applyIntExprSubstM lawHw
+            let toBinding = (\(x, y) -> (x, sw, hw, T.TVar y))
+                bindings = map toBinding $ zip vars1 vars2
+            return bindings
     Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
       concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
       let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
