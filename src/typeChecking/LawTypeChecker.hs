@@ -15,8 +15,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
 
--- | TODO check that all law names are distinct
-
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'
   where
@@ -25,6 +23,7 @@ typecheckLaws lawList = runCheckM typecheckLaws'
       tLawList <- mapM transform innerLawList
       mapM checkLaw tLawList
       let entryList = map toEntry tLawList
+          -- TODO check that all law names are distinct
           lawMap = Map.fromList entryList
       return lawMap
 
@@ -179,7 +178,6 @@ transformImpRel UT.StrongImprovementRL = return (Com.StrongImprovementLR, True)
 transformImpRel UT.WeakImprovementRL = return (Com.WeakImprovementLR, True)
 transformImpRel UT.StrongCostEquiv = return (Com.StrongCostEquiv, False)
 transformImpRel UT.WeakCostEquiv = return (Com.StrongCostEquiv, False)
-transformImpRel UT.Reduction = noSupport "Reduction"
 
 instance Transformable UT.LetBindings where
   type TypedVersion UT.LetBindings = T.LetBindings
@@ -192,7 +190,8 @@ instance Transformable UT.LetBindings where
       tLetBinds <- mapM transformLB letBinds
       return $ T.LBSBoth tMetaBinds tLetBinds
       where
-        transformLB (UT.DLetBinding var bindSym term) = do
+        -- TODO LBVect
+        transformLB (UT.LBConcrete var bindSym term) = do
           (tsw,thw) <- case bindSym of
             UT.BSWeights sw hw -> do
               let (UT.DStackWeight swIexpr) = sw
@@ -246,6 +245,10 @@ instance Transformable UT.VarSet where
     return $ T.VSFreeVars tVarContainer
   transform (UT.VSDomain (UT.MVLetBindings str)) =
     return $ T.VSDomain str
+  transform (UT.VSUnion setTerm1 setTerm2) = do
+    tSetTerm1 <- transform setTerm1
+    tSetTerm2 <- transform setTerm2
+    return $ T.VSUnion tSetTerm1 tSetTerm2
 
 instance Transformable UT.VarContainer where
   type TypedVersion UT.VarContainer = T.VarContainer
@@ -279,19 +282,6 @@ instance Transformable UT.SideCond where
       let tvar = getVarName var
       tSetTerm <- transform setTerm
       return $ T.WithSideCond $ T.BTIn tvar tSetTerm
-
-instance Transformable UT.SetTerm where
-  type TypedVersion UT.SetTerm = T.SetTerm
-  transform (UT.STMetaBindSet metaBindSet) = do
-    tmetaBindSet <- transform metaBindSet
-    return $ T.STMetaBindSet tmetaBindSet
-  transform (UT.STVarSet varSet) = do
-    tvarSet <- transform varSet
-    return $ T.STVarSet tvarSet
-  transform (UT.STUnion setTerm1 setTerm2) = do
-    tSetTerm1 <- transform setTerm1
-    tSetTerm2 <- transform setTerm2
-    return $ T.STUnion tSetTerm1 tSetTerm2
 
 instance Transformable UT.Constructor where
   type TypedVersion UT.Constructor = T.Constructor

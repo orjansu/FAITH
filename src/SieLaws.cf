@@ -86,8 +86,8 @@ VSConcrete. VarSet1 ::= "{" [Var] "}"; -- variables are separated by space.
 _.          VarSet1 ::= "{" VarSet "}";
 VSFreeVars. VarSet1 ::= "FV" "(" VarContainer ")";
 VSDomain.   VarSet1 ::= "dom" MVLetBindings;
-STUnion.        VarSet ::= VarSet "union" VarSet1;
-STDifference.   VarSet ::= VarSet "\\\\" VarSet1;
+VSUnion.        VarSet ::= VarSet "union" VarSet1;
+VSDifference.   VarSet ::= VarSet "\\\\" VarSet1;
 coercions VarSet 1;
 
 DVar.    Var ::= MVVar;

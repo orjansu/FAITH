@@ -50,7 +50,7 @@ instance Convertible T.LetBindings where
             utHw = toUntyped hw
             utTerm = toUntyped term
             bindSym = toBindSym utSw utHw
-        in UT.DLetBinding utVar bindSym utTerm
+        in UT.LBConcrete utVar bindSym utTerm
 
       toBindSym (UT.IENum 1) (UT.IENum 1) = UT.BSNoWeight
       toBindSym sw hw = UT.BSWeights (UT.DStackWeight sw) (UT.DHeapWeight hw)

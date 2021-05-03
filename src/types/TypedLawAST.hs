@@ -62,6 +62,7 @@ data VarSet
   | VSMetaVar String
   | VSFreeVars VarContainer
   | VSDomain MVLetBindings
+  | VSUnion VarSet VarSet
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data VarContainer
@@ -106,13 +107,7 @@ data SideCond
 
 data BoolTerm
   = BTSizeEq MVLetBindings MVLetBindings
-  | BTSetEq SetTerm SetTerm
-  | BTSubsetOf SetTerm SetTerm
-  | BTIn Var SetTerm
-  deriving (C.Eq, C.Ord, C.Show, C.Read)
-
-data SetTerm
-  = STMetaBindSet MetaBindSet
-  | STVarSet VarSet
-  | STUnion SetTerm SetTerm
+  | BTSetEq VarSet VarSet
+  | BTSubsetOf VarSet VarSet
+  | BTIn Var VarSet
   deriving (C.Eq, C.Ord, C.Show, C.Read)
