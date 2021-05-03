@@ -14,7 +14,7 @@ gen/AbsSie.hs : src/Sie.cf $(stackFiles)
 	stack exec bnfc -- --makefile --outputdir=gen/ src/Sie.cf
 	stack exec make -- --directory=gen
 
-sie : gen/AbsSie.hs gen/AbsLNL.hs $(mainfiles) $(prettyPrinting) $(proofChecking) $(typeChecking) $(types) $(util) $(stackFiles)
+sie : gen/AbsSie.hs gen/AbsLNL.hs gen/AbsSieLaws.hs $(mainfiles) $(prettyPrinting) $(proofChecking) $(typeChecking) $(types) $(util) $(stackFiles)
 	stack build --copy-bins --local-bin-path="."
 
 testLaws : proofFiles/laws/miniLaws.sie gen/TestSie
