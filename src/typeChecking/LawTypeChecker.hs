@@ -15,6 +15,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
 
+-- | TODO check that all law names are distinct
+
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'
   where

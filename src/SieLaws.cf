@@ -17,17 +17,16 @@ StrongImprovementRL. ImpRel ::= "<~|";
 WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
-Reduction.           ImpRel ::= "~~>";
 
 token MVLetBindings      ('G' digit*);
 token MVValue            ('V');
 token MVContext          ('C' | 'D');
-token MVIntegerVar       ('v' | 'w' | 'n' | 'm' | 'i' | 'j');
-token MVVar              ('x' | 'y' | 'f');
+token MVIntegerVar       ('v' digit* | 'w' digit* | 'n' | 'm' | 'i' | 'j');
+token MVVar              ('x' | 'y' | 'f' | 'z');
 token MVVarVect          ('x' 's' | 'y' 's');
 token MVValueContext     ('V' 'c' 't' 'x');
 token MVReduction        ('R');
-token MVVarSet           ('X');
+token MVVarSet           ('X' | 'Y');
 token MVTerm             ('M' | 'N');
 token MVTerms            ('N' '_' 'i');
 token MVPatterns         ('p' 'a' 't' '_' 'i');
@@ -60,6 +59,7 @@ TSubstitution.    Term3  ::= Term4 "[" Var "/" Var "]";
 
 TRApp.        Term2 ::= Term2 Var;
 TRAppW.       Term2 ::= RedWeight "(" Term2 Var ")";
+TRAppNoW.     Term2 ::= Term2 "<>" Var;
 
 TRPlus.    Term1    ::= Term1 "+" Term2;
 TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
@@ -81,6 +81,7 @@ NoRedWeight.   MaybeRedWeight ::= ;
 
 separator Var "";
 VSMetaVar.  VarSet ::= MVVarSet;
+VSVectMeta. VarSet ::= "{" MVVarVect "}";
 VSConcrete. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
 _.          VarSet ::= "{" VarSet "}";
 VSFreeVars. VarSet ::= "FV" "(" VarContainer ")";
@@ -121,6 +122,7 @@ DIntegerVar. IntegerVar ::= MVIntegerVar;
 
 IEVar.   IntExpr1 ::= IntegerVar;
 IENum.   IntExpr1 ::= Integer;
+IESizeBind. IntExpr1 ::= "|" MVLetBindings "|";
 IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
 IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
 coercions IntExpr 1;
@@ -131,13 +133,21 @@ DRedWeight. RedWeight ::= "[" StackWeight "]";
 NoSideCond. SideCond ::= ;
 WithSideCond. SideCond ::= "if" BoolTerm;
 
-BTSizeEq.   BoolTerm ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
-BTSetEq.    BoolTerm ::= SetTerm "=" SetTerm;
-BTSubsetOf. BoolTerm ::= SetTerm "subsetof" SetTerm;
-BTIn.       BoolTerm ::= Var "in" SetTerm;
-BTNot.      BoolTerm ::= "not" BoolTerm ;
+BTSizeEq.    BoolTerm ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
+BTSetEq.     BoolTerm ::= SetTerm "=" SetTerm;
+BTSubsetOf.  BoolTerm ::= SetTerm "subsetof" SetTerm;
+BTIn.        BoolTerm ::= Var "in" SetTerm;
+BTNot.       BoolTerm ::= "not" BoolTerm ;
+BTLE.        BoolTerm ::= IntExpr "=<" IntExpr;
+BTGE.        BoolTerm ::= IntExpr ">=" IntExpr;
+BTGT.        BoolTerm ::= IntExpr ">" IntExpr;
+BTIsFresh.   BoolTerm ::= Var "is" "fresh";
+BTAreFresh.  BoolTerm ::= MVVarVect "are" "fresh";
+BTReducesTo. BoolTerm ::= MVReduction "[" MVValue "]" "~~>" MVTerm;
 
 STMetaBindSet.  SetTerm1 ::= MetaBindSet;
 STVarSet.       SetTerm1 ::= VarSet;
 STUnion.        SetTerm ::= SetTerm "union" SetTerm1;
+STDifference.   SetTerm ::= SetTerm "\" SetTerm1;
+STEmpty.        SetTerm ::= ; -- Oklart
 coercions SetTerm 1;
