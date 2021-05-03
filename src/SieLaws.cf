@@ -148,7 +148,7 @@ BTGE.        BoolTerm1 ::= IntExpr ">=" IntExpr;
 BTGT.        BoolTerm1 ::= IntExpr ">" IntExpr;
 BTIsFresh.   BoolTerm1 ::= Var "is" "fresh";
 BTAreFresh.  BoolTerm1 ::= MVVarVect "are" "fresh";
-BTReducesTo. BoolTerm1 ::= MVReduction "[" MVValue "]" "~~>" MVTerm;
+BTReducesTo. BoolTerm1 ::= MVReduction "[" MVValue "]" "~~>" Term;
 BTAnd.       BoolTerm ::= BoolTerm "&&" BoolTerm1;
 
 coercions BoolTerm 1;

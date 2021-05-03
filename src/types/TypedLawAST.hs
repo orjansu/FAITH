@@ -32,6 +32,7 @@ data Term
     | TSubstitution Term String String
     | TLam String Term
     | TLet LetBindings Term
+    | TCase Term [CaseStm]
     | TRedWeight IntExpr Reduction
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -60,9 +61,11 @@ type MVLetBindings = String
 data VarSet
   = VSConcrete (Set Var)
   | VSMetaVar String
+  | VSVectMeta String
   | VSFreeVars VarContainer
   | VSDomain MVLetBindings
   | VSUnion VarSet VarSet
+  | VSDifference VarSet VarSet
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 data VarContainer
@@ -101,6 +104,7 @@ data CaseStm
 data IntExpr
   = IEVar String
   | IENum Integer
+  | IESizeBind String
   | IEPlus IntExpr IntExpr
   | IEMinus IntExpr IntExpr
   deriving (C.Eq, C.Ord, C.Show, C.Read)
@@ -115,4 +119,15 @@ data BoolTerm
   | BTSetEq VarSet VarSet
   | BTSubsetOf VarSet VarSet
   | BTIn Var VarSet
+  | BTNot BoolTerm
+  | BTLE IntExpr IntExpr
+  | BTGE IntExpr IntExpr
+  | BTGT IntExpr IntExpr
+  | BTIsFresh Var
+  | BTAreFresh String
+  | BTReducesTo ReductionStr ValueStr Term
+  | BTAnd BoolTerm BoolTerm
   deriving (C.Eq, C.Ord, C.Show, C.Read)
+
+type ReductionStr = String
+type ValueStr = String

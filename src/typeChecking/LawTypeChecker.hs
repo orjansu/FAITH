@@ -7,6 +7,8 @@ module LawTypeChecker (typecheckLaws) where
 
 import qualified AbsSieLaws as UT
 import qualified TypedLawAST as T
+import qualified Control.Monad.Logger as Log
+import Data.Text (pack)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal, noSupport)
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
                            , evalState, evalStateT, gets, modify)
@@ -130,7 +132,7 @@ instance Transformable UT.Term where
       rw <- transform mRw
       tTerm <- transform term
       tCaseStms <- mapM transCase caseStms
-      undefined
+      return $ T.TCase tTerm tCaseStms
       -- Correctness in terms of what case statement patterns that are allowed
       -- are checked in checkLaw.
       where
@@ -229,6 +231,8 @@ instance Transformable UT.IntExpr where
   transform (UT.IEVar (UT.DIntegerVar (UT.MVIntegerVar varStr))) =
     return $ T.IEVar varStr
   transform (UT.IENum integer) = return $ T.IENum integer
+  transform (UT.IESizeBind (UT.MVLetBindings str)) =
+    return $ T.IESizeBind str
   transform (UT.IEPlus intExpr1 intExpr2) = do
     tIntExpr1 <- transform intExpr1
     tIntExpr2 <- transform intExpr2
@@ -259,6 +263,12 @@ instance Transformable UT.VarSet where
     tSetTerm1 <- transform setTerm1
     tSetTerm2 <- transform setTerm2
     return $ T.VSUnion tSetTerm1 tSetTerm2
+  transform (UT.VSDifference setTerm1 setTerm2) = do
+    tSetTerm1 <- transform setTerm1
+    tSetTerm2 <- transform setTerm2
+    return $ T.VSDifference tSetTerm1 tSetTerm2
+  transform (UT.VSVectMeta (UT.MVVarVect str)) =
+    return $ T.VSVectMeta str
 
 instance Transformable UT.VarContainer where
   type TypedVersion UT.VarContainer = T.VarContainer
@@ -275,23 +285,59 @@ instance Transformable UT.VarContainer where
 instance Transformable UT.SideCond where
   type TypedVersion UT.SideCond = T.SideCond
   transform (UT.NoSideCond) = return T.NoSideCond
-  transform (UT.WithSideCond boolTerm) = case boolTerm of
-    UT.BTSizeEq mVLetBindings1 mVLetBindings2 ->
-      let (UT.MVLetBindings str1) = mVLetBindings1
-          (UT.MVLetBindings str2) = mVLetBindings2
-      in return $ T.WithSideCond $ T.BTSizeEq str1 str2
-    UT.BTSetEq setTerm1 setTerm2 -> do
-      tsetTerm1 <- transform setTerm1
-      tSetTerm2 <- transform setTerm2
-      return $ T.WithSideCond $ T.BTSetEq tsetTerm1 tSetTerm2
-    UT.BTSubsetOf setTerm1 setTerm2 -> do
-      tsetTerm1 <- transform setTerm1
-      tSetTerm2 <- transform setTerm2
-      return $ T.WithSideCond $ T.BTSubsetOf tsetTerm1 tSetTerm2
-    UT.BTIn var setTerm -> do
-      let tvar = getVarName var
-      tSetTerm <- transform setTerm
-      return $ T.WithSideCond $ T.BTIn tvar tSetTerm
+  transform (UT.WithSideCond boolTerm) = do
+    tBt <- transform boolTerm
+    return $ T.WithSideCond tBt
+
+
+instance Transformable UT.BoolTerm where
+  type TypedVersion UT.BoolTerm = T.BoolTerm
+  transform (UT.BTSizeEq mVLetBindings1 mVLetBindings2) =
+    let (UT.MVLetBindings str1) = mVLetBindings1
+        (UT.MVLetBindings str2) = mVLetBindings2
+    in return $ T.BTSizeEq str1 str2
+  transform (UT.BTSetEq setTerm1 setTerm2) = do
+    tsetTerm1 <- transform setTerm1
+    tSetTerm2 <- transform setTerm2
+    return $ T.BTSetEq tsetTerm1 tSetTerm2
+  transform (UT.BTSubsetOf setTerm1 setTerm2) = do
+    tsetTerm1 <- transform setTerm1
+    tSetTerm2 <- transform setTerm2
+    return $ T.BTSubsetOf tsetTerm1 tSetTerm2
+  transform (UT.BTIn var setTerm) = do
+    let tvar = getVarName var
+    tSetTerm <- transform setTerm
+    return $ T.BTIn tvar tSetTerm
+  transform (UT.BTNot subBoolTerm) = do
+    tSubBoolTerm <- transform subBoolTerm
+    return $ T.BTNot tSubBoolTerm
+  transform (UT.BTLE ie1 ie2) = do
+    tIE1 <- transform ie1
+    tIE2 <- transform ie2
+    return $ T.BTLE tIE1 tIE2
+  transform (UT.BTGE ie1 ie2) = do
+    tIE1 <- transform ie1
+    tIE2 <- transform ie2
+    return $ T.BTGE tIE1 tIE2
+  transform (UT.BTGT ie1 ie2) = do
+    tIE1 <- transform ie1
+    tIE2 <- transform ie2
+    return $ T.BTGT tIE1 tIE2
+  transform (UT.BTIsFresh var) =
+    let varName = getVarName var
+    in return $ T.BTIsFresh varName
+  transform (UT.BTAreFresh vars) =
+    let (UT.MVVarVect str) = vars
+    in return $ T.BTAreFresh str
+  transform (UT.BTReducesTo reduction value term) = do
+    let UT.MVReduction rStr = reduction
+        UT.MVValue vStr = value
+    tTerm <- transform term
+    return $ T.BTReducesTo rStr vStr tTerm
+  transform (UT.BTAnd bt1 bt2) = do
+    tBT1 <- transform bt1
+    tBT2 <- transform bt2
+    return $ T.BTAnd tBT1 tBT2
 
 instance Transformable UT.Constructor where
   type TypedVersion UT.Constructor = T.Constructor
@@ -329,10 +375,13 @@ checkLaw (T.DLaw _name term1 _imprel term2 _sidecond) = do
       checkCaseStatements t
 
 checkLetBindingsNotCopied :: T.Term -> CheckM ()
-checkLetBindingsNotCopied = undefined
+checkLetBindingsNotCopied _ = do
+  Log.logInfoN . pack $ "Skipping check checkLetBindingsNotCopied for now."
 
 checkMetaBindVarsNotCopied :: T.Term -> CheckM ()
-checkMetaBindVarsNotCopied = undefined
+checkMetaBindVarsNotCopied _ =
+  Log.logInfoN . pack $ "Skipping check checkMetaBindVarsNotCopied for now."
 
 checkCaseStatements :: T.Term -> CheckM ()
-checkCaseStatements = undefined
+checkCaseStatements _ =
+  Log.logInfoN . pack $ "Skipping check checkCaseStatements for now."
