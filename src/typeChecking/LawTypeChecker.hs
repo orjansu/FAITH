@@ -136,7 +136,7 @@ instance Transformable UT.Term where
       -- Correctness in terms of what case statement patterns that are allowed
       -- are checked in checkLaw.
       where
-        transCase (UT.CSAlts (UT.MVCaseStm str)) = return $ T.CSAlts str
+        transCase (UT.CSAlts (UT.MVCaseStms str)) = return $ T.CSAlts str
         transCase (UT.CSPatterns (UT.MVPatterns str) term) = do
           tTerm <- transform term
           return $ T.CSPatterns str tTerm

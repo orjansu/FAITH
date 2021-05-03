@@ -273,13 +273,8 @@ instance Transformable UT.Term where
   transform (UT.TRCase maybeRedWeight term caseStms) = do
     rw <- transform maybeRedWeight
     tTerm <- transform term
-    alts <- mapM transAlt caseStms
+    alts <- mapM transform caseStms
     return $ T.TRedWeight rw $ T.RCase tTerm alts
-    where
-      transAlt (UT.CSConcrete constructor term) = do
-        (name, args) <- transform constructor
-        tTerm <- transform term
-        return (name, args, tTerm)
   transform (UT.TRAddConst maybeRedWeight integer term) = do
     rw <- transform maybeRedWeight
     tTerm <- transform term
@@ -337,6 +332,12 @@ instance Transformable UT.LetBindings where
         tTerm <- transform term
         return (varName, sw, hw, tTerm)
 
+instance Transformable UT.CaseStm where
+  type TransformedVersion UT.CaseStm = (String, [String], T.Term)
+  transform (UT.CSConcrete constructor term) = do
+    (name, args) <- transform constructor
+    tTerm <- transform term
+    return (name, args, tTerm)
 
 instance Transformable UT.VarSet where
   type TransformedVersion UT.VarSet = T.VarSet
@@ -356,27 +357,28 @@ instance Transformable UT.MaybeRedWeight where
 instance Transformable UT.Constructor where
   type TransformedVersion UT.Constructor = (String, [String])
   transform = \case
-    UT.CGeneral (UT.CapitalIdent name) vars -> do
-      constructors <- gets constructors
-      case Map.lookup name constructors of
-        Just numArgs -> do
-          actualNumArgs <- case Safe.fromEnum (length vars) of
-            Just n -> return n
-            Nothing -> throwCallstackError $ "We do not support constructors "
-              ++"more than "++show maxInt++" arguments."
-          assert (actualNumArgs == numArgs) $ "All constructors must be fully "
-            ++"applied, so "++show name++" must have "++show numArgs
-            ++" arguments."
-          let varNames = map getVarName vars
-          return (name, varNames)
-        Nothing -> throwError $ "Constructor "++name++" is not declared. "
-          ++"If it has "++show(length vars)++" arguments, declare it by typing "
-          ++name++" ("++show(length vars)++"); in the bindings list."
-    UT.CNil -> return $ (nilName, [])
+    UT.CGeneralWArgs (UT.ConstructorName name) vars
+      -> checkConstructor name vars
+    UT.CGeneralNoArgs (UT.ConstructorName name) -> checkConstructor name []
     UT.CCons var1 var2 -> return $ (consName, [getVarName var1
                                               , getVarName var2])
-    UT.CTrue -> return $ (trueName, [])
-    UT.CFalse -> return $ (falseName, [])
+    where
+      checkConstructor name vars = do
+        constructors <- gets constructors
+        case Map.lookup name constructors of
+          Just numArgs -> do
+            actualNumArgs <- case Safe.fromEnum (length vars) of
+              Just n -> return n
+              Nothing -> throwCallstackError $ "We do not support constructors "
+                ++"more than "++show maxInt++" arguments."
+            assert (actualNumArgs == numArgs) $ "All constructors must be fully "
+              ++"applied, so "++show name++" must have "++show numArgs
+              ++" arguments."
+            let varNames = map getVarName vars
+            return (name, varNames)
+          Nothing -> throwError $ "Constructor "++name++" is not declared. "
+            ++"If it has "++show(length vars)++" arguments, declare it by typing "
+            ++name++" ("++show(length vars)++"); in the bindings list."
 
 instance Checkable UT.Proof where
   type TypedVersion UT.Proof = T.Proof
@@ -564,11 +566,30 @@ checkArg (UT.CAAssign assignee value) = case assignee of
           UT.CVSubTerm (UT.STTerm (UT.TVar (UT.DVar (UT.Ident varName)))) ->
             return $ Just (name, T.SVar varName)
           _ -> throwError "Not a variable"
-      UTLaw.MetaVarMVVarVect (UTLaw.MVVarVect name) -> noSupport "MVVarVect"
+      UTLaw.MetaVarMVVarVect (UTLaw.MVVarVect name) ->
+        case value of
+          UT.CVVarVect vars -> do
+            let tVars = map getVarName vars
+            return $ Just $ (name, T.SVarVect tVars)
+          _ -> throwError "Not a vector of variables."
       UTLaw.MetaVarMVValueContext (UTLaw.MVValueContext name) ->
-        noSupport "MVValueContext"
+        case value of
+          UT.CVSubTerm (UT.STTerm vctx) -> do
+            tVctx <- transform vctx
+            checkArgumentTerm tVctx
+            assert (numHoles tVctx > 0) "Argument should be a context."
+            assert (isValue tVctx) "Argument should be a value."
+            return $ Just $ (name, T.SValueContext tVctx)
+          _ -> throwError "Not a value context."
       UTLaw.MetaVarMVReduction (UTLaw.MVReduction name) ->
-        noSupport "MVReduction"
+        case value of
+          UT.CVSubTerm (UT.STTerm term) -> do
+            tTerm <- transform term
+            assert (isReductionContext tTerm) $ "Argument should be a reduction"
+              ++"context."
+            T.TRedWeight rw red <- return tTerm
+            return $ Just $ (name, T.SReduction rw red)
+          _ -> throwError "Not a reduction context"
       UTLaw.MetaVarMVVarSet (UTLaw.MVVarSet name) -> do
         case value of
           UT.CVVarSet (UT.DVarSet varList) ->
@@ -576,11 +597,37 @@ checkArg (UT.CAAssign assignee value) = case assignee of
                 strSet = Set.fromList strList
             in return $ Just (name, T.SVarSet strSet)
           _ -> throwError "Not a set of variables"
-      UTLaw.MetaVarMVTerm (UTLaw.MVTerm name) -> noSupport "MVTerm"
-      UTLaw.MetaVarMVPatterns (UTLaw.MVPatterns name) -> noSupport "MVPatterns"
-      UTLaw.MetaVarMVCaseStm (UTLaw.MVCaseStm name) -> noSupport "MVCaseStm"
+      UTLaw.MetaVarMVTerm (UTLaw.MVTerm name) ->
+        case value of
+          UT.CVSubTerm (UT.STTerm term) -> do
+            tTerm <- transform term
+            checkArgumentTerm tTerm
+            assert (numHoles tTerm == 0) "Should not be a context."
+            return $ Just (name, T.STerm tTerm)
+          _ -> throwError "Not a term"
+      UTLaw.MetaVarMVPatterns (UTLaw.MVPatterns name) ->
+        case value of
+          UT.CVPatterns constructors -> do
+            tConstructors <- mapM transform constructors
+            return $ Just (name, T.SPatterns tConstructors)
+          _ -> throwError "not a list of constructors."
+      UTLaw.MetaVarMVCaseStms (UTLaw.MVCaseStms name) ->
+        case value of
+          UT.CVCaseStms caseStms -> do
+            tCaseStms <- mapM transform caseStms
+            let dummyTerm = T.TRedWeight 1 $ T.RCase (T.TNum 1) tCaseStms
+            checkArgumentTerm dummyTerm
+            assert (numHoles dummyTerm == 0) "should not be a context"
+            return $ Just (name, T.SCaseStms tCaseStms)
+          _ -> throwError "Not a list of case statements"
       UTLaw.MetaVarMVConstructorName (UTLaw.MVConstructorName name) ->
-        noSupport "MVConstructorName"
+        case value of
+          UT.CVConstructorName (UT.ConstructorName name) -> do
+            constructors <- gets constructors
+            case Map.lookup name constructors of
+              Just _ -> return $ Just (name, T.SConstructorName name)
+              Nothing -> throwError "Constructor not declared."
+          _ -> throwError "Not a constructor name."
     where
       logCheckArg name = Log.logInfoN . pack $ "Checking argument "++name
 
@@ -602,3 +649,27 @@ checkAllSubstitutionsProvided (Law.DLaw _name term1 _impRel term2 _sideCond)
       substitutedVars = Map.keysSet substMap
   assert ((metaVars1 `Set.union` metaVars2) == substitutedVars)
     "Currently, you need to specify all substitutions."
+
+isReductionContext :: T.Term -> Bool
+isReductionContext outerTerm =
+  numHoles outerTerm == 1 && rightStructure
+ where
+   rightStructure = case outerTerm of
+     T.TNonTerminating -> False
+     T.TVar _ -> False
+     T.TNum _ -> False
+     T.TConstructor _ _ -> False
+     T.TLam _ _ -> False
+     T.THole -> False
+     T.TLet _ _ -> False
+     T.TDummyBinds _ _ -> False
+     T.TStackSpikes _ _ -> False
+     T.THeapSpikes _ _ -> False
+     T.TRedWeight _ red -> case red of
+       T.RApp T.THole _ -> True
+       T.RCase T.THole _ -> True
+       T.RPlusWeight T.THole _ _ -> True
+       T.RAddConst _ T.THole -> True
+       T.RIsZero T.THole -> True
+       T.RSeq T.THole _ -> True
+       _ -> False

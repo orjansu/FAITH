@@ -108,12 +108,12 @@ data Substitute
   | SContext Term
   | SIntegerVar Integer
   | SVar String
-  | SVarSet (Set String) -- Not used yet
-  | STerm Term
   | SVarVect [String]
---  | SValueContext
---  | SReduction
---  | SPattern
---  | SCaseStm
---  | SConstructorName
+  | SValueContext Term
+  | SReduction RedWeight Red
+  | SVarSet (Set String)
+  | STerm Term
+  | SPatterns [(String, [Var])]
+  | SCaseStms [(String, [Var], Term)]
+  | SConstructorName String
   deriving (C.Eq, C.Ord, C.Read)
