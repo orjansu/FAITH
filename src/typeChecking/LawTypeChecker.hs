@@ -133,7 +133,7 @@ instance Transformable UT.Term where
       rw <- transform mRw
       tTerm <- transform term
       tCaseStms <- mapM transCase caseStms
-      return $ T.TCase tTerm tCaseStms
+      return $ T.TRedWeight rw $ T.RCase tTerm tCaseStms
       -- Correctness in terms of what case statement patterns that are allowed
       -- are checked in checkLaw.
       where

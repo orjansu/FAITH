@@ -32,7 +32,6 @@ data Term
     | TSubstitution Term String String
     | TLam String Term
     | TLet LetBindings Term
-    | TCase Term [CaseStm]
     | TRedWeight IntExpr Reduction
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 

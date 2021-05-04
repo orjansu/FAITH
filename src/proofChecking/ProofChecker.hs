@@ -159,6 +159,10 @@ checkRuleAlphaEquiv lawTerm m n = do
       else throwCallstackError $ "Not alpha equivalent, and law term does not "
                                  ++ "contain let."
   where
+    -- | Returns whether the law term contains a let that is in the main term
+    -- of the law term, That is, {FV(let G in M)}d^N does not contain a let,
+    -- since the free variables are made concrete when applied to a term,
+    -- but let G in M contains a let.
     containsLet :: Law.Term -> Bool
     containsLet (Law.TValueMetaVar _) = False
     containsLet (Law.TGeneralMetaVar _) = False
@@ -175,11 +179,22 @@ checkRuleAlphaEquiv lawTerm m n = do
     containsLet (Law.TSubstitution term _ _) = containsLet term
     containsLet (Law.TLam _ term) = containsLet term
     containsLet (Law.TLet _ _) = True
-    containsLet (Law.TCase term caseStms) = containsLet term || undefined
-    containsLet (Law.TRedWeight _ reduction) = undefined
+    containsLet (Law.TRedWeight _ reduction) = case reduction of
+      Law.RMetaVar _ term -> containsLet term
+      Law.RApp term _ -> containsLet term
+      Law.RPlusW term1 _ term2 -> containsLet term1 || containsLet term2
+      Law.RCase term caseStms -> containsLet term || casesContainsLet
+        where
+          casesContainsLet = any caseContainsLet caseStms
+          caseContainsLet (Law.CSAlts _) = False
+          caseContainsLet (Law.CSPatterns _ term) = containsLet term
+          caseContainsLet (Law.CSConcrete _ term) = containsLet term
+      Law.RAddConst _ term -> containsLet term
+      Law.RIsZero term -> containsLet term
+      Law.RSeq term1 term2 -> containsLet term1 || containsLet term2
 
     getAllLetPermutations :: T.Term -> [T.Term]
-    getAllLetPermutations term = case term of
+    getAllLetPermutations bigTerm = case bigTerm of
       (T.TVar var) -> [T.TVar var]
       (T.TNum i) -> [T.TNum i]
       (T.TLam var term) -> recursePerms term (T.TLam var)
