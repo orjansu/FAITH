@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module OtherUtils (applyOnSubTermsM, filterNoise) where
+module OtherUtils (applyOnSubTermsM, filterNoise, applyOnLawSubterms) where
 
 import Control.Monad.Except (MonadError, throwError)
 import Data.List (zip4, unzip4)

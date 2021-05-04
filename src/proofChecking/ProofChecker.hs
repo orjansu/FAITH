@@ -25,6 +25,7 @@ import ShowTypedTerm (showTypedTerm)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
 import Substitution (applySubstitution)
+import OtherUtils (applyOnLawSubterms)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
 -- containing a log and error message if it is incorrect, and Nothing
@@ -164,57 +165,66 @@ checkRuleAlphaEquiv lawTerm m n = do
     -- since the free variables are made concrete when applied to a term,
     -- but let G in M contains a let.
     containsLet :: Law.Term -> Bool
-    containsLet (Law.TValueMetaVar _) = False
-    containsLet (Law.TGeneralMetaVar _) = False
-    containsLet (Law.TMVTerms _) = False
-    containsLet (Law.TVar _) = False
-    containsLet (Law.TAppCtx mv term) = containsLet term
-    containsLet (Law.TAppValCtx _ term) = containsLet term
-    containsLet (Law.TNonTerminating) = False
-    containsLet (Law.TNum _) = False
-    containsLet (Law.TConstructor _) = False
-    containsLet (Law.TStackSpikes _ term) = containsLet term
-    containsLet (Law.THeapSpikes _ term) = containsLet term
-    containsLet (Law.TDummyBinds _ term) = containsLet term
-    containsLet (Law.TSubstitution term _ _) = containsLet term
-    containsLet (Law.TLam _ term) = containsLet term
     containsLet (Law.TLet _ _) = True
-    containsLet (Law.TRedWeight _ reduction) = case reduction of
-      Law.RMetaVar _ term -> containsLet term
-      Law.RApp term _ -> containsLet term
-      Law.RPlusW term1 _ term2 -> containsLet term1 || containsLet term2
-      Law.RCase term caseStms -> containsLet term || casesContainsLet
-        where
-          casesContainsLet = any caseContainsLet caseStms
-          caseContainsLet (Law.CSAlts _) = False
-          caseContainsLet (Law.CSPatterns _ term) = containsLet term
-          caseContainsLet (Law.CSConcrete _ term) = containsLet term
-      Law.RAddConst _ term -> containsLet term
-      Law.RIsZero term -> containsLet term
-      Law.RSeq term1 term2 -> containsLet term1 || containsLet term2
+    containsLet otherLawTerm =
+      applyOnLawSubterms otherLawTerm False containsLet (any id)
 
     getAllLetPermutations :: T.Term -> [T.Term]
     getAllLetPermutations bigTerm = case bigTerm of
-      (T.TVar var) -> [T.TVar var]
-      (T.TNum i) -> [T.TNum i]
-      (T.TLam var term) -> recursePerms term (T.TLam var)
-      (T.THole) -> [T.THole]
-      (T.TLet letBindings term) ->
+      T.TNonTerminating -> [bigTerm]
+      T.TVar var -> [bigTerm]
+      T.TNum i -> [bigTerm]
+      T.TConstructor _ _ -> [bigTerm]
+      T.TLam var term -> recursePerms term (T.TLam var)
+      T.THole -> [bigTerm]
+      T.TLet letBindings term ->
         let permsLB = permutations letBindings
             permsTerm = getAllLetPermutations term
             combinedPerms = [(lbs, term) | lbs <- permsLB, term <- permsTerm]
             toLetBindings = (\(lbs, term) -> T.TLet lbs term)
         in map toLetBindings combinedPerms
-      (T.TDummyBinds varSet term) -> recursePerms term (T.TDummyBinds varSet)
-      (T.TRedWeight rw1 red) -> case red of
+      T.TDummyBinds varSet term -> recursePerms term (T.TDummyBinds varSet)
+      T.TStackSpikes sw term -> recursePerms term (T.TStackSpikes sw)
+      T.THeapSpikes hw term -> recursePerms term (T.THeapSpikes hw)
+      T.TRedWeight rw1 red -> case red of
         T.RApp term var ->
           recursePerms term (\t -> T.TRedWeight rw1 (T.RApp t var))
+        T.RCase decideTerm cases ->
+          let (constructors, boundVars, terms) = unzip3 cases
+              termPerms = map getAllLetPermutations terms :: [[T.Term]]
+              combinedTermPerms = combineListedPerms termPerms :: [[T.Term]]
+              caseBranches = map (zip3 constructors boundVars) combinedTermPerms
+                :: [[(String, [String], T.Term)]]
+              decideTermPerms = getAllLetPermutations decideTerm :: [T.Term]
+              allCaseTups = [(term, branches) | term <- decideTermPerms,
+                                                branches <- caseBranches]
+                :: [(T.Term, [(String, [String], T.Term)])]
+           in map toCase allCaseTups
+          where
+            combineListedPerms [] = [[]]
+            combineListedPerms (p1:[]) = [p1]
+            combineListedPerms (p1:p2:[]) = [[a,b] | a <- p1, b <- p2]
+            combineListedPerms (p1:ps) =
+              let tailPerms = combineListedPerms ps
+              in [h:t | h <- p1, t <- tailPerms]
+            toCase (term, branches) = T.TRedWeight rw1 $ T.RCase term branches
         T.RPlusWeight term1 rw2 term2 ->
-          let perms1 = getAllLetPermutations term1
-              perms2 = getAllLetPermutations term2
-              combinedPerms = [(t1, t2) | t1 <- perms1, t2 <- perms2]
-              toPlus = \(t1, t2) -> T.TRedWeight rw1 (T.RPlusWeight t1 rw2 t2)
-          in map toPlus combinedPerms
+          let toPlus = \(t1, t2) -> T.TRedWeight rw1 (T.RPlusWeight t1 rw2 t2)
+          in map toPlus $ combinedPermutations term1 term2
+        T.RAddConst i term ->
+          recursePerms term (\t -> T.TRedWeight rw1 (T.RAddConst i t))
+        T.RIsZero term ->
+          recursePerms term (\t -> T.TRedWeight rw1 (T.RIsZero t))
+        T.RSeq term1 term2 ->
+          map toSeq $ combinedPermutations term1 term2
+          where
+            toSeq (t1, t2) = T.TRedWeight rw1 $ T.RSeq t1 t2
+
+    combinedPermutations :: T.Term -> T.Term -> [(T.Term, T.Term)]
+    combinedPermutations term1 term2 =
+      let perms1 = getAllLetPermutations term1
+          perms2 = getAllLetPermutations term2
+      in [(t1, t2) | t1 <- perms1, t2 <- perms2]
 
     recursePerms recurseTerm wrapTerm =
       let perms = getAllLetPermutations recurseTerm
