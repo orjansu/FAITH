@@ -2,7 +2,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module ProofChecker where
@@ -161,10 +161,22 @@ checkRuleAlphaEquiv lawTerm m n = do
   where
     containsLet :: Law.Term -> Bool
     containsLet (Law.TValueMetaVar _) = False
+    containsLet (Law.TGeneralMetaVar _) = False
+    containsLet (Law.TMVTerms _) = False
     containsLet (Law.TVar _) = False
     containsLet (Law.TAppCtx mv term) = containsLet term
-    containsLet (Law.TLet _ _) = True
+    containsLet (Law.TAppValCtx _ term) = containsLet term
+    containsLet (Law.TNonTerminating) = False
+    containsLet (Law.TNum _) = False
+    containsLet (Law.TConstructor _) = False
+    containsLet (Law.TStackSpikes _ term) = containsLet term
+    containsLet (Law.THeapSpikes _ term) = containsLet term
     containsLet (Law.TDummyBinds _ term) = containsLet term
+    containsLet (Law.TSubstitution term _ _) = containsLet term
+    containsLet (Law.TLam _ term) = containsLet term
+    containsLet (Law.TLet _ _) = True
+    containsLet (Law.TCase term caseStms) = containsLet term || undefined
+    containsLet (Law.TRedWeight _ reduction) = undefined
 
     getAllLetPermutations :: T.Term -> [T.Term]
     getAllLetPermutations term = case term of
