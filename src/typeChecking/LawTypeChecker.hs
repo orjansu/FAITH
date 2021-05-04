@@ -16,6 +16,7 @@ import Control.Monad.Except (throwError, MonadError)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
+import LanguageLogic (trueName, falseName)
 
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'
@@ -343,8 +344,8 @@ instance Transformable UT.Constructor where
   type TypedVersion UT.Constructor = T.Constructor
   transform (UT.CGeneral (UT.MVConstructorName name) (UT.MVVarVect args)) =
     return $ T.CGeneral name args
-  transform UT.CTrue = return T.CTrue
-  transform UT.CFalse = return T.CFalse
+  transform UT.CTrue = return $ T.CGeneral trueName []
+  transform UT.CFalse = return $ T.CGeneral falseName []
 
 getVarName :: UT.Var -> String
 getVarName (UT.DVar (UT.MVVar varStr)) = varStr

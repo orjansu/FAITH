@@ -36,6 +36,7 @@ import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
 import ToLocallyNameless (toLocallyNameless)
 import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport
                   , throwCallstackError)
+import LanguageLogic (nilName, consName, trueName, falseName)
 
 data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
                  , constructors :: Map.Map String Int
@@ -45,11 +46,6 @@ data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
                  , freeVarVars :: Set.Set String
                  , lawMap :: Law.LawMap
                  }
-
-nilName = "[]"
-consName = "(:)"
-trueName = "true"
-falseName = "false"
 
 mkInitSt :: Law.LawMap -> MySt
 mkInitSt lawMap = MkSt { letBindings = Map.empty

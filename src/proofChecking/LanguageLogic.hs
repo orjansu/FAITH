@@ -1,6 +1,10 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module LanguageLogic (impRelImplies) where
+module LanguageLogic (impRelImplies
+                     , nilName
+                     , consName
+                     , trueName
+                     , falseName) where
 
 {- This file contains logic specific to space improvement theory. It does
 however not contain the logic for the binding structure. This is handled in the
@@ -46,3 +50,8 @@ instance ImpRelRepresentation UT.ImpRel where
   impRelImplies UT.WeakCostEquiv UT.StrongCostEquiv = False
   impRelImplies UT.WeakCostEquiv UT.WeakImprovementLR = True
   impRelImplies _ _ = False
+
+nilName = "[]"
+consName = "(:)"
+trueName = "true"
+falseName = "false"

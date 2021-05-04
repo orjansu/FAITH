@@ -51,8 +51,6 @@ type Arguments = String
 
 data Constructor
   = CGeneral Name Arguments
-  | CTrue
-  | CFalse
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type Var = String
