@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 -- | A monad with the invariant that all terms that you get out of the
 -- substitutionMonad are properly renamed so that their bound variables
@@ -26,7 +26,7 @@ import Data.Text (pack)
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import Control.Monad.Trans.Class (MonadTrans)
-import Data.List (zip4, unzip4)
+import Data.List (zip4, unzip4, intersperse)
 
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
@@ -87,13 +87,20 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
         $ Map.elems
         $ Map.filter isContext substSimpleMap
     isContext :: T.Substitute -> Bool
-    isContext (T.SLetBindings _) = False
-    isContext (T.SValue _) = False
-    isContext (T.SContext _) = True
-    isContext (T.SIntegerVar _) = False
-    isContext (T.SVar _) = False
-    isContext (T.SVarSet _) = False
-    isContext (T.STerm _) = False
+    isContext (T.SLetBindings _)     = False
+    isContext (T.SValue _)           = False
+    isContext (T.SContext _)         = True
+    isContext (T.SIntegerVar _)      = False
+    isContext (T.SVar _)             = False
+    isContext (T.SVarVect _)         = False
+    isContext (T.SValueContext _)    = True
+    isContext (T.SReduction _)       = True
+    isContext (T.SVarSet _)          = False
+    isContext (T.STerm _)            = False
+    isContext (T.STerms _)           = False
+    isContext (T.SPatterns _)        = False
+    isContext (T.SCaseStms _)        = False
+    isContext (T.SConstructorName _) = False
 
 prepareSubstitutions :: HasCallStack => Map.Map String T.Substitute
                         -> Map.Map String (T.Substitute, IsUsed)
@@ -109,23 +116,57 @@ getSubstitute metaVar = do
   case Map.lookup metaVar substMap of
     Just (subst, isUsed) ->
       case subst of
-        T.SLetBindings letBindings1 -> do
-          let asTerm = T.TLet letBindings1 (T.TNum 0)
-          preparedTerm <- prepareTermForSubstitution metaVar asTerm isUsed
-          T.TLet letBindings2 (T.TNum 0) <- return preparedTerm
-          return $ T.SLetBindings letBindings2
+        T.SLetBindings letBindings1 -> return subst
+          -- In LawTypeChecker, there is a check that makes sure that let-
+          -- bindings are not copied in a term. Therefore, if they are used
+          -- multiple times, they are used in varSets, where the names of their
+          -- bound variables are needed.
         T.SValue term -> do
           prepared <- prepareTermForSubstitution metaVar term isUsed
           return $ T.SValue prepared
-        T.SContext ctx -> internalException $ "use applyContext, not "
-                            ++"getSubstitute for contexts"
+        T.SContext ctx -> contextUsed
         T.SIntegerVar intExpr -> return subst
-        T.SVar string -> return $ T.SVar string
-        T.SVarSet varSet -> return $ T.SVarSet varSet
+        T.SVar string -> return subst
+        T.SVarVect vars -> return subst
+        T.SValueContext _ -> contextUsed
+        T.SReduction _ -> contextUsed
+        T.SVarSet varSet -> return subst
         T.STerm term -> do
           prepared <- prepareTermForSubstitution metaVar term isUsed
           return $ T.STerm prepared
+        T.STerms terms -> do
+          prepared <- prepareTerms metaVar terms isUsed
+          return $ T.STerms prepared
+        T.SPatterns ptns -> return subst
+        T.SCaseStms caseStms1 -> do
+          let dummy1 = T.TRedWeight 1 $ T.RCase (T.TNum 1) caseStms1
+          dummy2 <- prepareTermForSubstitution metaVar dummy1 isUsed
+          T.TRedWeight 1 (T.RCase (T.TNum 1) caseStms2) <- return dummy2
+          return $ T.SCaseStms caseStms2
+        T.SConstructorName name -> return subst
     Nothing -> internalException $ "Substitution for "++metaVar++" not found"
+  where
+    contextUsed = internalException $  "use applyContext or "
+                  ++"getContextFreeVars, not getSubstitute for contexts"
+
+prepareTerms :: HasCallStack => String -> [T.Term] -> Bool -> SubstM [T.Term]
+prepareTerms mv terms areUsed =
+  if areUsed
+    then do
+      renamed <- mapM renameAllBound terms
+      return renamed
+    else do
+      setToUsed mv
+      let termsBV = Set.unions $ map getBoundVariables terms
+        --We know that the bound variables of the terms are disjoint by the
+        --check in checkSubstBVDistinct in Substitution.hs
+      forbidden <- gets forbiddenNames
+      assertInternal (termsBV `Set.disjoint` forbidden)
+        $ "terms "++mv++" inserted for the first time should only contain "
+        ++"new names for bound variables. "++mv++
+        " = [" ++ concat (intersperse ", " (map showTypedTerm terms))++"]."
+      mapM addBVToForbiddenNames terms
+      return terms
 
 prepareTermForSubstitution :: HasCallStack =>
                               String -> T.Term -> Bool -> SubstM T.Term
@@ -179,7 +220,7 @@ applyContext ctxName term = do
   assertInternal (numHoles term == 0)
     "You may not insert a context into a context"
   substMap <- gets substitutions
-  Just (T.SContext ctx, isUsed) <- return $ Map.lookup ctxName substMap
+  (ctx, isUsed) <- getUniformContext ctxName substMap
   if isUsed
     then do
       appliedButWithOldNames <- applyContext1 ctx term
@@ -190,8 +231,12 @@ applyContext ctxName term = do
       addBVToForbiddenNames res
       setToUsed ctxName
       return res
-
   where
+    getUniformContext ctxName substMap = case Map.lookup ctxName substMap of
+      Just (T.SContext ctx, isUsed) -> return (ctx, isUsed)
+      Just (T.SValueContext ctx, isUsed) -> return (ctx, isUsed)
+      Just (T.SReduction red, isUsed) -> return (T.TRedWeight 1 red, isUsed)
+      _ -> internalException $ "no context substitution for "++ctxName
     applyContext1 :: HasCallStack => T.Term -> T.Term -> SubstM T.Term
     applyContext1 ctx term = do
       let holeSubstitution = Map.singleton dummy (T.STerm term, False)
@@ -298,10 +343,14 @@ renameNeededMonadic :: (MonadState (Map.Map String String) m,
                           HasCallStack) =>
                     T.Term -> m T.Term
 renameNeededMonadic = \case
+  T.TNonTerminating -> return T.TNonTerminating
   T.TVar var -> do
     var' <- toCorrectMentionedVar var
     return $ T.TVar var
   T.TNum integer -> return $ T.TNum integer
+  T.TConstructor name vars -> do
+    vars' <- mapM toCorrectMentionedVar vars
+    return $ T.TConstructor name vars'
   T.TLam var term -> do
     var' <- toCorrectBoundVar var
     term' <- renameNeededMonadic term
@@ -320,12 +369,25 @@ renameNeededMonadic = \case
     let varSet2 = Set.fromList varList2
     term2 <- renameNeededMonadic term1
     return $ T.TDummyBinds varSet2 term2
+  T.TStackSpikes sw term -> do
+    term' <- renameNeededMonadic term
+    return $ T.TStackSpikes sw term'
+  T.THeapSpikes hw term -> do
+    term' <- renameNeededMonadic term
+    return $ T.THeapSpikes hw term'
   T.TRedWeight rw1 red1 -> do
     red2 <- case red1 of
               T.RApp term1 var1 -> do
                 var2 <- toCorrectMentionedVar var1
                 term2 <- renameNeededMonadic term1
                 return $ T.RApp term2 var2
+              T.RCase decideTerm branches -> do
+                decideTerm' <- renameNeededMonadic decideTerm
+                let (cnames, args, terms) = unzip3 branches
+                args' <- mapM (mapM toCorrectBoundVar) args
+                terms' <- mapM renameNeededMonadic terms
+                let branches' = zip3 cnames args' terms'
+                return $ T.RCase decideTerm' branches'
               T.RPlusWeight t1 rw2 t2 -> do
                 t1' <- renameNeededMonadic t1
                 t2' <- renameNeededMonadic t2
