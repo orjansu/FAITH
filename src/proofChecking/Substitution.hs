@@ -7,6 +7,7 @@ module Substitution (applySubstitution) where
 
 import Data.Text (pack, Text)
 import Data.List (intersperse, unzip4, zip4)
+import Data.List.Extra (replace)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
@@ -20,12 +21,13 @@ import CheckMonad (CheckM, runCheckM, assert, assertInternal, internalException)
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
 import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
-                       , checkTypedTerm, numHoles, getAllVariables)
+         , checkTypedTerm, numHoles, getAllVariables, getFreeVariables)
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
-import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext)
+import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
+                          , getCtxFreeVars)
 import ShowLaw (showLaw)
-import OtherUtils (applyOnLawSubterms)
+import OtherUtils (applyOnLawSubterms, applyAndRebuild)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -48,7 +50,7 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
   let boundSubstVars = getBoundSubstVars substitutions law
       forbiddenNames2 = forbiddenNames1 `Set.union` boundSubstVars
   checkSubstBVDistinct substitutions forbiddenNames2
-  res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM law
+  res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM (-1) law
   let (finalTerm, forbiddenNames3) = res
       finalBV = getBoundVariables finalTerm
   Log.logInfoN . pack $ "checking correctness of M after substitution , where "
@@ -60,10 +62,12 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
   assertInternal (numHoles finalTerm == 0) "| M should not be a context"
   let finalVariables = getAllVariables finalTerm
       expectedForbiddenNames = finalVariables `Set.union` forbiddenNames1
-  assertInternal (expectedForbiddenNames == forbiddenNames3)
-    $ "| M substituted wrt S -> S' => AllVars(M) union S == S', where "
-    ++"AllVars(M) union S = "++show expectedForbiddenNames++" and "
-    ++"S' = "++show forbiddenNames3
+  --assertInternal (expectedForbiddenNames == forbiddenNames3)
+  --  $ "| M substituted wrt S -> S' => AllVars(M) union S == S', where "
+  --  ++"AllVars(M) union S = "++show expectedForbiddenNames++" and "
+  --  ++"S' = "++show forbiddenNames3
+  --TODO: change to a better assertion, since things will be renamed in vain
+  --      when you get terms for getting their free variables.
 
   return finalTerm
   where
@@ -81,8 +85,7 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
       T.SVar string -> string
       T.SVarVect strings -> show strings
       T.SValueContext term -> showTypedTerm term
-      T.SReduction rw reduction -> let term = T.TRedWeight rw $ reduction
-                                   in "["++show rw++"]"++showTypedTerm term
+      T.SReduction red -> showTypedTerm $ T.TRedWeight 1 red
       T.SVarSet stringSet ->
         let listForm = concat . intersperse ", " . Set.toList $ stringSet
         in "{" ++ listForm ++"}"
@@ -130,7 +133,7 @@ checkSubstBVDistinct substitutions forbiddenNames = do
         let (_, bindVars, terms) = unzip3 stms
         checkBSSubstListBvsTerms (concat bindVars) terms
       T.SConstructorName str -> return ()
-      T.SReduction rw red -> case red of
+      T.SReduction red -> case red of
         T.RApp T.THole var -> return ()
         T.RCase T.THole stms -> do
           let (_, bindVars, terms) = unzip3 stms
@@ -140,7 +143,7 @@ checkSubstBVDistinct substitutions forbiddenNames = do
         T.RIsZero T.THole -> return ()
         T.RSeq T.THole term -> checkBVTerm term
         _ -> internalException $ "the non-reduction-context "
-          ++showTypedTerm (T.TRedWeight rw red)++" got all the way to"
+          ++showTypedTerm (T.TRedWeight 1 red)++" got all the way to"
           ++"substitution."
 
     checkBSSubstListBvsTerms bindVars terms = do
@@ -252,27 +255,65 @@ getBoundSubstVars substitutions law = case law of
                  ++"typechecker."
 
 
--- | TODO: check that you do not substitute into a binding position.
-applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
-applyTermSubstM bigLawTerm = do
+-- | Applies a substitution to a law term.
+-- TODO: check that you do not substitute into a binding position.
+applyTermSubstM :: HasCallStack => Int -> Law.Term -> SubstM T.Term
+applyTermSubstM index bigLawTerm = do
   Log.logInfoN . pack $ "substituting into law "++showLaw bigLawTerm
   case bigLawTerm of
     Law.TValueMetaVar mvName -> do
       T.SValue value <- getSubstitute mvName
-      logSubst mvName value
       return value
+    Law.TGeneralMetaVar mvName -> do
+      T.STerm term <- getSubstitute mvName
+      return term
+    Law.TMVTerms mvName -> do
+      assertInternal (index /= (-1)) $
+        "Index should be set when vectorized term "++mvName++" is used."
+      T.STerms terms <- getSubstitute mvName
+      let term = terms !! index
+      return term
     Law.TVar mvName -> do
       T.SVar var <- getSubstitute mvName
-      logSubst mvName $ T.TVar var
       return $ T.TVar var
     Law.TAppCtx mvName lawTerm -> do
-      concreteTerm <- applyTermSubstM lawTerm
-      Log.logInfoN . pack $ "applying context "++mvName
-        ++" to "++showTypedTerm concreteTerm
+      concreteTerm <- applyTermSubstM index lawTerm
       applyContext mvName concreteTerm
+    Law.TAppValCtx mvName lawTerm -> do
+      concreteTerm <- applyTermSubstM index lawTerm
+      applyContext mvName concreteTerm
+    Law.TNonTerminating -> return T.TNonTerminating
+    Law.TNum int -> return $ T.TNum int
+    Law.TConstructor (Law.CGeneral lname largs) -> do
+      T.SConstructorName cname <- getSubstitute lname
+      T.SVarVect cargs <- getSubstitute largs
+      return $ T.TConstructor cname cargs
+    Law.TStackSpikes iexpr lterm -> do
+      res <- substituteAndEvalIntExpr iexpr
+      cterm <- applyTermSubstM index lterm
+      return $ T.TStackSpikes res cterm
+    Law.THeapSpikes iexpr lterm -> do
+      res <- substituteAndEvalIntExpr iexpr
+      cterm <- applyTermSubstM index lterm
+      return $ T.THeapSpikes res cterm
+    Law.TDummyBinds lvarSet lawTerm -> do
+      varSet <- substituteAndEvalVarSet index lvarSet
+      term <- applyTermSubstM index lawTerm
+      return $ T.TDummyBinds varSet term
+    Law.TSubstitution lterm ly lx -> do
+      -- M[y/x]
+      term <- applyTermSubstM index lterm
+      T.SVar y <- getSubstitute ly
+      T.SVar x <- getSubstitute lx
+      substitutedTerm <- substituteFor term y x
+      return substitutedTerm
+    Law.TLam lawVar lawTerm -> do
+      T.SVar var <- getSubstitute lawVar
+      term <- applyTermSubstM index lawTerm
+      return $ T.TLam var term
     Law.TLet letBindings term -> do
       concreteBindings <- applyOnLBS
-      concreteTerm <- applyTermSubstM term
+      concreteTerm <- applyTermSubstM index term
       return $ T.TLet concreteBindings concreteTerm
         where
           applyOnLBS = case letBindings of
@@ -284,33 +325,155 @@ applyTermSubstM bigLawTerm = do
           applyMBS (Law.MBSMetaVar metaBindVar) = do
             T.SLetBindings concreteFirst <- getSubstitute metaBindVar
             return concreteFirst
+          applyMBS (Law.MBSSubstitution metaG y x) = do
+            T.SLetBindings concreteG <- getSubstitute metaG
+            let dummyTerm = T.TLet concreteG (T.TNum 1)
+            T.TLet substitutedG (T.TNum 1) <- substituteFor dummyTerm y x
+            return substitutedG
           applyOnLB (Law.LBConcrete lawVar lawSw lawHw lawTerm) = do
             T.SVar var <- getSubstitute lawVar
-            sw <- applyIntExprSubstM lawSw
-            hw <- applyIntExprSubstM lawHw
-            term <- applyTermSubstM lawTerm
+            sw <- substituteAndEvalIntExpr lawSw
+            hw <- substituteAndEvalIntExpr lawHw
+            term <- applyTermSubstM index lawTerm
             return [(var, sw, hw, term)]
           applyOnLB (Law.LBVectorized varVect1 lawSw lawHw varVect2) = do
             T.SVarVect vars1 <- getSubstitute varVect1
             T.SVarVect vars2 <- getSubstitute varVect2
-            sw <- applyIntExprSubstM lawSw
-            hw <- applyIntExprSubstM lawHw
+            sw <- substituteAndEvalIntExpr lawSw
+            hw <- substituteAndEvalIntExpr lawHw
             let toBinding = (\(x, y) -> (x, sw, hw, T.TVar y))
                 bindings = map toBinding $ zip vars1 vars2
             return bindings
-    Law.TDummyBinds (Law.VSConcrete lawVarSet) lawTerm -> do
-      concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
-      let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
-          varSet = Set.fromList concreteVarList
-      term <- applyTermSubstM lawTerm
-      return $ T.TDummyBinds varSet term
-  where
-    logSubst mvName term = Log.logInfoN . pack $ "applying substitution "
-                            ++mvName++" = "++showTypedTerm term
+    Law.TRedWeight lrw lred -> do
+      rw <- substituteAndEvalIntExpr lrw
+      red <- substRed lred
+      return $ T.TRedWeight rw red
+      where
+        substRed (Law.RMetaVar lReduction lTerm) = do
+          term <- applyTermSubstM index lTerm
+          T.TRedWeight 1 reduction <- applyContext lReduction term
+          return reduction
+        substRed (Law.RApp lterm lvar) = do
+          term <- applyTermSubstM index lterm
+          T.SVar var <- getSubstitute lvar
+          return $ T.RApp term var
+        substRed (Law.RPlusW lTerm1 lrw2 lTerm2) = do
+          term1 <- applyTermSubstM index lTerm1
+          rw2 <- substituteAndEvalIntExpr lrw2
+          term2 <- applyTermSubstM index lTerm2
+          return $ T.RPlusWeight term1 rw2 term2
+        substRed (Law.RCase lterm lbranches) = do
+          term <- applyTermSubstM index lterm
+          unConcatBranches <- mapM applyBranch lbranches
+          let branches = concat unConcatBranches
+          return $ T.RCase term branches
+          where
+            applyBranch (Law.CSAlts alts) = do
+              T.SCaseStms concreteAlts <- getSubstitute alts
+              return concreteAlts
+            applyBranch (Law.CSPatterns pat_i lterm) = do
+              T.SPatterns patterns <- getSubstitute pat_i
+              let indicies = [0..length patterns - 1]
+                  applyTupled = (\(i,t) -> applyTermSubstM i t)
+              terms <- mapM applyTupled $ zip indicies $ repeat lterm
+              let (constrNames, args) = unzip patterns
+                  branches = zip3 constrNames args terms
+              return branches
+            applyBranch (Law.CSConcrete (Law.CGeneral lc lxs) lM) = do
+              T.SConstructorName c <- getSubstitute lc
+              T.SVarVect xs <- getSubstitute lxs
+              m <- applyTermSubstM index lM
+              return [(c,xs,m)]
+        substRed (Law.RAddConst ln lM) = do
+          n <- substituteAndEvalIntExpr ln
+          m <- applyTermSubstM index lM
+          return $ T.RAddConst n m
+        substRed (Law.RIsZero lTerm) = do
+          term <- applyTermSubstM index lTerm
+          return $ T.RIsZero term
+        substRed (Law.RSeq lTerm1 lTerm2) = do
+          term1 <- applyTermSubstM index lTerm1
+          term2 <- applyTermSubstM index lTerm2
+          return $ T.RSeq term1 term2
 
-applyIntExprSubstM :: HasCallStack => Law.IntExpr -> SubstM Integer
-applyIntExprSubstM = \case
+substituteAndEvalIntExpr :: HasCallStack => Law.IntExpr -> SubstM Integer
+substituteAndEvalIntExpr = \case
   Law.IEVar var -> do
     T.SIntegerVar int <- getSubstitute var
     return int
   Law.IENum num -> return num
+  Law.IESizeBind metaG -> do
+    T.SLetBindings concreteG <- getSubstitute metaG
+    return $ toInteger $ length concreteG
+  Law.IEPlus ie1 ie2 -> do
+    m <- substituteAndEvalIntExpr ie1
+    n <- substituteAndEvalIntExpr ie2
+    return $ m + n
+  Law.IEMinus ie1 ie2 -> do
+    m <- substituteAndEvalIntExpr ie1
+    n <- substituteAndEvalIntExpr ie2
+    return $ m - n
+
+substituteAndEvalVarSet :: HasCallStack =>
+                           Int -> Law.VarSet -> SubstM (Set.Set String)
+substituteAndEvalVarSet index law = case law of
+  Law.VSConcrete lawVarSet -> do
+    concreteWrappedVarList <- mapM getSubstitute $ Set.toList lawVarSet
+    let concreteVarList = map (\(T.SVar str) -> str) concreteWrappedVarList
+        varSet = Set.fromList concreteVarList
+    return varSet
+  Law.VSMetaVar metaX -> do
+    T.SVarSet concreteX <- getSubstitute metaX
+    return concreteX
+  Law.VSVectMeta metaxs -> do
+    T.SVarVect concretexs <- getSubstitute metaxs
+    return $ Set.fromList $ concretexs
+  Law.VSFreeVars varContainer -> case varContainer of
+    Law.VCTerm lterm -> do
+      term <- applyTermSubstM index lterm
+      return $ getFreeVariables term
+    Law.VCMetaVarContext metaC -> getCtxFreeVars metaC
+    Law.VCMetaVarRed metaR -> getCtxFreeVars metaR
+    Law.VCValueContext metaV -> getCtxFreeVars metaV
+  Law.VSDomain metaG -> do
+    T.SLetBindings concreteG <- getSubstitute metaG
+    let (bindVars, _,_,_) = unzip4 concreteG
+    return $ Set.fromList bindVars
+  Law.VSUnion lVarSet1 lVarSet2 -> do
+    varSet1 <- substituteAndEvalVarSet index lVarSet1
+    varSet2 <- substituteAndEvalVarSet index lVarSet2
+    return $ varSet1 `Set.union` varSet2
+  Law.VSDifference lVarSet1 lVarSet2 -> do
+    varSet1 <- substituteAndEvalVarSet index lVarSet1
+    varSet2 <- substituteAndEvalVarSet index lVarSet2
+    return $ varSet1 Set.\\ varSet2
+
+-- | given M y and x, returns M[y/x]
+substituteFor :: (HasCallStack, Log.MonadLogger m, MonadError String m) =>
+                 T.Term -> String -> String -> m T.Term
+substituteFor term y x = do
+  checkBoundVariablesDistinct term
+  assert (x `Set.member` getFreeVariables term)
+    "you may only substitute a free variable."
+  assert (y `Set.notMember` getBoundVariables term) $
+    "Currently, the system only supports M[y/x] if y is not in the bound "
+    ++"variables of M, for uniqueness of binding name reasons."
+  return $ substitute y x term
+  where
+    substitute y x term = case term of
+      T.TVar var | var == x -> T.TVar y
+                 | otherwise -> T.TVar var
+      T.TConstructor constrName vars ->
+        let vars' = replace [x] [y] vars
+        in T.TConstructor constrName vars'
+      T.TDummyBinds varSet term ->
+        let term' = substitute y x term
+            varSet' = if Set.member x varSet
+                        then Set.insert y $ Set.delete x varSet
+                        else varSet
+        in T.TDummyBinds varSet' term'
+      T.TRedWeight rw (T.RApp term var) ->
+        let term' = substitute y x term
+            var' = if var == x then y else var
+        in T.TRedWeight rw (T.RApp term' var')
+      _ -> applyAndRebuild term (substitute y x)

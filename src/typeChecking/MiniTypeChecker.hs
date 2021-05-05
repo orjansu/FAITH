@@ -584,7 +584,8 @@ checkArg (UT.CAAssign assignee value) = case assignee of
             assert (isReductionContext tTerm) $ "Argument should be a reduction"
               ++"context."
             T.TRedWeight rw red <- return tTerm
-            return $ Just $ (name, T.SReduction rw red)
+            assert (rw == 1) $ "You cannot add outer weight to the reduction"
+            return $ Just $ (name, T.SReduction red)
           _ -> throwError "Not a reduction context"
       UTLaw.MetaVarMVVarSet (UTLaw.MVVarSet name) -> do
         case value of

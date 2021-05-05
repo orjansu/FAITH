@@ -110,7 +110,7 @@ data Substitute
   | SVar String
   | SVarVect [String]
   | SValueContext Term
-  | SReduction RedWeight Red
+  | SReduction Red
   | SVarSet (Set String)
   | STerm Term
   | STerms [Term]

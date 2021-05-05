@@ -11,6 +11,7 @@
 module SubstitutionMonad (runSubstM
                          , getSubstitute
                          , applyContext
+                         , getCtxFreeVars
                          , SubstM) where
 
 import qualified Data.Map.Strict as Map -- TODO fundera om lat är bättre
@@ -31,7 +32,7 @@ import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (getBoundVariables, numHoles, getFreeVariables
                        , checkBoundVariablesDistinct)
-import OtherUtils (applyOnSubTermsM)
+import OtherUtils (applyAndRebuildM)
 
 type IsUsed = Bool
 data SubstSt = MkSubstSt
@@ -158,8 +159,21 @@ addBVToForbiddenNames term = do
       forbidden' = termBV `Set.union` forbidden
   modify (\st -> st{forbiddenNames = forbidden'})
 
+-- | since you can't get the contexts out via getSubstitute, this is a special
+-- function to just get the free variables from it.
+getCtxFreeVars :: String -> SubstM (Set.Set String)
+getCtxFreeVars mv = do
+  substMap <- gets substitutions
+  case Map.lookup mv substMap of
+    Just (T.SContext ctx,_) -> return $ getFreeVariables ctx
+    Just (T.SReduction red,_) -> return $ getFreeVariables $ T.TRedWeight 1 red
+    Just (T.SValueContext vctx,_) -> return $ getFreeVariables vctx
+    Just _ -> internalException "getCtxFreeVars used for a non-context"
+    Nothing -> internalException $ "substitute for "++mv++" not found."
+
 -- | given a name corresponding to a context C and a term M, returns C[M],
 -- properly renamed.
+-- TODO the context may be a Value context or a reduction too.
 applyContext :: HasCallStack => String -> T.Term -> SubstM T.Term
 applyContext ctxName term = do
   assertInternal (numHoles term == 0)
@@ -209,12 +223,10 @@ applyContext ctxName term = do
 
     applyContext2 :: HasCallStack => T.Term -> SubstM T.Term
     applyContext2 = \case
-      T.TVar var -> return $ T.TVar var
-      T.TNum integer -> return $ T.TNum integer
       T.THole -> do
         T.STerm substTerm <- getSubstitute dummy
         return substTerm
-      recursiveTerm -> applyOnSubTermsM applyContext2 recursiveTerm
+      recursiveTerm -> applyAndRebuildM applyContext2 recursiveTerm
 
 -- | Run the monadic computation with a new substitution set, and then
 -- switch back.
