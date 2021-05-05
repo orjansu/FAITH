@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module Substitution (applySubstitution) where
 
@@ -25,6 +25,7 @@ import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext)
 import ShowLaw (showLaw)
+import OtherUtils (applyOnLawSubterms)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -86,6 +87,8 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
         let listForm = concat . intersperse ", " . Set.toList $ stringSet
         in "{" ++ listForm ++"}"
       T.STerm term -> showTypedTerm term
+      T.STerms terms -> let strs = map showTypedTerm terms
+                        in concat $ intersperse ", " strs
       T.SPatterns ptns -> show ptns
       T.SCaseStms stms -> let strStms = map showStm stms
                               everything = concat $ intersperse ", " strStms
@@ -121,6 +124,7 @@ checkSubstBVDistinct substitutions forbiddenNames = do
       T.SVarVect varVect -> return ()
       T.SValueContext term -> checkBVTerm term
       T.STerm term -> checkBVTerm term
+      T.STerms terms -> mapM checkBVTerm terms >> return ()
       T.SPatterns ptns -> return ()
       T.SCaseStms stms -> do
         let (_, bindVars, terms) = unzip3 stms
@@ -173,13 +177,45 @@ checkSubstBVDistinct substitutions forbiddenNames = do
           return $ set1 `Set.union` set2
 
 
--- | returns the variables that are substituted into a binding position.
+-- | returns the variables that are substituted into a binding position,
+-- including possible binding vars in M in terms like {FV(M)}d^N.
+-- NOTE: unclear if the binding pos variables in M in {FV(M)}d^N are needed.
+-- maybe add typechecker check that if {FV(M)}d^N appears, M must also appear
+-- somewhere else?
 getBoundSubstVars :: T.Substitutions -> Law.Term -> Set.Set String
 getBoundSubstVars substitutions law = case law of
-  Law.TValueMetaVar _ -> Set.empty
-  Law.TGeneralMetaVar _ -> Set.empty
-  Law.TVar _ -> Set.empty
-  Law.TAppCtx _ term -> getBoundSubstVars substitutions term
+  Law.TDummyBinds vs term ->
+    getBoundSubstVars substitutions term `Set.union` inVarSet vs
+    where
+      inVarSet (Law.VSConcrete _) = Set.empty
+      inVarSet (Law.VSMetaVar _) = Set.empty
+      inVarSet (Law.VSVectMeta _) = Set.empty
+      inVarSet (Law.VSFreeVars vc) = case vc of
+        Law.VCTerm term -> getBoundSubstVars substitutions term
+        Law.VCMetaVarContext _ -> Set.empty
+        Law.VCMetaVarRed _ -> Set.empty
+        Law.VCValueContext _ -> Set.empty
+      inVarSet (Law.VSDomain _) = Set.empty
+      inVarSet (Law.VSUnion varSet1 varSet2) =
+        inVarSet varSet1 `Set.union` inVarSet varSet2
+      inVarSet (Law.VSDifference varSet1 varSet2) =
+        inVarSet varSet1 `Set.union` inVarSet varSet2
+  Law.TLam lawVar term -> case Map.lookup lawVar substitutions of
+    Just (T.SVar var) -> Set.singleton var
+                  `Set.union` getBoundSubstVars substitutions term
+    _ -> substitutionNotfound lawVar
+  Law.TRedWeight _ (Law.RCase decTerm cases) -> bvDecTerm `Set.union` bvCases
+    where
+      bvDecTerm = getBoundSubstVars substitutions decTerm
+      bvCases = Set.unions $ map bvCase cases
+      bvCase (Law.CSAlts _) = Set.empty
+      bvCase (Law.CSPatterns _pat_i term) =
+        getBoundSubstVars substitutions term
+      bvCase (Law.CSConcrete (Law.CGeneral _name lawArgs) term) =
+        case Map.lookup lawArgs substitutions of
+          Just (T.SVarVect args) -> Set.fromList args
+            `Set.union` getBoundSubstVars substitutions term
+          _ -> substitutionNotfound lawArgs
   Law.TLet letBindings term ->
     let mainBounds = getBoundSubstVars substitutions term
     in mainBounds `Set.union` innerBounds
@@ -205,13 +241,18 @@ getBoundSubstVars substitutions law = case law of
             (Just (T.SVarVect vars1), Just (T.SVarVect vars2)) ->
               Set.fromList (vars1 ++ vars2)
             _ -> substitutionNotfound $ varVect1++" and/or "++varVect2
+  nonBindingTerm -> applyOnLawSubterms law
+                                       Set.empty
+                                       (getBoundSubstVars substitutions)
+                                       Set.unions
+  where
+    substitutionNotfound lawVar = error $
+                   "Internal: substitution for"++lawVar++" is not bound to "
+                 ++"a variable. This was not discovered in the "
+                 ++"typechecker."
 
-      substitutionNotfound lawVar = error $
-                     "Internal: substitution for"++lawVar++" is not bound to "
-                   ++"a variable. This was not discovered in the "
-                   ++"typechecker."
-  Law.TDummyBinds _ term -> getBoundSubstVars substitutions term
 
+-- | TODO: check that you do not substitute into a binding position.
 applyTermSubstM :: HasCallStack => Law.Term -> SubstM T.Term
 applyTermSubstM bigLawTerm = do
   Log.logInfoN . pack $ "substituting into law "++showLaw bigLawTerm

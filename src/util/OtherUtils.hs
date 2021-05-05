@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+--{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module OtherUtils (applyOnSubTermsM, filterNoise, applyOnLawSubterms) where
 
