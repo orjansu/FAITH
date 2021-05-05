@@ -35,7 +35,7 @@ token MVConstructorName  ('c' digit*);
 -- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
 -- a way to share grammar between .cf files.
 
-rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVPatterns | MVCaseStms | MVConstructorName;
+rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVTerms | MVPatterns | MVCaseStms | MVConstructorName;
 
 TValueMetaVar.    Term4 ::= MVValue;
 TGeneralMetaVar.  Term4 ::= MVTerm;

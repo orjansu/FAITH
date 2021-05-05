@@ -601,6 +601,18 @@ checkArg (UT.CAAssign assignee value) = case assignee of
             assert (numHoles tTerm == 0) "Should not be a context."
             return $ Just (name, T.STerm tTerm)
           _ -> throwError "Not a term"
+      UTLaw.MetaVarMVTerms (UTLaw.MVTerms name) ->
+        case value of
+          UT.CVTerms utTerms -> do
+            tTerms <- mapM go utTerms
+            return $ Just (name, T.STerms tTerms)
+          _ -> throwError "not terms"
+        where
+          go utTerm = do
+            tTerm <- transform utTerm
+            checkArgumentTerm tTerm
+            assert (numHoles tTerm == 0) "Should not be a context."
+            return tTerm
       UTLaw.MetaVarMVPatterns (UTLaw.MVPatterns name) ->
         case value of
           UT.CVPatterns constructors -> do

@@ -65,6 +65,7 @@ TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
 TRSeq.        Term ::= MaybeRedWeight "seq" Term3 Term3;
 
 coercions Term 3;
+separator Term ",";
 
 WithRedWeight. MaybeRedWeight ::= RedWeight;
 NoRedWeight.   MaybeRedWeight ::= ;
@@ -137,6 +138,7 @@ CVLet.             CmdValue    ::= "let" LetBindings;
 CVPatterns.        CmdValue    ::= "patterns" "[" [Constructor] "]";
 CVCaseStms.        CmdValue    ::= "case" "{" [CaseStm] "}";
 CVConstructorName. CmdValue    ::= "constructor" ConstructorName;
+CVTerms.           CmdValue    ::= "terms" "[" [Term] "]";
 CAMetaVar.        CmdAssignee ::= VarAnyType;
 CASubTerm.        CmdAssignee ::= "subterm";
 CAContext.        CmdAssignee ::= "ctx";

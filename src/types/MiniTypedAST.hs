@@ -113,6 +113,7 @@ data Substitute
   | SReduction RedWeight Red
   | SVarSet (Set String)
   | STerm Term
+  | STerms [Term]
   | SPatterns [(String, [Var])]
   | SCaseStms [(String, [Var], Term)]
   | SConstructorName String
