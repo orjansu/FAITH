@@ -4,7 +4,8 @@
 module OtherUtils ( applyAndRebuild
                   , applyAndRebuildM
                   , filterNoise
-                  , applyOnLawSubterms) where
+                  , applyOnLawSubterms
+                  , applyOnLawSubtermsM) where
 
 import Control.Monad.Except (MonadError, throwError)
 import Data.List (zip4, unzip4)
@@ -110,28 +111,6 @@ filterNoise = let removeChars = filter (\c -> c /='\"' && c /= '\n')
                   lessWhiteSpace = replace "  " " "
               in lessWhiteSpace . removeChars
 
--- | Given f1 and f2, it applies f1 to all subterms that are part of real
--- terms and f2 on all subterms that are part of . For terms that do not
--- contain subterms, it does nothing.
-applyOnLawSubtermsM :: (Monad m) => Law.Term -> (Law.Term -> m ()) -> m ()
-applyOnLawSubtermsM bigTerm f = case bigTerm of
-  Law.TValueMetaVar _string -> undefined
-  Law.TGeneralMetaVar _string -> undefined
-  Law.TMVTerms _string -> undefined
-  Law.TVar _string -> undefined
-  Law.TAppCtx _string term -> undefined
-  Law.TAppValCtx _string term -> undefined
-  Law.TNonTerminating -> undefined
-  Law.TNum _integer -> undefined
-  Law.TConstructor _constructor -> undefined
-  Law.TStackSpikes _intExpr term -> undefined
-  Law.THeapSpikes _intExpr term -> undefined
-  Law.TDummyBinds varSet term -> undefined
-  Law.TSubstitution term _string1 _string2 -> undefined
-  Law.TLam _string term -> undefined
-  Law.TLet letBindings term -> undefined
-  Law.TRedWeight intExpr reduction -> undefined
-
 -- | designed to be used to cover all the simple recursive and base cases of
 -- a function. Given the term, base value, recursive case and a combinator
 -- function, the function returns the base value all terms that do not
@@ -209,3 +188,51 @@ applyOnLawSubterms bigTerm baseValue recurseFun combinator = case bigTerm of
     Law.RAddConst _ term -> recurseFun term
     Law.RIsZero term -> recurseFun term
     Law.RSeq term1 term2 -> combinator $ map recurseFun [term1, term2]
+
+-- | Like applyOnLawSubterms, but monadic
+applyOnLawSubtermsM :: (Monad m) => Law.Term
+                                    -> b
+                                    -> (Law.Term -> m b)
+                                    -> ([b] -> b)
+                                    -> m b
+applyOnLawSubtermsM bigTerm baseValue recurseFun combinator = case bigTerm of
+  Law.TValueMetaVar _        -> return baseValue
+  Law.TGeneralMetaVar _      -> return baseValue
+  Law.TMVTerms _             -> return baseValue
+  Law.TVar _                 -> return baseValue
+  Law.TAppCtx _ term         -> recurseFun term
+  Law.TAppValCtx _ term      -> recurseFun term
+  Law.TNonTerminating        -> return baseValue
+  Law.TNum _                 -> return baseValue
+  Law.TConstructor _         -> return baseValue
+  Law.TStackSpikes _ term    -> recurseFun term
+  Law.THeapSpikes _ term     -> recurseFun term
+  Law.TDummyBinds _ term     -> recurseFun term
+  Law.TSubstitution term _ _ -> recurseFun term
+  Law.TLam _ term            -> recurseFun term
+  Law.TLet (Law.LBSBoth _metas moreConcreteBinds) term  -> do
+    results <- mapM recurseFun (term:innerTerms)
+    return $ combinator results
+    where
+      innerTerms = catMaybes $ map getInnerTerm moreConcreteBinds
+      getInnerTerm (Law.LBConcrete _ _ _ term) = Just term
+      getInnerTerm (Law.LBVectorized _ _ _ _) = Nothing
+  Law.TRedWeight _ reduction -> case reduction of
+    Law.RMetaVar _ term -> recurseFun term
+    Law.RApp term _ -> recurseFun term
+    Law.RPlusW term1 _ term2 -> do
+      results <- mapM recurseFun [term1, term2]
+      return $ combinator results
+    Law.RCase term caseStms -> do
+      results <- mapM recurseFun (term:innerTerms)
+      return $ combinator results
+      where
+        innerTerms = catMaybes $ map getInnerTerm caseStms
+        getInnerTerm (Law.CSAlts _) = Nothing
+        getInnerTerm (Law.CSPatterns _ term) = Just term
+        getInnerTerm (Law.CSConcrete _ term) = Just term
+    Law.RAddConst _ term -> recurseFun term
+    Law.RIsZero term -> recurseFun term
+    Law.RSeq term1 term2 -> do
+      results <- mapM recurseFun [term1, term2]
+      return $ combinator results

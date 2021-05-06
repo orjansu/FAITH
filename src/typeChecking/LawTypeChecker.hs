@@ -361,10 +361,14 @@ getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 -- -Metavariables in binding positions are not copied
 -- -Case statements are either
 --   {alts, [Concrete]}
---   {pat_i -> C[N_i]} or {pat_i -> M}
+--   {pat_i -> C[N_i]} or {pat_i -> M} - NOTE that C[N_i] may not contain
+--      multiple vectorized expressions (i.e. N_i and N_j), so no nesting
+--      of vectorized case statements.
 --   {[Concrete]}
 --   (The c_i ys_i -> N_i is just for reduction, and I think that I will
 --   implement reduction manually)
+-- NOTE: new checks:
+-- - not (... isfresh ...) and not (... areFresh ...) are not supported.
 checkLaw :: T.Law -> CheckM ()
 checkLaw (T.DLaw _name term1 _imprel term2 _sidecond) = do
   mapM checkTerm [term1, term2]

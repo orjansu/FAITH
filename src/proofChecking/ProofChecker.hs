@@ -24,7 +24,7 @@ import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
-import Substitution (applySubstitution)
+import Substitution (applySubstitution, checkSideCondition)
 import OtherUtils (applyOnLawSubterms)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
@@ -85,7 +85,7 @@ checkStep globalImpRel
   case command of
     T.AlphaEquiv -> checkAlphaEquiv term1 term2
     T.Law context
-          (Law.DLaw lawName lawLHS lawImpRel lawRHS _sideCond)
+          (Law.DLaw lawName lawLHS lawImpRel lawRHS sideCond)
           substitutions -> do
       assert (lawImpRel == localImpRel)
         $ "The improvement relation of the law must be the same as the "
@@ -101,10 +101,17 @@ checkStep globalImpRel
                                          (T.SContext context)
                                          substitutions
           forbiddenNames = varFreeVars
-      substToLHS <- applySubstitution lawLHSctx substitutionsWctx forbiddenNames
+      checkSideCondition sideCond substitutionsWctx
+      substToLHS <- applySubstitution lawLHSctx
+                                      sideCond
+                                      substitutionsWctx
+                                      forbiddenNames
                                       varFreeVars
       checkRuleAlphaEquiv lawLHSctx term1 substToLHS
-      substToRHS <- applySubstitution lawRHSctx substitutionsWctx forbiddenNames
+      substToRHS <- applySubstitution lawRHSctx
+                                      sideCond
+                                      substitutionsWctx
+                                      forbiddenNames
                                       varFreeVars
       checkRuleAlphaEquiv lawRHSctx substToRHS term2
 

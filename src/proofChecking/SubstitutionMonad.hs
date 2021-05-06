@@ -12,6 +12,7 @@ module SubstitutionMonad (runSubstM
                          , getSubstitute
                          , applyContext
                          , getCtxFreeVars
+                         , isFresh
                          , SubstM) where
 
 import qualified Data.Map.Strict as Map -- TODO fundera om lat är bättre
@@ -31,7 +32,7 @@ import Data.List (zip4, unzip4, intersperse)
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (getBoundVariables, numHoles, getFreeVariables
-                       , checkBoundVariablesDistinct)
+                       , checkBoundVariablesDistinct, getAllVariables)
 import OtherUtils (applyAndRebuildM)
 
 type IsUsed = Bool
@@ -106,6 +107,86 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
     toGeneralContext (T.SValueContext ctx) = ctx
     toGeneralContext (T.SReduction red) = T.TRedWeight 1 red
     toGeneralContext _ = error "Internal: Contexts not correctly filtered"
+
+-- | Checks whether the variable corresponding to a metavariable is among the
+-- free or bound variables of the terms and other things that are substituted,
+-- except for the variable itself.
+-- NOTE: the correctness of this check
+-- depends on that all the fresh variables are added to the set of forbidden
+-- names before substitution into the law term (see the use of
+-- getFreshVariables in applySubstitution) and that all substitutions are
+-- provided (see check in the typechecker).
+isFresh :: String -> SubstM Bool
+isFresh metax = do
+  T.SVar x <- getSubstitute metax
+  substMap <- gets substitutions
+  return $ all (x `isFreshWrt` ) $ map fst $ Map.elems substMap
+  where
+  isFreshWrt :: String -> T.Substitute -> Bool
+  isFreshWrt x (T.SLetBindings letBindings) =
+    let dummy = T.TLet letBindings (T.TNum 1)
+    in x `Set.notMember` getAllVariables dummy
+  isFreshWrt x (T.SValue term) = x `Set.notMember` getAllVariables term
+  isFreshWrt x (T.SContext term) = x `Set.notMember` getAllVariables term
+  isFreshWrt x (T.SIntegerVar _) = True
+  isFreshWrt x (T.SVar _) = True
+    --Because we do not check when x is explicitly substituted.
+  isFreshWrt x (T.SVarVect vars) = x `Set.notMember` Set.fromList vars
+  isFreshWrt x (T.SValueContext term) = x `Set.notMember` getAllVariables term
+  isFreshWrt x (T.SReduction red) =
+    let dummy = (T.TRedWeight 1 red)
+    in x `Set.notMember` getAllVariables dummy
+  isFreshWrt x (T.SVarSet varSet) = x `Set.notMember` varSet
+  isFreshWrt x (T.STerm term) = x `Set.notMember` getAllVariables term
+  isFreshWrt x (T.STerms terms) =
+    all (\t -> x `Set.notMember` getAllVariables t) terms
+  isFreshWrt x (T.SPatterns pat_i) =
+    let (constructors, args) = unzip pat_i
+        argSet = Set.fromList $ concat args
+    in x `Set.notMember` argSet
+  isFreshWrt x (T.SCaseStms branches) =
+    let (constructors, args, terms) = unzip3 branches
+        argSet = Set.fromList $ concat args
+        xFreshWrtArgs = x `Set.notMember` argSet
+        xFreshWrtTerms = all (\t -> x `Set.notMember` getAllVariables t) terms
+    in xFreshWrtArgs && xFreshWrtTerms
+  isFreshWrt x (T.SConstructorName _) = True
+
+-- | the same as isFresh, but for a metavariable corresponding to a vector
+-- of metavariables.
+areFresh :: String -> SubstM Bool
+areFresh metaxs = do
+  T.SVarVect xsVect <- getSubstitute metaxs
+  let xs = Set.fromList xsVect
+  substMap <- gets substitutions
+  let substWithoutxs = Map.delete metaxs substMap
+  return $ all (xs `areFreshWrt` ) $ map fst $ Map.elems substWithoutxs
+  where
+    areFreshWrt xs (T.SLetBindings letBindings) =
+      let dummy = T.TLet letBindings (T.TNum 1)
+      in xs `Set.disjoint` getAllVariables dummy
+    areFreshWrt xs (T.SValue term) = xs `Set.disjoint` getAllVariables term
+    areFreshWrt xs (T.SContext term) = xs `Set.disjoint` getAllVariables term
+    areFreshWrt xs (T.SIntegerVar _) = True
+    areFreshWrt xs (T.SVar var) = var `Set.notMember` xs
+    areFreshWrt xs (T.SVarVect ys) = xs `Set.disjoint` Set.fromList ys
+    areFreshWrt xs (T.SValueContext term) =
+      xs `Set.disjoint` getAllVariables term
+    areFreshWrt xs (T.SReduction red) =
+      let dummy = T.TRedWeight 1 red
+      in xs `Set.disjoint` getAllVariables dummy
+    areFreshWrt xs (T.SVarSet varSet) = xs `Set.disjoint` varSet
+    areFreshWrt xs (T.STerm term) = xs `Set.disjoint` getAllVariables term
+    areFreshWrt xs (T.STerms terms) =
+      all (\t -> xs `Set.disjoint` getAllVariables t) terms
+    areFreshWrt xs (T.SPatterns patterns) =
+      let (constructors, args) = unzip patterns
+          argSet = Set.fromList $ concat args
+      in xs `Set.disjoint` argSet
+    areFreshWrt xs (T.SCaseStms branches) =
+      let dummy = T.TRedWeight 1 (T.RCase (T.TNum 1) branches)
+      in xs `Set.disjoint` getAllVariables dummy
+    areFreshWrt xs (T.SConstructorName _) = True
 
 prepareSubstitutions :: HasCallStack => Map.Map String T.Substitute
                         -> Map.Map String (T.Substitute, IsUsed)

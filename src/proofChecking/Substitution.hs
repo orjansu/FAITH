@@ -3,11 +3,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module Substitution (applySubstitution) where
+module Substitution (applySubstitution, checkSideCondition) where
 
 import Data.Text (pack, Text)
 import Data.List (intersperse, unzip4, zip4)
 import Data.List.Extra (replace)
+import Maybes (firstJust, firstJusts)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
@@ -27,7 +28,7 @@ import ToLocallyNameless (toLocallyNameless)
 import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
                           , getCtxFreeVars)
 import ShowLaw (showLaw)
-import OtherUtils (applyOnLawSubterms, applyAndRebuild)
+import OtherUtils (applyOnLawSubterms, applyOnLawSubtermsM, applyAndRebuild)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -39,16 +40,20 @@ import OtherUtils (applyOnLawSubterms, applyAndRebuild)
 -- Fails if sigma doesn't contain substitutions for all meta-variables in M.
 applySubstitution :: HasCallStack =>
                   Law.Term
+                  -> Law.SideCond
                   -> T.Substitutions
                   -> Set.Set String
                   -> Set.Set String
                   -> CheckM T.Term
-applySubstitution law substitutions forbiddenNames1 freeVars = do
+applySubstitution law sideCond substitutions forbiddenNames1 freeVars = do
   Log.logInfoN . pack $ "applying substitution {"++showSubstitutions++"}"
   Log.logInfoN . pack $ "to law term"++showLaw law
   Log.logInfoN . pack $ "With forbidden names "++ show forbiddenNames1
   let boundSubstVars = getBoundSubstVars substitutions law
-      forbiddenNames2 = forbiddenNames1 `Set.union` boundSubstVars
+      freshVars = getFreshVariables substitutions sideCond
+      forbiddenNames2 = forbiddenNames1
+                          `Set.union` boundSubstVars
+                          `Set.union` freshVars
   checkSubstBVDistinct substitutions forbiddenNames2
   res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM (-1) law
   let (finalTerm, forbiddenNames3) = res
@@ -68,7 +73,6 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
   --  ++"S' = "++show forbiddenNames3
   --TODO: change to a better assertion, since things will be renamed in vain
   --      when you get terms for getting their free variables.
-
   return finalTerm
   where
     showSubstitutions = concat $
@@ -101,6 +105,24 @@ applySubstitution law substitutions forbiddenNames1 freeVars = do
             let vars' = concat $ intersperse " " vars
             in constr++" "++vars'++" -> "++showTypedTerm term
       T.SConstructorName str -> str
+
+-- | Given a sidecondition and a set of substitutions (where all substitutions
+-- for the sidecondition are provided), the function checks if the
+-- sideconditions hold. NOTE: since the only involvement of terms in the side-
+-- conditions concern the names of variables in let-bindings and the names of
+-- free variables, this function does not have to take into account the bound
+-- variables and doesn't have to make sure that bound variables do not clash.
+-- therefore, no forbidden names are provided, and the set of forbidden names
+-- given to the substitution monad is empty for this reason. If this function
+-- is expanded to include conditions that also concern the bound variables in
+-- some way, this function (and possibly much else of the general approach)
+-- would need to be revised.
+checkSideCondition :: Law.SideCond -> T.Substitutions -> CheckM ()
+checkSideCondition Law.NoSideCond _ = return ()
+checkSideCondition (Law.WithSideCond boolTerm) substitutions = do
+  (res, _fv) <- runSubstM substitutions Set.empty $ evalBoolTerm boolTerm
+  assert (res == True) "The sideconditions must hold."
+
 
 -- | Checks that none of the substitutions has a bound variable that
 -- has a name that is forbidden (in the forbidden names) or that one bound
@@ -179,6 +201,32 @@ checkSubstBVDistinct substitutions forbiddenNames = do
             ++"variables."
           return $ set1 `Set.union` set2
 
+getFreshVariables :: T.Substitutions -> Law.SideCond -> Set.Set String
+getFreshVariables _ Law.NoSideCond = Set.empty
+getFreshVariables subst (Law.WithSideCond sideCond) = go sideCond
+  where
+  go (Law.BTSizeEq _ _) = Set.empty
+  go (Law.BTSetEq _ _) = Set.empty
+  go (Law.BTSubsetOf _ _) = Set.empty
+  go (Law.BTIn _ _) = Set.empty
+  go (Law.BTNot lBoolTerm) =
+    let fresh = go lBoolTerm
+    in if fresh == Set.empty
+        then Set.empty
+        else error $ "not (... is fresh ...) and not (... are fresh ...) is "
+          ++"not supported and got all the way to substitution."
+  go (Law.BTLE _ _) = Set.empty
+  go (Law.BTGE _ _) = Set.empty
+  go (Law.BTGT _ _) = Set.empty
+  go (Law.BTIsFresh lVar) = case Map.lookup lVar subst of
+    Just (T.SVar cVar) -> Set.singleton cVar
+    _ -> error $ "substitution for "++lVar++" not provided."
+  go (Law.BTAreFresh lVars) = case Map.lookup lVars subst of
+    Just (T.SVarVect cVars) -> Set.fromList cVars
+    _ -> error $ "substitution for "++lVars++" not provided."
+  go (Law.BTReducesTo _ _ _) = Set.empty
+  go (Law.BTAnd lBoolTerm1 lBoolTerm2) =
+    go lBoolTerm1 `Set.union` go lBoolTerm2
 
 -- | returns the variables that are substituted into a binding position,
 -- including possible binding vars in M in terms like {FV(M)}d^N.
@@ -477,3 +525,92 @@ substituteFor term y x = do
             var' = if var == x then y else var
         in T.TRedWeight rw (T.RApp term' var')
       _ -> applyAndRebuild term (substitute y x)
+
+-- | NOTE: The correctness of the  implementation of BTIsFresh and BTAreFresh
+-- depends on that all the fresh variables are added to the set of forbidden
+-- names before substitution into the law term (see the use of
+-- getFreshVariables in applySubstitution) and that all substitutions are
+-- provided (see check in the typechecker).
+evalBoolTerm :: Law.BoolTerm -> SubstM Bool
+evalBoolTerm (Law.BTSizeEq metaG1 metaG2) = do
+  T.SLetBindings concreteG1 <- getSubstitute metaG1
+  T.SLetBindings concreteG2 <- getSubstitute metaG2
+  return $ length concreteG1 == length concreteG2
+evalBoolTerm (Law.BTSetEq lVarSet1 lVarSet2) = do
+  cVarSet1 <- evalPossiblyVectorizedVarSet lVarSet1
+  cVarSet2 <- evalPossiblyVectorizedVarSet lVarSet2
+  return $ cVarSet1 == cVarSet2
+evalBoolTerm (Law.BTSubsetOf varSet1 varSet2) = do
+  cVarSet1 <- evalPossiblyVectorizedVarSet varSet1
+  cVarSet2 <- evalPossiblyVectorizedVarSet varSet2
+  return $ cVarSet1 `Set.isSubsetOf` cVarSet2
+evalBoolTerm (Law.BTIn lVar lVarSet) = do
+  T.SVar cVar <- getSubstitute lVar
+  cVarSet <- evalPossiblyVectorizedVarSet lVarSet
+  return $ cVar `Set.member` cVarSet
+evalBoolTerm (Law.BTNot lBoolTerm) = do
+  cBoolTerm <- evalBoolTerm lBoolTerm
+  return $ not cBoolTerm
+evalBoolTerm (Law.BTLE lIntExpr1 lIntExpr2) = do
+  res1 <- substituteAndEvalIntExpr lIntExpr1
+  res2 <- substituteAndEvalIntExpr lIntExpr2
+  return $ res1 <= res2
+evalBoolTerm (Law.BTGE lIntExpr1 lIntExpr2) = do
+  res1 <- substituteAndEvalIntExpr lIntExpr1
+  res2 <- substituteAndEvalIntExpr lIntExpr2
+  return $ res1 >= res2
+evalBoolTerm (Law.BTGT lIntExpr1 lIntExpr2) = do
+  res1 <- substituteAndEvalIntExpr lIntExpr1
+  res2 <- substituteAndEvalIntExpr lIntExpr2
+  return $ res1 > res2
+--evalBoolTerm (Law.BTIsFresh Var) =
+--evalBoolTerm (Law.BTAreFresh String) =
+--evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
+--  T.SValue value <- getSubstitute lValueStr
+--  result <- reduce
+evalBoolTerm (Law.BTAnd lBoolTerm1 lBoolTerm2) = do
+  b1 <- evalBoolTerm lBoolTerm1
+  b2 <- evalBoolTerm lBoolTerm2
+  return $ b1 && b2
+
+evalPossiblyVectorizedVarSet :: Law.VarSet -> SubstM (Set.Set String)
+evalPossiblyVectorizedVarSet lVarSet = case lVarSet of
+  Law.VSConcrete _ -> substituteAndEvalVarSet (-1) lVarSet
+  Law.VSMetaVar _ -> substituteAndEvalVarSet (-1) lVarSet
+  Law.VSVectMeta _ -> substituteAndEvalVarSet (-1) lVarSet
+  Law.VSFreeVars varContainer -> case varContainer of
+    Law.VCTerm term -> do
+      lenIfVect <- getLenIfVectorized term
+      case lenIfVect of
+        Just len -> do
+          let tupledEval = (\(i,vs) -> substituteAndEvalVarSet i vs)
+          sets <- mapM tupledEval $ zip [0..len-1] $ repeat lVarSet
+          return $ Set.unions sets
+        Nothing -> substituteAndEvalVarSet (-1) lVarSet
+      where
+        getLenIfVectorized :: Law.Term -> SubstM (Maybe Int)
+        getLenIfVectorized = \case
+          Law.TMVTerms metaN_i -> do
+            T.STerms concreteN_i <- getSubstitute metaN_i
+            return $ Just $ length concreteN_i
+          Law.TDummyBinds (Law.VSFreeVars (Law.VCTerm fvTerm)) term -> do
+            mlfvt <- getLenIfVectorized fvTerm
+            mlt <- getLenIfVectorized term
+            return $ firstJust mlfvt mlt
+          otherTerm -> applyOnLawSubtermsM otherTerm
+                                           Nothing
+                                           getLenIfVectorized
+                                           firstJusts
+
+    Law.VCMetaVarContext _ -> substituteAndEvalVarSet (-1) lVarSet
+    Law.VCMetaVarRed _ -> substituteAndEvalVarSet (-1) lVarSet
+    Law.VCValueContext _ -> substituteAndEvalVarSet (-1) lVarSet
+  Law.VSDomain _ -> substituteAndEvalVarSet (-1) lVarSet
+  Law.VSUnion lVarSet1 lVarSet2 -> do
+    cVarSet1 <- evalPossiblyVectorizedVarSet lVarSet1
+    cVarSet2 <- evalPossiblyVectorizedVarSet lVarSet2
+    return $ cVarSet1 `Set.union` cVarSet2
+  Law.VSDifference lVarSet1 lVarSet2 -> do
+    cVarSet1 <- evalPossiblyVectorizedVarSet lVarSet1
+    cVarSet2 <- evalPossiblyVectorizedVarSet lVarSet2
+    return $ cVarSet1 Set.\\ cVarSet2
