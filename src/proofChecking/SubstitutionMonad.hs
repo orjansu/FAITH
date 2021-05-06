@@ -108,60 +108,30 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
     toGeneralContext (T.SReduction red) = T.TRedWeight 1 red
     toGeneralContext _ = error "Internal: Contexts not correctly filtered"
 
--- | Checks whether the variable corresponding to a metavariable is among the
+-- | Checks whether the variable or variable vector corresponding to the
+-- metavariable provided is among the
 -- free or bound variables of the terms and other things that are substituted,
--- except for the variable itself.
+-- except for the variable(s) itself (themselves).
 -- NOTE: the correctness of this check
 -- depends on that all the fresh variables are added to the set of forbidden
 -- names before substitution into the law term (see the use of
 -- getFreshVariables in applySubstitution) and that all substitutions are
 -- provided (see check in the typechecker).
-isFresh :: String -> SubstM Bool
-isFresh metax = do
-  T.SVar x <- getSubstitute metax
+isFresh :: HasCallStack => String -> SubstM Bool
+isFresh metaVar = do
+  xs <- getFreshCheckSet
   substMap <- gets substitutions
-  return $ all (x `isFreshWrt` ) $ map fst $ Map.elems substMap
+  let substWithoutMV = Map.delete metaVar substMap
+  return $ all (xs `areFreshWrt` ) $ map fst $ Map.elems substWithoutMV
   where
-  isFreshWrt :: String -> T.Substitute -> Bool
-  isFreshWrt x (T.SLetBindings letBindings) =
-    let dummy = T.TLet letBindings (T.TNum 1)
-    in x `Set.notMember` getAllVariables dummy
-  isFreshWrt x (T.SValue term) = x `Set.notMember` getAllVariables term
-  isFreshWrt x (T.SContext term) = x `Set.notMember` getAllVariables term
-  isFreshWrt x (T.SIntegerVar _) = True
-  isFreshWrt x (T.SVar _) = True
-    --Because we do not check when x is explicitly substituted.
-  isFreshWrt x (T.SVarVect vars) = x `Set.notMember` Set.fromList vars
-  isFreshWrt x (T.SValueContext term) = x `Set.notMember` getAllVariables term
-  isFreshWrt x (T.SReduction red) =
-    let dummy = (T.TRedWeight 1 red)
-    in x `Set.notMember` getAllVariables dummy
-  isFreshWrt x (T.SVarSet varSet) = x `Set.notMember` varSet
-  isFreshWrt x (T.STerm term) = x `Set.notMember` getAllVariables term
-  isFreshWrt x (T.STerms terms) =
-    all (\t -> x `Set.notMember` getAllVariables t) terms
-  isFreshWrt x (T.SPatterns pat_i) =
-    let (constructors, args) = unzip pat_i
-        argSet = Set.fromList $ concat args
-    in x `Set.notMember` argSet
-  isFreshWrt x (T.SCaseStms branches) =
-    let (constructors, args, terms) = unzip3 branches
-        argSet = Set.fromList $ concat args
-        xFreshWrtArgs = x `Set.notMember` argSet
-        xFreshWrtTerms = all (\t -> x `Set.notMember` getAllVariables t) terms
-    in xFreshWrtArgs && xFreshWrtTerms
-  isFreshWrt x (T.SConstructorName _) = True
+    getFreshCheckSet = do
+      substitute <- getSubstitute metaVar
+      case substitute of
+        T.SVar x -> return $ Set.singleton x
+        T.SVarVect xs -> return $ Set.fromList xs
+        _ -> internalException $ metaVar++" does not correspond to a variable "
+              ++"or a variable list"
 
--- | the same as isFresh, but for a metavariable corresponding to a vector
--- of metavariables.
-areFresh :: String -> SubstM Bool
-areFresh metaxs = do
-  T.SVarVect xsVect <- getSubstitute metaxs
-  let xs = Set.fromList xsVect
-  substMap <- gets substitutions
-  let substWithoutxs = Map.delete metaxs substMap
-  return $ all (xs `areFreshWrt` ) $ map fst $ Map.elems substWithoutxs
-  where
     areFreshWrt xs (T.SLetBindings letBindings) =
       let dummy = T.TLet letBindings (T.TNum 1)
       in xs `Set.disjoint` getAllVariables dummy

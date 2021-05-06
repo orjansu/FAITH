@@ -26,7 +26,7 @@ import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
-                          , getCtxFreeVars)
+                          , getCtxFreeVars, isFresh)
 import ShowLaw (showLaw)
 import OtherUtils (applyOnLawSubterms, applyOnLawSubtermsM, applyAndRebuild)
 
@@ -563,8 +563,8 @@ evalBoolTerm (Law.BTGT lIntExpr1 lIntExpr2) = do
   res1 <- substituteAndEvalIntExpr lIntExpr1
   res2 <- substituteAndEvalIntExpr lIntExpr2
   return $ res1 > res2
---evalBoolTerm (Law.BTIsFresh Var) =
---evalBoolTerm (Law.BTAreFresh String) =
+evalBoolTerm (Law.BTIsFresh x) = isFresh x
+evalBoolTerm (Law.BTAreFresh xs) = isFresh xs
 --evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
 --  T.SValue value <- getSubstitute lValueStr
 --  result <- reduce
