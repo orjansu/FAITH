@@ -83,7 +83,7 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
   where
     addContextBVToForbiddenNames =
       mapM addBVToForbiddenNames
-        $ map (\(T.SContext ctx) -> ctx)
+        $ map toGeneralContext
         $ Map.elems
         $ Map.filter isContext substSimpleMap
     isContext :: T.Substitute -> Bool
@@ -101,6 +101,11 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
     isContext (T.SPatterns _)        = False
     isContext (T.SCaseStms _)        = False
     isContext (T.SConstructorName _) = False
+
+    toGeneralContext (T.SContext ctx) = ctx
+    toGeneralContext (T.SValueContext ctx) = ctx
+    toGeneralContext (T.SReduction red) = T.TRedWeight 1 red
+    toGeneralContext _ = error "Internal: Contexts not correctly filtered"
 
 prepareSubstitutions :: HasCallStack => Map.Map String T.Substitute
                         -> Map.Map String (T.Substitute, IsUsed)
@@ -392,6 +397,16 @@ renameNeededMonadic = \case
                 t1' <- renameNeededMonadic t1
                 t2' <- renameNeededMonadic t2
                 return $ T.RPlusWeight t1' rw2 t2'
+              T.RAddConst integer term -> do
+                term' <- renameNeededMonadic term
+                return $ T.RAddConst integer term'
+              T.RIsZero term -> do
+                term' <- renameNeededMonadic term
+                return $ T.RIsZero term'
+              T.RSeq term1 term2 -> do
+                term1' <- renameNeededMonadic term1
+                term2' <- renameNeededMonadic term2
+                return $ T.RSeq term1' term2'
     return $ T.TRedWeight rw1 red2
 
 
