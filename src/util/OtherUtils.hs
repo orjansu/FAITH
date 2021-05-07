@@ -6,6 +6,8 @@ module OtherUtils ( applyAndRebuild
                   , filterNoise
                   , applyOnLawSubterms
                   , applyOnLawSubtermsM
+                  , applyOnSubterms
+                  , applyOnSubtermsM
                   , distinct) where
 
 import Control.Monad.Except (MonadError, throwError)
@@ -147,6 +149,45 @@ applyOnSubterms bigTerm baseValue recurseFun combinator = case bigTerm of
     T.RAddConst _ term -> recurseFun term
     T.RIsZero term -> recurseFun term
     T.RSeq term1 term2 -> combinator $ map recurseFun [term1, term2]
+
+-- | same as applyOnSubterms, but for a monadic function.
+applyOnSubtermsM :: (Monad m) =>
+                     T.Term
+                     -> b
+                     -> (T.Term -> m b)
+                     -> ([b] -> b)
+                     -> m b
+applyOnSubtermsM bigTerm baseValue recurseFun combinator = case bigTerm of
+  T.TNonTerminating -> return baseValue
+  T.TVar _ -> return baseValue
+  T.TNum _ -> return baseValue
+  T.TConstructor _ _ -> return baseValue
+  T.TLam _ term -> recurseFun term
+  T.THole -> return baseValue
+  T.TLet letBindings mainTerm ->
+    let (_, _, _, innerTerms) = unzip4 letBindings
+    in do
+      results <- mapM recurseFun (mainTerm:innerTerms)
+      return $ combinator results
+  T.TDummyBinds _ term -> recurseFun term
+  T.TStackSpikes _ term -> recurseFun term
+  T.THeapSpikes _ term -> recurseFun term
+  T.TRedWeight _ red -> case red of
+    T.RApp term _ -> recurseFun term
+    T.RCase mainTerm caseStms ->
+      let (_, _, innerTerms) = unzip3 caseStms
+      in do
+        results <- mapM recurseFun (mainTerm:innerTerms)
+        return $ combinator results
+    T.RPlusWeight term1 _ term2 -> do
+      results <- mapM recurseFun [term1, term2]
+      return $ combinator results
+    T.RAddConst _ term -> recurseFun term
+    T.RIsZero term -> recurseFun term
+    T.RSeq term1 term2 -> do
+      results <- mapM recurseFun [term1, term2]
+      return $ combinator results
+
 
 -- | same as applyOnSubterms, but for laws. Does not apply the recursive case
 -- to the term that may be inside the VarSet of the TDummyBinds.

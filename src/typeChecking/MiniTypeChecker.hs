@@ -653,12 +653,11 @@ checkArgumentTerm term = do
 checkAllSubstitutionsProvided ::
   (MonadError String m, Log.MonadLogger m, HasCallStack) =>
   Law.Law -> T.Substitutions -> m ()
-checkAllSubstitutionsProvided (Law.DLaw _name term1 _impRel term2 _sideCond)
+checkAllSubstitutionsProvided law
                               substMap = do
-  let metaVars1 = getAllMetaVars term1
-      metaVars2 = getAllMetaVars term2
+  let metaVars = getAllMetaVars law
       substitutedVars = Map.keysSet substMap
-  assert ((metaVars1 `Set.union` metaVars2) == substitutedVars)
+  assert (metaVars == substitutedVars)
     "Currently, you need to specify all substitutions."
 
 isReductionContext :: T.Term -> Bool
