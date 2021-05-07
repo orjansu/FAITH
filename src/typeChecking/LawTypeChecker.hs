@@ -16,7 +16,7 @@ import Control.Monad.Except (throwError, MonadError)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
-import LanguageLogic (trueName, falseName)
+import Common (trueName, falseName)
 
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'

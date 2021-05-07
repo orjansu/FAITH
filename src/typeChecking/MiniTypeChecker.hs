@@ -36,7 +36,7 @@ import TermCorrectness (checkTypedTerm, numHoles, checkBoundVariablesDistinct
 import ToLocallyNameless (toLocallyNameless)
 import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport
                   , throwCallstackError)
-import LanguageLogic (nilName, consName, trueName, falseName)
+import Common (nilName, consName, trueName, falseName)
 import OtherUtils (distinct)
 
 data MySt = MkSt { letBindings :: Map.Map String T.LetBindings

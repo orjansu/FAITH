@@ -2,16 +2,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module LanguageLogic (impRelImplies
-                     , nilName
-                     , consName
-                     , trueName
-                     , falseName
                      , reduce) where
 
 {- This file contains logic specific to space improvement theory. It does
 however not contain the logic for the binding structure. This is handled in the
 other files. It might be that these functions might be implemented as parsed
 in the laws file later.
+note that the name for true, false, cons and nil
+are in Common.hs for inheritance reasons.
 -}
 
 import qualified Control.Monad.Logger as Log
@@ -27,6 +25,7 @@ import CheckMonad (throwCallstackError, assert, internalException)
 import TermCorrectness (isValue)
 import OtherUtils (distinct)
 import ShowTypedTerm (showTypedTerm)
+import Common (trueName, falseName)
 
 class ImpRelRepresentation a where
   -- | If given two improvement relations I1 ans I2 (<~>, <~~>, |~>, |~~>, =def=
@@ -63,11 +62,6 @@ instance ImpRelRepresentation UT.ImpRel where
   impRelImplies UT.WeakCostEquiv UT.StrongCostEquiv = False
   impRelImplies UT.WeakCostEquiv UT.WeakImprovementLR = True
   impRelImplies _ _ = False
-
-nilName = "[]"
-consName = "(:)"
-trueName = "True"
-falseName = "False"
 
 -- | given R and V, returns N such that R[V] ~~> N, where ~~> is reduction.
 -- R is a reduction, since the weight is needed to make it into

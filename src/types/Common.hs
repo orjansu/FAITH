@@ -27,3 +27,8 @@ instance C.Show ImpRel where
   show WeakImprovementLR = "|~~>"
   show StrongCostEquiv = "<~>"
   show WeakCostEquiv = "<~~>"
+
+nilName = "[]"
+consName = "(:)"
+trueName = "True"
+falseName = "False"

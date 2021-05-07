@@ -13,6 +13,7 @@ import PrintSie                 ( printTree, Print )
 import qualified MiniTypedAST as T
 import qualified AbsSie as UT
 import OtherUtils (filterNoise)
+import Common (consName)
 
 showTypedTerm :: (Convertible a, Print (UntypedVersion a)) => a -> String
 showTypedTerm = filterNoise . printTree . toUntyped
@@ -23,11 +24,19 @@ class Convertible a where
 
 instance Convertible T.Term where
   type UntypedVersion T.Term = UT.Term
+  toUntyped (T.TNonTerminating) = UT.TNonTerminating
   toUntyped (T.TVar var) =  UT.TVar $ UT.DVar $ UT.Ident var
   toUntyped (T.TNum integer) = UT.TNum integer
   toUntyped (T.TLam var term ) = UT.TLam (UT.DVar (UT.Ident var))
                                          (toUntyped term)
   toUntyped (T.THole) = UT.THole
+  toUntyped (T.TConstructor name args) = UT.TConstructor utCons
+    where
+      utCons = case args of
+        [] ->  UT.CGeneralNoArgs $ UT.ConstructorName name
+        a:as:[] | name == consName ->
+          UT.CCons (toUntypedVar a) (toUntypedVar as)
+
   toUntyped (T.TLet letBindings term) = UT.TLet (toUntyped letBindings)
                                              (toUntyped term)
   toUntyped (T.TDummyBinds varSet term) =
