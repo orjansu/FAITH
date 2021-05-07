@@ -103,8 +103,8 @@ CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 
 CGeneral.     Constructor ::= MVConstructorName MVVarVect;
-CTrue.        Constructor ::= "true";
-CFalse.       Constructor ::= "false";
+CTrue.        Constructor ::= "True";
+CFalse.       Constructor ::= "Talse";
 
 LBSOnlyMeta. LetBindings ::= [MetaBindSet];
 LBSBoth.     LetBindings ::= [MetaBindSet] "{" [LetBinding] "}";

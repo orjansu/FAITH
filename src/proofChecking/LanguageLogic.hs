@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module LanguageLogic (impRelImplies
                      , nilName
                      , consName
                      , trueName
-                     , falseName) where
+                     , falseName
+                     , reduce) where
 
 {- This file contains logic specific to space improvement theory. It does
 however not contain the logic for the binding structure. This is handled in the
@@ -12,8 +14,19 @@ other files. It might be that these functions might be implemented as parsed
 in the laws file later.
 -}
 
+import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack)
+import Control.Monad.Except (MonadError)
+import Data.List (find, intersperse)
+
 import qualified Common as Com
 import qualified AbsSie as UT
+import qualified MiniTypedAST as T
+import TermUtils (substituteFor)
+import CheckMonad (throwCallstackError, assert, internalException)
+import TermCorrectness (isValue)
+import OtherUtils (distinct)
+import ShowTypedTerm (showTypedTerm)
 
 class ImpRelRepresentation a where
   -- | If given two improvement relations I1 ans I2 (<~>, <~~>, |~>, |~~>, =def=
@@ -53,5 +66,42 @@ instance ImpRelRepresentation UT.ImpRel where
 
 nilName = "[]"
 consName = "(:)"
-trueName = "true"
-falseName = "false"
+trueName = "True"
+falseName = "False"
+
+-- | given R and V, returns N such that R[V] ~~> N, where ~~> is reduction.
+-- R is a reduction, since the weight is needed to make it into
+-- a term, and that is not specific to the reduction.
+-- note that R must be a reduction context and V must be a value.
+-- the monad is for input checking in substitution.
+-- Throws an error if the reduction is unsuccessful.
+reduce :: (HasCallStack, Log.MonadLogger m, MonadError String m) =>
+          T.Red -> T.Term -> m T.Term
+reduce (T.RApp T.THole y) (T.TLam x term) = substituteFor term y x
+reduce (T.RCase T.THole branches) (T.TConstructor cj ys) =
+  case find (\(ci, _,_) -> ci == cj) branches of
+    Just (_cj, xsj, tMj) -> do
+      substituteAll tMj ys xsj
+      where
+        substituteAll term [] [] = return term
+        substituteAll term (y:ys) (x:xs) = do
+          term' <- substituteFor term y x
+          substituteAll term' ys xs
+        substituteAll _ _ _ = internalException
+                                "substitution params not same length."
+    Nothing -> throwCallstackError $ "reduction not possible. "++cj++" is "
+      ++"not one of the possible cases in "++names
+      where names = let (cNames, _, _) = unzip3 branches
+                    in concat $ intersperse ", " cNames
+reduce (T.RSeq T.THole tM) tV = do
+  assert (isValue tV)
+    $ "in seq V M, V must be a value. V="++showTypedTerm tV
+  return tM
+reduce (T.RPlusWeight T.THole w tN) (T.TNum m) =
+  return $ T.TRedWeight w (T.RAddConst m tN)
+reduce (T.RAddConst m T.THole) (T.TNum n) = return $ T.TNum (m + n)
+reduce (T.RIsZero T.THole) (T.TNum m)
+  | m == 0 = return $ T.TConstructor trueName []
+  | otherwise = return $ T.TConstructor falseName []
+reduce rR tV = throwCallstackError $ "Reduction failed. Type error in inputs "
+  ++"R = "++showTypedTerm (T.TRedWeight 1 rR)++" and V="++showTypedTerm tV

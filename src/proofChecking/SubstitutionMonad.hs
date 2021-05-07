@@ -13,6 +13,7 @@ module SubstitutionMonad (runSubstM
                          , applyContext
                          , getCtxFreeVars
                          , isFresh
+                         , liftCheckM
                          , SubstM) where
 
 import qualified Data.Map.Strict as Map -- TODO fundera om lat är bättre

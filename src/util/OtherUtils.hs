@@ -5,13 +5,15 @@ module OtherUtils ( applyAndRebuild
                   , applyAndRebuildM
                   , filterNoise
                   , applyOnLawSubterms
-                  , applyOnLawSubtermsM) where
+                  , applyOnLawSubtermsM
+                  , distinct) where
 
 import Control.Monad.Except (MonadError, throwError)
 import Data.List (zip4, unzip4)
 import qualified Control.Monad.Logger as Log
 import Data.List.Extra (replace)
 import Data.Maybe (catMaybes)
+import qualified Data.Set as Set
 
 import qualified MiniTypedAST as T
 import qualified TypedLawAST as Law
@@ -236,3 +238,9 @@ applyOnLawSubtermsM bigTerm baseValue recurseFun combinator = case bigTerm of
     Law.RSeq term1 term2 -> do
       results <- mapM recurseFun [term1, term2]
       return $ combinator results
+
+-- | could not actually find any utility function for this, except in
+-- Agda.Utils.List, which seems weird to import.
+distinct :: (Eq a) => [a] -> Bool
+distinct [] = True
+distinct (x:xs) = (x `notElem` xs) && distinct xs

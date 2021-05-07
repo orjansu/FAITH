@@ -26,6 +26,7 @@ import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
 import Substitution (applySubstitution, checkSideCondition)
 import OtherUtils (applyOnLawSubterms)
+import TermUtils (isAlphaEquiv, checkAlphaEquiv)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
 -- containing a log and error message if it is incorrect, and Nothing
@@ -114,34 +115,6 @@ checkStep globalImpRel
                                       forbiddenNames
                                       varFreeVars
       checkRuleAlphaEquiv lawRHSctx substToRHS term2
-
-class AlphaEq a where
-  isAlphaEquiv :: HasCallStack => a -> a -> CheckM Bool
-  checkAlphaEquiv :: HasCallStack => a -> a -> CheckM ()
-
-instance AlphaEq T.Term where
-  checkAlphaEquiv term1 term2 = do
-    Log.logInfoN . pack $ "Checking that M and N are alpha equivalent"
-    Log.logInfoN . pack $ "| where M = "++showTypedTerm term1
-    Log.logInfoN . pack $ "| and   N = "++showTypedTerm term2
-    Log.logInfoN . pack $ "| see debug output for details."
-    alphaEq <- isAlphaEquiv term1 term2
-    assert alphaEq $ "| The locally-nameless representation "
-      ++"of M and N should be equal"
-
-  isAlphaEquiv :: T.Term -> T.Term -> CheckM Bool
-  isAlphaEquiv term1 term2 | term1 == term2 = return True
-                           | otherwise = do
-    Log.logDebugN . pack $ "Determining wheter M and N are alpha equivalent,"
-    Log.logDebugN . pack $ "| where M = "++ showTypedTerm term1
-    Log.logDebugN . pack $ "| and   N = "++showTypedTerm term2
-    let (lnlTerm1, _) = toLocallyNameless term1
-    let (lnlTerm2, _) = toLocallyNameless term2
-    Log.logDebugN . pack $ "| Locally nameless representation of M is "
-      ++showLNL lnlTerm1
-    Log.logDebugN . pack $ "| Locally nameless representation of N is "
-      ++ showLNL lnlTerm2
-    return (lnlTerm1 == lnlTerm2)
 
 -- | Given the law term L and two terms M and N,
 -- this function checks alpha equivalance of M and N. If L contains let-terms

@@ -3,11 +3,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module Substitution (applySubstitution, checkSideCondition) where
+module Substitution (applySubstitution, checkSideCondition, substituteFor) where
 
 import Data.Text (pack, Text)
 import Data.List (intersperse, unzip4, zip4)
-import Data.List.Extra (replace)
 import Maybes (firstJust, firstJusts)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -26,9 +25,11 @@ import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
-                          , getCtxFreeVars, isFresh)
+                          , getCtxFreeVars, isFresh, liftCheckM)
 import ShowLaw (showLaw)
 import OtherUtils (applyOnLawSubterms, applyOnLawSubtermsM, applyAndRebuild)
+import LanguageLogic (reduce)
+import TermUtils (substituteFor, isAlphaEquiv)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -496,36 +497,6 @@ substituteAndEvalVarSet index law = case law of
     varSet2 <- substituteAndEvalVarSet index lVarSet2
     return $ varSet1 Set.\\ varSet2
 
--- | given M y and x, returns M[y/x]
-substituteFor :: (HasCallStack, Log.MonadLogger m, MonadError String m) =>
-                 T.Term -> String -> String -> m T.Term
-substituteFor term y x = do
-  checkBoundVariablesDistinct term
-  assert (x `Set.member` getFreeVariables term)
-    "you may only substitute a free variable."
-  assert (y `Set.notMember` getBoundVariables term) $
-    "Currently, the system only supports M[y/x] if y is not in the bound "
-    ++"variables of M, for uniqueness of binding name reasons."
-  return $ substitute y x term
-  where
-    substitute y x term = case term of
-      T.TVar var | var == x -> T.TVar y
-                 | otherwise -> T.TVar var
-      T.TConstructor constrName vars ->
-        let vars' = replace [x] [y] vars
-        in T.TConstructor constrName vars'
-      T.TDummyBinds varSet term ->
-        let term' = substitute y x term
-            varSet' = if Set.member x varSet
-                        then Set.insert y $ Set.delete x varSet
-                        else varSet
-        in T.TDummyBinds varSet' term'
-      T.TRedWeight rw (T.RApp term var) ->
-        let term' = substitute y x term
-            var' = if var == x then y else var
-        in T.TRedWeight rw (T.RApp term' var')
-      _ -> applyAndRebuild term (substitute y x)
-
 -- | NOTE: The correctness of the  implementation of BTIsFresh and BTAreFresh
 -- depends on that all the fresh variables are added to the set of forbidden
 -- names before substitution into the law term (see the use of
@@ -565,9 +536,14 @@ evalBoolTerm (Law.BTGT lIntExpr1 lIntExpr2) = do
   return $ res1 > res2
 evalBoolTerm (Law.BTIsFresh x) = isFresh x
 evalBoolTerm (Law.BTAreFresh xs) = isFresh xs
---evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
---  T.SValue value <- getSubstitute lValueStr
---  result <- reduce
+evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
+  T.SValue value <- getSubstitute lValueStr
+  T.SReduction red <- getSubstitute lReductionStr
+  Log.logInfoN . pack $ "reducing R[V], where R="
+    ++showTypedTerm (T.TRedWeight 1 red)++" and V="++showTypedTerm value
+  result <- reduce red value
+  tTerm <- applyTermSubstM (-1) lTerm
+  liftCheckM $ result `isAlphaEquiv` tTerm
 evalBoolTerm (Law.BTAnd lBoolTerm1 lBoolTerm2) = do
   b1 <- evalBoolTerm lBoolTerm1
   b2 <- evalBoolTerm lBoolTerm2

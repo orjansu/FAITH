@@ -37,6 +37,7 @@ import ToLocallyNameless (toLocallyNameless)
 import CheckMonad (CheckM, runCheckM, assert, assertTerm, noSupport
                   , throwCallstackError)
 import LanguageLogic (nilName, consName, trueName, falseName)
+import OtherUtils (distinct)
 
 data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
                  , constructors :: Map.Map String Int
@@ -332,6 +333,7 @@ instance Transformable UT.CaseStm where
   type TransformedVersion UT.CaseStm = (String, [String], T.Term)
   transform (UT.CSConcrete constructor term) = do
     (name, args) <- transform constructor
+    assert (distinct args) "The arguments to a constructor should be distinct."
     tTerm <- transform term
     return (name, args, tTerm)
 

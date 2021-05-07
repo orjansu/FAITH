@@ -369,6 +369,8 @@ getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 --   implement reduction manually)
 -- NOTE: new checks:
 -- - not (... isfresh ...) and not (... areFresh ...) are not supported.
+-- - not (... ReducesTo ...) is not supported.
+-- - the N of R[V] ~~> N may not contain indexed expressions.
 checkLaw :: T.Law -> CheckM ()
 checkLaw (T.DLaw _name term1 _imprel term2 _sidecond) = do
   mapM checkTerm [term1, term2]

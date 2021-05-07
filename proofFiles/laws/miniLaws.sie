@@ -1,6 +1,5 @@
 -- This should contain all laws that are part of space improvement from Gustavsson and Sands' paper.
 
-
 -reduction: [w]^R[V] <~> [w]s^{X}d^N if (R[V] ~~> N) && (FV(R[V]) = FV({X}d^N));
 --the reduction ~~> is implemented in code. It will be in LanguageLogic.hs.
 -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
@@ -93,7 +92,7 @@
 -dummy-ref-algebra-2: let G in {X}d^M <~> [|G|]h^{X}d^(let G in M)
                                           if dom G subsetof FV(M);
 -dummy-ref-algebra-3: let G {x =[w,0]=V} in C[{x}d^M]
-<~> let G {x =[w,0]=V} in C[{FV(V)\\{x}}d^M];
+                  <~> let G {x =[w,0]=V} in C[{FV(V)\\{x}}d^M];
 -dummy-ref-algebra-4: [w]^R[{X}d^M] <~> [w]^R[M] if X subsetof FV(R);
 -dummy-ref-algebra-5: {}d^M <~> M;
 -dummy-ref-algebra-6: {X union Y}d^M <~> {X}d^M if Y subsetof FV(M);
@@ -103,7 +102,7 @@
 -dummy-ref-def: {xs}d^M =def= let {ys = xs} in M if ys are fresh;
 -dummy-bind-intro: let {x = M} in N <~~> let {z = @, x = {z}d^M} in N
   if z is fresh;
--stack-spike-def: [w]s^M =def= [w] case true of {true -> M};
+-stack-spike-def: [w]s^M =def= [w] case True of {True -> M};
 -heap-spike-def: [w]h^M =def= let {x=[1,w]= @} in {x}d^M if x is fresh;
 -stack-spike-intro: M <~~> [w]s^M;
 -heap-spike-intro: M <~~> [w]h^M;
