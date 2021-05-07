@@ -355,9 +355,10 @@ instance Transformable UT.MaybeRedWeight where
 instance Transformable UT.Constructor where
   type TransformedVersion UT.Constructor = (String, [String])
   transform = \case
-    UT.CGeneralWArgs (UT.ConstructorName name) vars
+    UT.CGeneralWArgs (UT.CapitalIdent name) vars
       -> checkConstructor name vars
-    UT.CGeneralNoArgs (UT.ConstructorName name) -> checkConstructor name []
+    UT.CGeneralNoArgs (UT.CapitalIdent name) -> checkConstructor name []
+    UT.CNil -> return (nilName, [])
     UT.CCons var1 var2 -> return $ (consName, [getVarName var1
                                               , getVarName var2])
     where
@@ -631,14 +632,22 @@ checkArg (UT.CAAssign assignee value) = case assignee of
             assert (numHoles dummyTerm == 0) "should not be a context"
             return $ Just (name, T.SCaseStms tCaseStms)
           _ -> throwError "Not a list of case statements"
-      UTLaw.MetaVarMVConstructorName (UTLaw.MVConstructorName name) ->
-        case value of
-          UT.CVConstructorName (UT.ConstructorName name) -> do
-            constructors <- gets constructors
-            case Map.lookup name constructors of
-              Just _ -> return $ Just (name, T.SConstructorName name)
-              Nothing -> throwError "Constructor not declared."
-          _ -> throwError "Not a constructor name."
+      UTLaw.MetaVarMVConstructorName (UTLaw.MVConstructorName name) -> do
+        cname <- getCName
+        constructors <- gets constructors
+        case Map.lookup name constructors of
+          Just _ -> return $ Just (name, T.SConstructorName name)
+          Nothing -> throwError "Constructor not declared."
+        where
+          getCName = case value of
+            UT.CVSubTerm
+              (UT.STTerm
+                (UT.TConstructor constructor)) -> case constructor of
+                  (UT.CGeneralNoArgs (UT.CapitalIdent cname)) -> return cname
+                  UT.CNil -> return nilName
+                  _ -> throwError "Not a constructor name."
+            UT.CVConsPre -> return consName
+            _ -> throwError "Not a constructor name."
     where
       logCheckArg name = Log.logInfoN . pack $ "Checking argument "++name
 

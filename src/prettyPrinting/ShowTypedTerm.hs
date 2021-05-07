@@ -112,9 +112,9 @@ toUntypedMaybeRW rw = UT.WithRedWeight $ toUntypedRedWeight rw
 
 toUTConstructor :: String -> [String] -> UT.Constructor
 toUTConstructor name args = case args of
-  [] ->  UT.CGeneralNoArgs $ UT.ConstructorName name
+  [] ->  UT.CGeneralNoArgs $ UT.CapitalIdent name
   a:as:[] | name == consName ->
     UT.CCons (toUntypedVar a) (toUntypedVar as)
   _ -> let utArgs = map toUntypedVar args
-           utName = UT.ConstructorName name
+           utName = UT.CapitalIdent name
        in UT.CGeneralWArgs utName utArgs
