@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module ToPrettyLNL (showLNL) where
 

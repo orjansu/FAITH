@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module ShowLaw (showLaw) where
 

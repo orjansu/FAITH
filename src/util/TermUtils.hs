@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module TermUtils (substituteFor, isAlphaEquiv, checkAlphaEquiv) where
 

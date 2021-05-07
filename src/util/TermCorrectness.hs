@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
--- {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 {-# LANGUAGE LambdaCase #-}
 
 module TermCorrectness where
