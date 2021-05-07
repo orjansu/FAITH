@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+--{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
 module ShowLaw (showLaw) where
 
@@ -14,8 +14,9 @@ import qualified TypedLawAST as T
 import qualified AbsSieLaws as UT
 import OtherUtils (filterNoise)
 
-showLaw :: (Convertible a, Print (UntypedVersion a)) => a -> String
-showLaw = filterNoise . printTree . toUntyped
+showLaw :: (Convertible a, Print (UntypedVersion a), Show a) => a -> String
+showLaw a = "ShowLaw not fully implemented. Raw show: "++show a
+  --filterNoise . printTree . toUntyped
 
 class Convertible a where
   type UntypedVersion a
@@ -29,8 +30,8 @@ instance Convertible T.Term where
                                                  (toUntyped term)
   toUntyped (T.TLet letBindings term) = UT.TLet (toUntyped letBindings)
                                                 (toUntyped term)
-  toUntyped (T.TDummyBinds (T.VSConcrete varSet) term) =
-    let utVarSet = UT.VSConcrete $ map toUntypedVar $ Set.toList varSet
+  toUntyped (T.TDummyBinds vs term) =
+    let utVarSet = toUntyped vs
         utTerm = toUntyped term
     in UT.TDummyBinds utVarSet utTerm
 
@@ -67,3 +68,8 @@ instance Convertible T.IntExpr where
   type UntypedVersion T.IntExpr = UT.IntExpr
   toUntyped (T.IEVar str) = UT.IEVar $ UT.DIntegerVar $ UT.MVIntegerVar str
   toUntyped (T.IENum integer) = UT.IENum integer
+
+instance Convertible T.VarSet where
+  type UntypedVersion T.VarSet = UT.VarSet
+  toUntyped (T.VSConcrete varSet) =
+    UT.VSConcrete $ map toUntypedVar $ Set.toList varSet
