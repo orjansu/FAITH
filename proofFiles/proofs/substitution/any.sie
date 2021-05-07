@@ -1,0 +1,43 @@
+bindings {
+G = { or = \a. \b. case a of
+                     { True -> True
+                     , False -> b
+                     }}
+}
+
+-- Add gadgets
+-- vi måste ha let in any(M) för att det ska funka. Just nu kör jag på
+-- att any är fri
+proposition: free(any) |-
+  \p. \xs. case xs of
+            { [] -> False
+            , y:ys -> let { py = p y
+                          , anypys = any p y ys}
+                      in or py anypys}
+   <~~>
+   \p. \xs. [2]h^(case xs of
+                       { [] -> False
+                       , y:ys -> let { py = p y
+                                     , anypys = any p y ys}
+                                 in or py anypys});
+--  \p. \xs. [2]h^(case xs of
+--                   { [] -> s^False
+--                   , y:ys -> s^(let { z = @
+--                                    , py = p <> y
+--                                    , anypys = {z}d^(any <> p <> y <> ys)}
+--                             in or <> py <> anypys)});
+proof: -simple -single{
+  -heap-spike-intro-rl ctx=(\p. \xs. [.])
+                       M= (case xs of
+                                 { [] -> False
+                                 , y:ys -> let { py = p y
+                                               , anypys = any p y ys}
+                                           in or py anypys})
+                       w=int(2);
+  <~~> \p. \xs. [2]h^(case xs of
+                      { [] -> False
+                      , y:ys -> let { py = p y
+                                    , anypys = any p y ys}
+                                in or py anypys});
+  }
+  qed;
