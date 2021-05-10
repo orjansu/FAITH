@@ -199,7 +199,7 @@ computeLNLReduction (T.RCase deciderTerm alts) = do
       caseVars42 = Map.map decDistance caseVars41
   assertElseError (caseVars1 == caseVars42) "correctness1 in case statements"
   assertElseError (all (\(d,i) -> d >= 0) (Map.elems caseVars42))
-    "case variable map has no -1 indexes."
+    $ "case variable map S has no -1 indexes. S="++show caseVars42
   modify (\st -> st{caseVars = caseVars42})
   -- 5. combine the results and return the new lnl term.
   return $ LNL.RCase lnlDeciderTerm lnlAltsSorted
@@ -220,9 +220,10 @@ computeLNLReduction (T.RCase deciderTerm alts) = do
       lnlTerm <- computeLNLTerm term
       -- 2.3 remove all the mappings for the bound case variables
       caseVars23 <- gets caseVars
-      let caseVars24 = Map.filter (\(d,i) -> d == 0) caseVars23
+      let caseVars24 = Map.filter (\(d,i) -> d /= 0) caseVars23
       assertElseError (caseVars24 == caseVars21)
-        "Case statement correctness"
+        $ "Case statement correctness "++show caseVars24++"/="++show caseVars21
+      modify (\st -> st{caseVars = caseVars24})
       return (constructorName, lnlTerm)
 
 computeLNLReduction (T.RPlusWeight term1 redWeight term2) = do
