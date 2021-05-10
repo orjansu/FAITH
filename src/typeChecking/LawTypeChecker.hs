@@ -17,17 +17,21 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
 import Common (trueName, falseName)
+import OtherUtils (distinct)
 
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'
   where
     typecheckLaws' = do
       let UT.DLawList innerLawList = lawList
-      tLawList <- mapM transform innerLawList
+      tLawLists <- mapM transform innerLawList
+      let tLawList = concat tLawLists
       mapM checkLaw tLawList
       let entryList = map toEntry tLawList
-          -- TODO check that all law names are distinct
-          lawMap = Map.fromList entryList
+          -- TODO add rl or lr to <~> and <~~> laws
+          names = map fst entryList
+      assert (distinct names) "All law names must be distinct."
+      let lawMap = Map.fromList entryList
       return lawMap
 
     toEntry law = let T.DLaw name _ _ _ _ = law
@@ -38,16 +42,19 @@ class Transformable a where
   transform :: a -> CheckM (TypedVersion a)
 
 instance Transformable UT.Law where
-  type TypedVersion UT.Law = T.Law
+  type TypedVersion UT.Law = [T.Law]
   transform (UT.DLaw name term1 imp term2 side) = do
     let UT.CommandName strName = name
     tTerm1 <- transform term1
     tTerm2 <- transform term2
-    (tImpRel, switch) <- transformImpRel imp
+    (tImpRel, impRelDir) <- transformImpRel imp
     tSide <- transform side
-    if switch
-      then return $ T.DLaw strName tTerm2 tImpRel tTerm1 tSide
-      else return $ T.DLaw strName tTerm1 tImpRel tTerm2 tSide
+    --Transforming the relations to left-to-right relations
+    case impRelDir of
+      LR -> return [T.DLaw strName tTerm1 tImpRel tTerm2 tSide]
+      RL -> return [T.DLaw strName tTerm2 tImpRel tTerm1 tSide]
+      Eq -> return [T.DLaw (strName++"-lr") tTerm1 tImpRel tTerm2 tSide
+                   , T.DLaw (strName++"-rl") tTerm1 tImpRel tTerm2 tSide]
 
 instance Transformable UT.Term where
   type TypedVersion UT.Term = T.Term
@@ -173,17 +180,22 @@ transformPlus mrw1 t1 mrw2 t2 = do
     transMrw Nothing = return $ T.IENum 1
     transMrw (Just (UT.DRedWeight (UT.DStackWeight expr))) = transform expr
 
+data ImpRelDir
+  = LR -- left-to-right (e.g. |~>)
+  | RL -- right-to-left (e.g. <~|)
+  | Eq -- equivalence relation (e.g. <~>)
+
 -- | Given an improvement relation, returns the corresponding left-to right
--- improvement relation and a boolean being True if the arguments should be
--- flipped.
-transformImpRel :: UT.ImpRel -> CheckM (Com.ImpRel, Bool)
-transformImpRel UT.DefinedEqual = return (Com.DefinedEqual, False)
-transformImpRel UT.StrongImprovementLR = return (Com.StrongImprovementLR, False)
-transformImpRel UT.WeakImprovementLR = return (Com.WeakImprovementLR, False)
-transformImpRel UT.StrongImprovementRL = return (Com.StrongImprovementLR, True)
-transformImpRel UT.WeakImprovementRL = return (Com.WeakImprovementLR, True)
-transformImpRel UT.StrongCostEquiv = return (Com.StrongCostEquiv, False)
-transformImpRel UT.WeakCostEquiv = return (Com.StrongCostEquiv, False)
+-- improvement relation and the relation class. If it is RL, it is flipped to
+-- RL.
+transformImpRel :: UT.ImpRel -> CheckM (Com.ImpRel, ImpRelDir)
+transformImpRel UT.DefinedEqual = return (Com.DefinedEqual, Eq)
+transformImpRel UT.StrongImprovementLR = return (Com.StrongImprovementLR, LR)
+transformImpRel UT.WeakImprovementLR = return (Com.WeakImprovementLR, LR)
+transformImpRel UT.StrongImprovementRL = return (Com.StrongImprovementLR, RL)
+transformImpRel UT.WeakImprovementRL = return (Com.WeakImprovementLR, RL)
+transformImpRel UT.StrongCostEquiv = return (Com.StrongCostEquiv, Eq)
+transformImpRel UT.WeakCostEquiv = return (Com.StrongCostEquiv, Eq)
 
 instance Transformable UT.LetBindings where
   type TypedVersion UT.LetBindings = T.LetBindings
