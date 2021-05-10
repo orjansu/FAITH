@@ -89,8 +89,9 @@ checkStep globalImpRel
           (Law.DLaw lawName lawLHS lawImpRel lawRHS sideCond)
           substitutions -> do
       assert (lawImpRel == localImpRel)
-        $ "The improvement relation of the law must be the same as the "
-        ++"improvement relation in the proof"
+        $ "The improvement relation of the law ("++show localImpRel++")"
+        ++ "must be the same as the improvement relation in the proof ("
+        ++ show lawImpRel++")"
       let ctxKey = "ctx"
       assertInternal (Map.notMember ctxKey substitutions) $ "The substitution "
         ++"map (i.e. substitutions from the law) should not contain a "

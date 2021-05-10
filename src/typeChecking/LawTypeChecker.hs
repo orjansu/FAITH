@@ -195,7 +195,7 @@ transformImpRel UT.WeakImprovementLR = return (Com.WeakImprovementLR, LR)
 transformImpRel UT.StrongImprovementRL = return (Com.StrongImprovementLR, RL)
 transformImpRel UT.WeakImprovementRL = return (Com.WeakImprovementLR, RL)
 transformImpRel UT.StrongCostEquiv = return (Com.StrongCostEquiv, Eq)
-transformImpRel UT.WeakCostEquiv = return (Com.StrongCostEquiv, Eq)
+transformImpRel UT.WeakCostEquiv = return (Com.WeakCostEquiv, Eq)
 
 instance Transformable UT.LetBindings where
   type TypedVersion UT.LetBindings = T.LetBindings

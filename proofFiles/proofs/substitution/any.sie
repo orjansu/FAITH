@@ -28,7 +28,7 @@ proposition: G free(any') |-
 --                                    , anypys = {z}d^(any <> p <> y <> ys)}
 --                             in or <> py <> anypys)});
 proof: -simple -single{
-  -heap-spike-intro-rl ctx=(\p. \xs. [.])
+  -heap-spike-intro-lr ctx=(\p. \xs. [.])
                        M= (case xs of
                                  { [] -> False
                                  , y:ys -> let { py = p y
