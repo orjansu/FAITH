@@ -303,6 +303,11 @@ getAllVariables (T.TDummyBinds varSet term) = varSet
 getAllVariables (T.TRedWeight _ (T.RApp term var)) =
   let termSet = getAllVariables term
   in Set.insert var termSet
-getAllVariables (T.TRedWeight _ (T.RCase term branches)) = undefined
+getAllVariables (T.TRedWeight _ (T.RCase term branches)) =
+  let termSet = getAllVariables term
+      (cNames, boundVars, terms) = unzip3 branches
+      boundSet = Set.fromList $ concat boundVars
+      termsSet = Set.unions $ map getAllVariables terms
+  in Set.unions [termSet, boundSet, termsSet]
 getAllVariables constructWithNoVariables =
   applyOnSubterms constructWithNoVariables Set.empty getAllVariables Set.unions

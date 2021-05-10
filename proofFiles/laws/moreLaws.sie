@@ -1,7 +1,7 @@
 -- This should contain all laws that are part of space improvement from Gustavsson and Sands' paper.
 
 -reduction: [w]^R[V] <~> [w]s^{X}d^N if (R[V] ~~> N) && (FV(R[V]) = FV({X}d^N));
---the reduction ~~> is implemented in code. It will be in LanguageLogic.hs.
+--the reduction ~~> is implemented in code. It is in LanguageLogic.hs.
 -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 -unfold-2: let G {x =[v,w]= V} in C[x]
        <~| let G {x =[v,w]= V} in C[{x}d^[v]s^V];
@@ -74,7 +74,7 @@
   if dom G subsetof FV(M);
 -spike-algebra-4:  let G in [v]h^M <~>  [v+|G|]h^(let G in M)
   if dom G subsetof FV(M);
--spike-algebra-5:  [w] case M of {pat_i -> [w]s^N_i}
+-spike-algebra-5: [w] case M of {pat_i -> [w]s^N_i}
               <~> [w] case M of {pat_i -> N_i};
 -spike-algebra-6:      [w]s^[v]s^M <~> [v]s^M if w =< v;
 -spike-algebra-7:      [w]h^[v]h^M <~> [v]h^M if w =< v;
@@ -122,3 +122,6 @@
 -balloon-reduction: (\x.M) <> y <~> M [y/x]   if y in FV(M[y/x]);
 
 -unfold-weak: let G {x=[v,w]=V} in C[x] <~~> let G{x=[v,w]=V} in C[{x}d^V];
+
+-- Laws that I added that I think are needed and valid
+-balloon-intro-untyped: M x <~~> M <> x;

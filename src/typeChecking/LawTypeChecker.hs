@@ -54,7 +54,7 @@ instance Transformable UT.Law where
       LR -> return [T.DLaw strName tTerm1 tImpRel tTerm2 tSide]
       RL -> return [T.DLaw strName tTerm2 tImpRel tTerm1 tSide]
       Eq -> return [T.DLaw (strName++"-lr") tTerm1 tImpRel tTerm2 tSide
-                   , T.DLaw (strName++"-rl") tTerm1 tImpRel tTerm2 tSide]
+                   , T.DLaw (strName++"-rl") tTerm2 tImpRel tTerm1 tSide]
 
 instance Transformable UT.Term where
   type TypedVersion UT.Term = T.Term

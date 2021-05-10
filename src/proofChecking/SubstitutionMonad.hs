@@ -173,11 +173,16 @@ getSubstitute metaVar = do
   case Map.lookup metaVar substMap of
     Just (subst, isUsed) ->
       case subst of
-        T.SLetBindings letBindings1 -> return subst
+        T.SLetBindings letBindings -> do
+          let dummy = T.TLet letBindings (T.TNum 1)
+          addBVToForbiddenNames dummy
+          return subst
           -- In LawTypeChecker, there is a check that makes sure that let-
           -- bindings are not copied in a term. Therefore, if they are used
           -- multiple times, they are used in varSets, where the names of their
-          -- bound variables are needed.
+          -- bound variables are needed. However, their names are still part
+          -- of the forbidden names, so their bound variables need to be added
+          -- to the set of forbiddenNames, but they do not need to be renamed.
         T.SValue term -> do
           prepared <- prepareTermForSubstitution metaVar term isUsed
           return $ T.SValue prepared
@@ -302,6 +307,7 @@ applyContext ctxName term = do
       assertInternal (termBV `Set.isSubsetOf` forbiddenNames1)
         $ "The term to be inserted to a context should have added its bound "
         ++"variables to the set of forbidden names."
+        ++show termBV++" should be a subset of "++show forbiddenNames1
       let ctxForbiddenNames = forbiddenNames1 Set.\\ termBV
       -- The reason that I remove the forbidden names of the term from the
       -- forbidden names is that otherwise the monad will think that something
