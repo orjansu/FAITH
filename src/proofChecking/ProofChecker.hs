@@ -26,7 +26,7 @@ import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
 import Substitution (applySubstitution, checkSideCondition)
 import OtherUtils (applyOnLawSubterms)
-import TermUtils (isAlphaEquiv, checkAlphaEquiv)
+import TermUtils (isAlphaEquiv)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
 -- containing a log and error message if it is incorrect, and Nothing
@@ -62,10 +62,10 @@ checkProofSteps :: HasCallStack =>
                    -> CheckM ()
 checkProofSteps (T.Simple proofSteps) start globalImpRel freeVars goal = do
   let (T.PSMiddle startTerm _ _ _) = head proofSteps
-  checkAlphaEquiv start startTerm
+  checkAlphaEqWrtLetReorder start startTerm
   mapM (checkStep globalImpRel freeVars) proofSteps
   let (T.PSMiddle _ _ _ endTerm) = last proofSteps
-  checkAlphaEquiv goal endTerm
+  checkAlphaEqWrtLetReorder goal endTerm
 
 -- | Checks if a single step is valid. This computation may be run
 -- independently in parallel for each step to speed things up if that is an
@@ -84,7 +84,7 @@ checkStep globalImpRel
   assert (localImpRel `Lang.impRelImplies` globalImpRel)
     $ show localImpRel ++ " should imply "++ show globalImpRel
   case command of
-    T.AlphaEquiv -> checkAlphaEquiv term1 term2
+    T.AlphaEquiv -> checkAlphaEqWrtLetReorder term1 term2
     T.Law context
           (Law.DLaw lawName lawLHS lawImpRel lawRHS sideCond)
           substitutions -> do
@@ -109,13 +109,13 @@ checkStep globalImpRel
                                       substitutionsWctx
                                       forbiddenNames
                                       varFreeVars
-      checkRuleAlphaEquiv lawLHSctx term1 substToLHS
+      checkAlphaEqWrtLetReorder term1 substToLHS
       substToRHS <- applySubstitution lawRHSctx
                                       sideCond
                                       substitutionsWctx
                                       forbiddenNames
                                       varFreeVars
-      checkRuleAlphaEquiv lawRHSctx substToRHS term2
+      checkAlphaEqWrtLetReorder substToRHS term2
 
 -- | Given the law term L and two terms M and N,
 -- this function checks alpha equivalance of M and N. If L contains let-terms
@@ -127,29 +127,17 @@ checkStep globalImpRel
 -- that are saved. Some things may also easily be paralellizable.
 --
 -- Subfunctions may be moved to base level
-checkRuleAlphaEquiv :: HasCallStack => Law.Term -> T.Term -> T.Term -> CheckM ()
-checkRuleAlphaEquiv lawTerm m n = do
+checkAlphaEqWrtLetReorder :: HasCallStack => T.Term -> T.Term -> CheckM ()
+checkAlphaEqWrtLetReorder m n = do
   orderedEq <- isAlphaEquiv m n
   if orderedEq
     then return ()
-    else if containsLet lawTerm
-      then let permutations = getAllLetPermutations m
-           in if any (isOrderedAlphaEq n) permutations
-                then return ()
-                else throwCallstackError $ "Not alpha equivalent, even with "
-                      ++ "reordering of let:s"
-      else throwCallstackError $ "Not alpha equivalent, and law term does not "
-                                 ++ "contain let."
+    else let permutations = getAllLetPermutations m
+         in if any (isOrderedAlphaEq n) permutations
+              then return ()
+              else throwCallstackError $ "Not alpha equivalent, even with "
+                    ++ "reordering of let:s"
   where
-    -- | Returns whether the law term contains a let that is in the main term
-    -- of the law term, That is, {FV(let G in M)}d^N does not contain a let,
-    -- since the free variables are made concrete when applied to a term,
-    -- but let G in M contains a let.
-    containsLet :: Law.Term -> Bool
-    containsLet (Law.TLet _ _) = True
-    containsLet otherLawTerm =
-      applyOnLawSubterms otherLawTerm False containsLet (any id)
-
     getAllLetPermutations :: T.Term -> [T.Term]
     getAllLetPermutations bigTerm = case bigTerm of
       T.TNonTerminating -> [bigTerm]
