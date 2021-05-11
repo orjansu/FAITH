@@ -34,12 +34,16 @@ proof: -simple -single{
     M=(\x2. let {ys = repeat x2} in x : ys);
   <~> let {xs = (\x2. let {ys = repeat x2} in x : ys) x} in f x xs;
   -reduction-lr
-    ctx=(let {xs = [.]} in f x xs)
+    ctx=(let G in let {xs = [.]} in f x xs)
     w=1
     R=([.] x)
     V=(\x2. let {ys = repeat x2} in x : ys)
     X={}
     N=(let {ys' = repeat x} in x : ys');
+  <~> let {xs = s^{}d^(let {ys = repeat x} in x : ys)} in f x xs;
+  -dummy-ref-algebra-5-lr
+    ctx=(let G in let {xs = s^[.]} in f x xs)
+    M=(let {ys = repeat x} in x : ys);
   <~> let {xs = s^(let {ys = repeat x} in x : ys)} in f x xs;
   -spike-algebra-13
     ctx=(let G in let {xs = [.]} in f x xs)

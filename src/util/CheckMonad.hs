@@ -76,4 +76,4 @@ throwCallstackError descr = do
 
 dbg :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
        String -> m ()
-dbg str = trace (str) $ Log.logInfoN $ pack str
+dbg str = trace (str) $ Log.logInfoN $ pack ""
