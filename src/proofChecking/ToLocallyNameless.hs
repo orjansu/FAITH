@@ -13,9 +13,6 @@ import Control.Monad.State (StateT, MonadState, runStateT, gets, modify)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (zip, unzip4)
 
-import Debug.Trace (trace)
-import ShowTypedTerm (showTypedTerm)
-
 import qualified MiniTypedAST as T
 import qualified LocallyNameless as LNL
 
@@ -48,7 +45,7 @@ toLocallyNameless term =
   let (lnlTerm, state) = runIdentity (
                        runStateT (
                           getM (
-                            trace ("term: "++showTypedTerm term) (computeLNLTerm term)
+                            computeLNLTerm term
                           )
                        ) initLNLSt
                      )

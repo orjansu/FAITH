@@ -30,8 +30,6 @@ import GHC.Stack (HasCallStack)
 import Control.Monad.Trans.Class (MonadTrans)
 import Data.List (zip4, unzip4, intersperse)
 
-import Debug.Trace (trace)
-
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (getBoundVariables, numHoles, getFreeVariables
@@ -405,9 +403,6 @@ renameNeeded term1 = do
     runRenameNeeded term1 = do
       checkBoundVariablesDistinct term1
       runRenameM $ renameNeededMonadic term1
-
-dbg :: (Log.MonadLogger m) => String -> m ()
-dbg str = trace str $ Log.logInfoN $ pack str
 
 data RenameSt = MkRenameSt { renamings :: Map.Map String String
                            , forbiddenNames' :: Set.Set String}
