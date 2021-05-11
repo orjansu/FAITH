@@ -111,43 +111,43 @@ proof: -simple -single{
                                      in or py anypys)});
   -let-flatten-rl
     ctx=(let G in \p. \xs. [2]h^(case xs of
-                          { [] -> s^False
-                          , y:ys -> s^([.])}))
-    G1=let {py = p <> y}
-    G2=let{anypys = any' <> p <> y <> ys}
+                                   { [] -> s^False
+                                   , y:ys -> s^([.])}))
+    G1=let {anypys = any' <> p <> y <> ys}
+    G2=let {py = p<> y}
     M=(or py anypys);
   <~>  \p. \xs. [2]h^(case xs of
                         { [] -> s^False
-                        , y:ys -> s^(let { py = p <> y}
-                                     in let {anypys = any' <> p <> y <> ys}
+                        , y:ys -> s^(let {anypys = any' <> p <> y <> ys}
+                                     in let {py = p <> y}
                                         in or py anypys)});
   -dummy-bind-intro-lr
-    ctx = (let G in \p. \xs. [2]h^(case xs of
-                          { [] -> s^False
-                          , y:ys -> s^(let { py = p <> y}
-                                       in [.])}))
-    x=anypys
-    M=(any' <> p <> y <> ys)
-    z=z
-    N=(or py anypys);
-  <~~> \p. \xs. [2]h^(case xs of
-                          { [] -> s^False
-                          , y:ys -> s^(let { py = p <> y}
-                                       in let { z=@
-                                              , anypys = {z}d^(any' <> p <> y <> ys)}
-                                          in or py anypys)});
-  -let-flatten-lr
     ctx=(let G in \p. \xs. [2]h^(case xs of
                                    { [] -> s^False
                                    , y:ys -> s^([.])}))
-    G1=let {py = p <> y}
-    G2=let {z=@, anypys = {z}d^(any' <> p <> y <> ys)}
+    x=anypys
+    M=(any' <> p <> y <> ys)
+    N=(let {py = p <> y}
+       in or py anypys)
+    z=z;
+  <~~> \p. \xs. [2]h^(case xs of
+                        { [] -> s^False
+                        , y:ys -> s^(let { z=@
+                                         , anypys = {z}d^(any' <> p <> y <> ys)}
+                                     in let {py = p <> y}
+                                        in or py anypys)});
+  -let-flatten-lr
+    ctx= (let G in \p. \xs. [2]h^(case xs of
+                          { [] -> s^False
+                          , y:ys -> s^([.])}))
+    G1=let { z=@, anypys = {z}d^(any' <> p <> y <> ys)}
+    G2=let {py = p <> y}
     M=(or py anypys);
   <~>  \p. \xs. [2]h^(case xs of
                         { [] -> s^False
                         , y:ys -> s^(let { z=@
-                                         , py = p <> y
-                                         , anypys = {z}d^(any' <> p <> y <> ys)}
+                                         , anypys = {z}d^(any' <> p <> y <> ys)
+                                         , py = p <> y}
                                      in or py anypys)});
   -balloon-intro-untyped-lr
     ctx = (let G in \p. \xs. [2]h^(case xs of

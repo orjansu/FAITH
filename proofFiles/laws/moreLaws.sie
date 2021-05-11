@@ -88,16 +88,16 @@
 
 -spike-algebra-zero-stack-spike: [0]s^M <~> M; -- Just used in proof.
 
--dummy-ref-algebra-1: [w]^R[{X}d^M] <~> [w]s^{X}d^[w]^R[M];
+-dummy-ref-algebra-1:   [w]^R[{X}d^M] <~> [w]s^{X}d^[w]^R[M];
 -dummy-ref-algebra-2: let G in {X}d^M <~> [|G|]h^{X}d^(let G in M)
                                           if dom G subsetof FV(M);
 -dummy-ref-algebra-3: let G {x =[w,0]=V} in C[{x}d^M]
                   <~> let G {x =[w,0]=V} in C[{FV(V)\\{x}}d^M];
--dummy-ref-algebra-4: [w]^R[{X}d^M] <~> [w]^R[M] if X subsetof FV(R);
--dummy-ref-algebra-5: {}d^M <~> M;
--dummy-ref-algebra-6: {X union Y}d^M <~> {X}d^M if Y subsetof FV(M);
--dummy-ref-algebra-7: {X}d^{Y}d^M <~> {X union Y}d^M;
--dummy-ref-algebra-8: {X}d^M |~> M;
+-dummy-ref-algebra-4:   [w]^R[{X}d^M] <~> [w]^R[M] if X subsetof FV(R);
+-dummy-ref-algebra-5:           {}d^M <~> M;
+-dummy-ref-algebra-6:  {X union Y}d^M <~> {X}d^M if Y subsetof FV(M);
+-dummy-ref-algebra-7:     {X}d^{Y}d^M <~> {X union Y}d^M;
+-dummy-ref-algebra-8:          {X}d^M |~> M;
 
 -dummy-ref-def: {xs}d^M =def= let {ys = xs} in M if ys are fresh;
 -dummy-bind-intro: let {x = M} in N <~~> let {z = @, x = {z}d^M} in N

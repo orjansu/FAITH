@@ -60,6 +60,7 @@ instance Convertible T.Term where
                utVar = toUntypedVar var
            in case redWeight of
                 1 -> UT.TRApp utTerm utVar
+                0 -> UT.TRAppNoW utTerm utVar
                 _ -> UT.TRAppW utRedw utTerm utVar
          T.RCase term branches ->
            let utTerm = toUntyped term
