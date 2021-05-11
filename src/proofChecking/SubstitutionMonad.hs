@@ -30,11 +30,14 @@ import GHC.Stack (HasCallStack)
 import Control.Monad.Trans.Class (MonadTrans)
 import Data.List (zip4, unzip4, intersperse)
 
+import Debug.Trace (trace)
+
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 import TermCorrectness (getBoundVariables, numHoles, getFreeVariables
                        , checkBoundVariablesDistinct, getAllVariables)
 import OtherUtils (applyAndRebuildM)
+import ToLocallyNameless (toLocallyNameless)
 
 type IsUsed = Bool
 data SubstSt = MkSubstSt
@@ -243,7 +246,8 @@ prepareTermForSubstitution metaVar term isUsed =
       forbidden <- gets forbiddenNames
       assertInternal (termBV `Set.disjoint` forbidden)
         $ "term M inserted the first time should only contain new "
-          ++"names for bound variables. M="++showTypedTerm term
+          ++"names for bound variables. M="++showTypedTerm term++" BV(M)"
+          ++"="++show termBV++" should be disjoint from "++show forbidden
       addBVToForbiddenNames term
       return term
 
@@ -369,17 +373,19 @@ renameAllBound term1 = do
 renameNeeded :: HasCallStack => T.Term -> SubstM T.Term
 renameNeeded term1 = do
   let initBV = getBoundVariables term1
-      initFV = getFreeVariables term1
+      (initLNL, initFV) = toLocallyNameless term1
 
   forbiddenNames1 <- gets forbiddenNames
   let shouldBeUnchanged = initBV Set.\\ forbiddenNames1
-  term2 <- runRenameNeeded term1 forbiddenNames1
+  term2 <- runRenameNeeded term1
   Log.logInfoN . pack $ "Checking correctness of renaming "
     ++showTypedTerm term1++" to "++showTypedTerm term2
   let newBV = getBoundVariables term2
-      forbiddenNames2 = newBV `Set.union` forbiddenNames1
-  modify (\st -> st{forbiddenNames = forbiddenNames2})
-
+      expectedForbiddenNames2 = newBV `Set.union` forbiddenNames1
+  forbiddenNames2 <- gets forbiddenNames
+  assertInternal (forbiddenNames2 == expectedForbiddenNames2) $
+    "expected forbiddenNames ="++show expectedForbiddenNames2++
+    "=="++show forbiddenNames2
   let unchanged = newBV Set.\\ forbiddenNames2
   assertInternal (unchanged == shouldBeUnchanged) $
     "Renaming just needed variables should not rename variables that do not "
@@ -387,37 +393,56 @@ renameNeeded term1 = do
   assertInternal (newBV `Set.disjoint` forbiddenNames1) $
     "Renaming needed variables should rename all variables that need to be "
     ++"renamed."
-  let newFV = getFreeVariables term2
+  let (newLNL, newFV) = toLocallyNameless term2
   assertInternal (initFV == newFV)
     "Renaming bound variables should not change free variables"
+  assertInternal (initLNL == newLNL)
+    "If M renames its bound variables to N, M should be alpha equivalent to N."
   return term2
   where
-    runRenameNeeded :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
-                        T.Term -> Set.Set String -> m T.Term
-    runRenameNeeded term1 forbidden = do
+    runRenameNeeded :: HasCallStack =>
+                        T.Term -> SubstM T.Term
+    runRenameNeeded term1 = do
       checkBoundVariablesDistinct term1
-      (flip evalStateT) Map.empty
-        $(flip runReaderT) forbidden
-          $ renameNeededMonadic term1
+      runRenameM $ renameNeededMonadic term1
 
-renameNeededMonadic :: (MonadState (Map.Map String String) m,
-                          MonadReader (Set.Set String) m,
-                          Log.MonadLogger m, MonadError String m,
-                          HasCallStack) =>
-                    T.Term -> m T.Term
+dbg :: (Log.MonadLogger m) => String -> m ()
+dbg str = trace str $ Log.logInfoN $ pack str
+
+data RenameSt = MkRenameSt { renamings :: Map.Map String String
+                           , forbiddenNames' :: Set.Set String}
+
+newtype RenameM a = MkRenameM {getRenameM :: StateT RenameSt CheckM a}
+  deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadError String
+           , MonadState RenameSt)
+
+runRenameM :: RenameM a -> SubstM a
+runRenameM monadic = do
+  forbiddenNames1 <- gets forbiddenNames
+  let initSt = (MkRenameSt {renamings = Map.empty
+                           , forbiddenNames' = forbiddenNames1})
+  (res, finalState) <- liftCheckM $
+                          (flip runStateT) initSt
+                            $ getRenameM monadic
+  let forbiddenNames2 = forbiddenNames' finalState
+  modify (\st -> st{forbiddenNames = forbiddenNames2})
+  return res
+
+renameNeededMonadic :: (HasCallStack) =>
+                    T.Term -> RenameM T.Term
 renameNeededMonadic = \case
   T.TNonTerminating -> return T.TNonTerminating
-  T.TVar var -> do
-    var' <- toCorrectMentionedVar var
-    return $ T.TVar var
+  T.TVar var1 -> do
+    var2 <- toCorrectMentionedVar var1
+    return $ T.TVar var2
   T.TNum integer -> return $ T.TNum integer
-  T.TConstructor name vars -> do
-    vars' <- mapM toCorrectMentionedVar vars
-    return $ T.TConstructor name vars'
-  T.TLam var term -> do
-    var' <- toCorrectBoundVar var
-    term' <- renameNeededMonadic term
-    return $ T.TLam var' term
+  T.TConstructor name vars1 -> do
+    vars2 <- mapM toCorrectMentionedVar vars1
+    return $ T.TConstructor name vars2
+  T.TLam var1 term1 -> do
+    var2 <- toCorrectBoundVar var1
+    term2 <- renameNeededMonadic term1
+    return $ T.TLam var2 term2
   T.THole -> return $ T.THole
   T.TLet letBindings1 mainTerm1 -> do
     let (bindingVars1, sWeights1, hWeights1, boundTerms1) = unzip4 letBindings1
@@ -432,65 +457,62 @@ renameNeededMonadic = \case
     let varSet2 = Set.fromList varList2
     term2 <- renameNeededMonadic term1
     return $ T.TDummyBinds varSet2 term2
-  T.TStackSpikes sw term -> do
-    term' <- renameNeededMonadic term
-    return $ T.TStackSpikes sw term'
-  T.THeapSpikes hw term -> do
-    term' <- renameNeededMonadic term
-    return $ T.THeapSpikes hw term'
+  T.TStackSpikes sw term1 -> do
+    term2 <- renameNeededMonadic term1
+    return $ T.TStackSpikes sw term2
+  T.THeapSpikes hw term1 -> do
+    term2 <- renameNeededMonadic term1
+    return $ T.THeapSpikes hw term2
   T.TRedWeight rw1 red1 -> do
     red2 <- case red1 of
               T.RApp term1 var1 -> do
                 var2 <- toCorrectMentionedVar var1
                 term2 <- renameNeededMonadic term1
                 return $ T.RApp term2 var2
-              T.RCase decideTerm branches -> do
-                decideTerm' <- renameNeededMonadic decideTerm
-                let (cnames, args, terms) = unzip3 branches
-                args' <- mapM (mapM toCorrectBoundVar) args
-                terms' <- mapM renameNeededMonadic terms
-                let branches' = zip3 cnames args' terms'
-                return $ T.RCase decideTerm' branches'
+              T.RCase decideTerm1 branches1 -> do
+                decideTerm2 <- renameNeededMonadic decideTerm1
+                let (cnames1, args1, terms1) = unzip3 branches1
+                args2 <- mapM (mapM toCorrectBoundVar) args1
+                terms2 <- mapM renameNeededMonadic terms1
+                let branches2 = zip3 cnames1 args2 terms2
+                return $ T.RCase decideTerm2 branches2
               T.RPlusWeight t1 rw2 t2 -> do
                 t1' <- renameNeededMonadic t1
                 t2' <- renameNeededMonadic t2
                 return $ T.RPlusWeight t1' rw2 t2'
-              T.RAddConst integer term -> do
-                term' <- renameNeededMonadic term
-                return $ T.RAddConst integer term'
-              T.RIsZero term -> do
-                term' <- renameNeededMonadic term
-                return $ T.RIsZero term'
+              T.RAddConst integer term1 -> do
+                term2 <- renameNeededMonadic term1
+                return $ T.RAddConst integer term2
+              T.RIsZero term1 -> do
+                term2 <- renameNeededMonadic term1
+                return $ T.RIsZero term2
               T.RSeq term1 term2 -> do
                 term1' <- renameNeededMonadic term1
                 term2' <- renameNeededMonadic term2
                 return $ T.RSeq term1' term2'
     return $ T.TRedWeight rw1 red2
 
-
-toCorrectMentionedVar :: (MonadState (Map.Map String String) m)
-                          => String -> m String
+toCorrectMentionedVar :: String -> RenameM String
 toCorrectMentionedVar var = do
-  renameMap <- get
+  renameMap <- gets renamings
   case Map.lookup var renameMap of
     Just newName -> return newName
     Nothing -> return var
 
-toCorrectBoundVar :: (MonadState (Map.Map String String) m,
-                      MonadReader (Set.Set String) m,
-                      Log.MonadLogger m, MonadError String m,
-                      HasCallStack)
-                      => String -> m String
+toCorrectBoundVar :: HasCallStack
+                      => String -> RenameM String
 toCorrectBoundVar oldName = do
-  forbiddenNames <- ask
-  if (oldName `Set.member` forbiddenNames)
+  forbiddenNames1 <- gets forbiddenNames'
+  if (oldName `Set.member` forbiddenNames1)
     then do
-      newName <- freshName oldName forbiddenNames
-      renameMap <- get
-      assertInternal (oldName `Map.notMember` renameMap)
+      newName <- freshName oldName forbiddenNames1
+      renameMap1 <- gets renamings
+      assertInternal (oldName `Map.notMember` renameMap1)
         "Old names should not be renamed twice, since binders are unique"
-      let renameMap' = Map.insert oldName newName renameMap
-      put renameMap'
+      let renameMap2 = Map.insert oldName newName renameMap1
+          forbiddenNames2 = Set.insert newName forbiddenNames1
+      modify (\st -> st{renamings = renameMap2
+                       , forbiddenNames' = forbiddenNames2})
       return newName
     else return oldName
 
@@ -505,7 +527,7 @@ freshName :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
              String -> Set.Set String -> m String
 freshName name forbiddenNames = do
   assertInternal (Set.member name forbiddenNames) $ "Renaming was "
-    ++"attempted, but not needed. "++name++" is not in "++show forbiddenNames
+    ++"attempted, but not needed. "++name++" should be in "++show forbiddenNames
   return $ freshName' 0
   where
     freshName' n = let tryName = freshNames !! n

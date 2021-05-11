@@ -5,7 +5,6 @@
 module TermUtils (substituteFor, isAlphaEquiv, checkAlphaEquiv) where
 
 import qualified Control.Monad.Logger as Log
-
 import GHC.Stack (HasCallStack)
 import Control.Monad.Except (MonadError)
 import qualified Data.Set as Set

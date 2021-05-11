@@ -118,7 +118,8 @@ showSubstitute = \case
 -- is expanded to include conditions that also concern the bound variables in
 -- some way, this function (and possibly much else of the general approach)
 -- would need to be revised.
-checkSideCondition :: Law.SideCond -> T.Substitutions -> CheckM ()
+checkSideCondition :: HasCallStack =>
+                      Law.SideCond -> T.Substitutions -> CheckM ()
 checkSideCondition Law.NoSideCond _ = return ()
 checkSideCondition (Law.WithSideCond boolTerm) substitutions = do
   (res, _fv) <- runSubstM substitutions Set.empty $ evalBoolTerm boolTerm
@@ -206,7 +207,8 @@ checkSubstBVDistinct substitutions forbiddenNames = do
             ++"variables."
           return $ set1 `Set.union` set2
 
-getFreshVariables :: T.Substitutions -> Law.SideCond -> Set.Set String
+getFreshVariables :: HasCallStack =>
+                     T.Substitutions -> Law.SideCond -> Set.Set String
 getFreshVariables _ Law.NoSideCond = Set.empty
 getFreshVariables subst (Law.WithSideCond sideCond) = go sideCond
   where
@@ -238,7 +240,8 @@ getFreshVariables subst (Law.WithSideCond sideCond) = go sideCond
 -- NOTE: unclear if the binding pos variables in M in {FV(M)}d^N are needed.
 -- maybe add typechecker check that if {FV(M)}d^N appears, M must also appear
 -- somewhere else?
-getBoundSubstVars :: T.Substitutions -> Law.Term -> Set.Set String
+getBoundSubstVars :: HasCallStack =>
+                     T.Substitutions -> Law.Term -> Set.Set String
 getBoundSubstVars substitutions law = case law of
   Law.TDummyBinds vs term ->
     getBoundSubstVars substitutions term `Set.union` inVarSet vs
@@ -283,7 +286,7 @@ getBoundSubstVars substitutions law = case law of
         -- can ignore _MetaBinds.
         Law.LBSBoth _MetaBinds innerLetbinds ->
           Set.unions $ map getLBBound innerLetbinds
-      getLBBound :: Law.LetBinding -> Set.Set String
+      getLBBound :: HasCallStack => Law.LetBinding -> Set.Set String
       getLBBound (Law.LBConcrete lawVar _ _ term) =
         case Map.lookup lawVar substitutions of
           Just (T.SVar substVar) ->
@@ -506,7 +509,7 @@ substituteAndEvalVarSet index law = case law of
 -- names before substitution into the law term (see the use of
 -- getFreshVariables in applySubstitution) and that all substitutions are
 -- provided (see check in the typechecker).
-evalBoolTerm :: Law.BoolTerm -> SubstM Bool
+evalBoolTerm :: HasCallStack => Law.BoolTerm -> SubstM Bool
 evalBoolTerm (Law.BTSizeEq metaG1 metaG2) = do
   T.SLetBindings concreteG1 <- getSubstitute metaG1
   T.SLetBindings concreteG2 <- getSubstitute metaG2
@@ -542,10 +545,10 @@ evalBoolTerm (Law.BTIsFresh x) = isFresh x
 evalBoolTerm (Law.BTAreFresh xs) = isFresh xs
 evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
   T.SValue value <- getSubstitute lValueStr
-  T.SReduction red <- getSubstitute lReductionStr
-  Log.logInfoN . pack $ "reducing R[V], where R="
-    ++showTypedTerm (T.TRedWeight 1 red)++" and V="++showTypedTerm value
-  result <- reduce red value
+  substituted <- applyContext lReductionStr value
+  Log.logInfoN . pack $ "reducing R[V]="
+    ++showTypedTerm substituted
+  result <- reduce substituted
   tTerm <- applyTermSubstM (-1) lTerm
   liftCheckM $ result `isAlphaEquiv` tTerm
 evalBoolTerm (Law.BTAnd lBoolTerm1 lBoolTerm2) = do
@@ -553,7 +556,8 @@ evalBoolTerm (Law.BTAnd lBoolTerm1 lBoolTerm2) = do
   b2 <- evalBoolTerm lBoolTerm2
   return $ b1 && b2
 
-evalPossiblyVectorizedVarSet :: Law.VarSet -> SubstM (Set.Set String)
+evalPossiblyVectorizedVarSet :: HasCallStack =>
+                                Law.VarSet -> SubstM (Set.Set String)
 evalPossiblyVectorizedVarSet lVarSet = case lVarSet of
   Law.VSConcrete _ -> substituteAndEvalVarSet (-1) lVarSet
   Law.VSMetaVar _ -> substituteAndEvalVarSet (-1) lVarSet
@@ -568,7 +572,7 @@ evalPossiblyVectorizedVarSet lVarSet = case lVarSet of
           return $ Set.unions sets
         Nothing -> substituteAndEvalVarSet (-1) lVarSet
       where
-        getLenIfVectorized :: Law.Term -> SubstM (Maybe Int)
+        getLenIfVectorized :: HasCallStack => Law.Term -> SubstM (Maybe Int)
         getLenIfVectorized = \case
           Law.TMVTerms metaN_i -> do
             T.STerms concreteN_i <- getSubstitute metaN_i

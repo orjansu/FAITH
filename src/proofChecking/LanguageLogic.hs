@@ -70,32 +70,33 @@ instance ImpRelRepresentation UT.ImpRel where
 -- the monad is for input checking in substitution.
 -- Throws an error if the reduction is unsuccessful.
 reduce :: (HasCallStack, Log.MonadLogger m, MonadError String m) =>
-          T.Red -> T.Term -> m T.Term
-reduce (T.RApp T.THole y) (T.TLam x term) = substituteFor term y x
-reduce (T.RCase T.THole branches) (T.TConstructor cj ys) =
-  case find (\(ci, _,_) -> ci == cj) branches of
-    Just (_cj, xsj, tMj) -> do
-      substituteAll tMj ys xsj
-      where
-        substituteAll term [] [] = return term
-        substituteAll term (y:ys) (x:xs) = do
-          term' <- substituteFor term y x
-          substituteAll term' ys xs
-        substituteAll _ _ _ = internalException
-                                "substitution params not same length."
-    Nothing -> throwCallstackError $ "reduction not possible. "++cj++" is "
-      ++"not one of the possible cases in "++names
-      where names = let (cNames, _, _) = unzip3 branches
-                    in concat $ intersperse ", " cNames
-reduce (T.RSeq T.THole tM) tV = do
-  assert (isValue tV)
-    $ "in seq V M, V must be a value. V="++showTypedTerm tV
-  return tM
-reduce (T.RPlusWeight T.THole w tN) (T.TNum m) =
-  return $ T.TRedWeight w (T.RAddConst m tN)
-reduce (T.RAddConst m T.THole) (T.TNum n) = return $ T.TNum (m + n)
-reduce (T.RIsZero T.THole) (T.TNum m)
-  | m == 0 = return $ T.TConstructor trueName []
-  | otherwise = return $ T.TConstructor falseName []
-reduce rR tV = throwCallstackError $ "Reduction failed. Type error in inputs "
-  ++"R = "++showTypedTerm (T.TRedWeight 1 rR)++" and V="++showTypedTerm tV
+          T.Term -> m T.Term
+reduce (T.TRedWeight 1 reduction) = case reduction of
+  (T.RApp (T.TLam x term) y) -> substituteFor term y x
+  (T.RCase (T.TConstructor cj ys) branches) ->
+    case find (\(ci, _,_) -> ci == cj) branches of
+      Just (_cj, xsj, tMj) -> do
+        substituteAll tMj ys xsj
+        where
+          substituteAll term [] [] = return term
+          substituteAll term (y:ys) (x:xs) = do
+            term' <- substituteFor term y x
+            substituteAll term' ys xs
+          substituteAll _ _ _ = internalException
+                                  "substitution params not same length."
+      Nothing -> throwCallstackError $ "reduction not possible. "++cj++" is "
+        ++"not one of the possible cases in "++names
+        where names = let (cNames, _, _) = unzip3 branches
+                      in concat $ intersperse ", " cNames
+  (T.RSeq tV tM) -> do
+    assert (isValue tV)
+      $ "in seq V M, V must be a value. V="++showTypedTerm tV
+    return tM
+  (T.RPlusWeight (T.TNum m) w tN) -> return $ T.TRedWeight w (T.RAddConst m tN)
+  (T.RAddConst m (T.TNum n)) -> return $ T.TNum (m + n)
+  (T.RIsZero (T.TNum m)) | m == 0 -> return $ T.TConstructor trueName []
+                         | otherwise -> return $ T.TConstructor falseName []
+  _ -> throwCallstackError $ "Reduction failed. Type error in inputs "
+          ++"R[V] = "++showTypedTerm (T.TRedWeight 1 reduction)
+reduce t = internalException $
+              "tried to reduce a non-reduction "++showTypedTerm t

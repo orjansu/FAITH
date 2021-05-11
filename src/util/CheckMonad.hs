@@ -20,6 +20,8 @@ import Data.Text (pack, Text)
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 
+import Debug.Trace (trace)
+
 newtype CheckM a = MkM {getM :: (ExceptT String
                                   (Log.WriterLoggingT Identity) a)}
   deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadError String)
@@ -41,12 +43,12 @@ toLine (loc, logsource, loglevel, logstr) =
 
 assert :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
           Bool -> String -> m ()
-assert True _ = return ()
+assert True s = dbg ("asserting "++s) >> return ()
 assert False description = throwCallstackError $
   "assertion failed: "++description
 
 assertTerm :: (MonadError String m, Log.MonadLogger m, HasCallStack) => Bool -> String -> T.Term -> m ()
-assertTerm True _ _ = return ()
+assertTerm True s t = (dbg ("asserting "++s++" for "++showTypedTerm t)) >> return ()
 assertTerm False str term = throwCallstackError $
   "Assertion "++str++" failed for term "++showTypedTerm term
 
@@ -56,7 +58,7 @@ noSupport spec = throwCallstackError $ spec ++ " not supported yet"
 
 assertInternal :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
                   Bool -> String -> m ()
-assertInternal True _ = return ()
+assertInternal True s = dbg ("asserting "++s) >> return ()
 assertInternal False description =
   internalException $ "Assertion failed: "++description
 
@@ -68,5 +70,10 @@ internalException description = do
 
 throwCallstackError :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
   String -> m a
-throwCallstackError descr =
+throwCallstackError descr = do
+  dbg descr
   throwError $ "At "++ prettyCallStack callStack++"\n"++descr
+
+dbg :: (Log.MonadLogger m, MonadError String m, HasCallStack) =>
+       String -> m ()
+dbg str = trace (str) $ Log.logInfoN $ pack str

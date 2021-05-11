@@ -1,5 +1,5 @@
 bindings {
-G = {repeat =[0,0]= \x'. let {ys = repeat x'} in x':ys};
+G = {repeat =[0,0]= \x1. let {zs = repeat x1} in x1:zs};
 }
 
 -- base case
@@ -25,15 +25,32 @@ proof: -simple -single{
   |~> let {xs = x : xs} in f x xs;
 } qed;
 --inductive case (before induction)
-proposition: G free(x f) |- let {xs = [0]s^(\x. let {ys = repeat x}
+proposition: G free(x f) |- let {xs = [0]s^(\x2. let {ys = repeat x2}
                                                 in x : ys) x} in f x xs
-                        |~> let {xs = let {ys = repeat x} in x : ys} in f x xs
+                        |~> let {xs = let {ys = repeat x} in x : ys} in f x xs;
 proof: -simple -single{
   -spike-algebra-zero-stack-spike-lr
     ctx=(let G in let {xs= [.] x} in f x xs)
-    M=(\x. let {ys = repeat x} in x : ys)
-  <~> let {xs = (\x. let {ys = repeat x} in x : ys) x} in f x xs
+    M=(\x2. let {ys = repeat x2} in x : ys);
+  <~> let {xs = (\x2. let {ys = repeat x2} in x : ys) x} in f x xs;
+  -reduction-lr
+    ctx=(let {xs = [.]} in f x xs)
+    w=1
+    R=([.] x)
+    V=(\x2. let {ys = repeat x2} in x : ys)
+    X={}
+    N=(let {ys' = repeat x} in x : ys');
+  <~> let {xs = s^(let {ys = repeat x} in x : ys)} in f x xs;
+  -spike-algebra-13
+    ctx=(let G in let {xs = [.]} in f x xs)
+    w=1
+    M=(let {ys = repeat x} in x : ys);
+  |~> let {xs = let {ys = repeat x} in x : ys} in f x xs;
 }
---inductive case (after induction)
+qed;
+----inductive case (after induction)
 --proposition: G free(x f) |- let {xs = let {ys = x : ys} in x : ys} in f x xs
 --                        |~> let {xs = x : xs} in f x xs
+--proof: -simple -single{
+--  -
+--}
