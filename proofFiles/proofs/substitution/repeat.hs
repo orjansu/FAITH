@@ -52,9 +52,16 @@ proof: -simple -single{
   |~> let {xs = let {ys = repeat x} in x : ys} in f x xs;
 }
 qed;
-----inductive case (after induction)
---proposition: G free(x f) |- let {xs = let {ys = x : ys} in x : ys} in f x xs
---                        |~> let {xs = x : xs} in f x xs
---proof: -simple -single{
---  -
---}
+--inductive case (after induction)
+proposition: G free(x f) |- let {xs = let {ys = x : ys} in x : ys} in f x xs
+                        |~> let {xs = x : xs} in f x xs;
+proof: -simple -single{
+  -value-merge'
+    ctx=(let G in [.])
+    G=let {}
+    x=xs
+    y=ys
+    V=(x:ys)
+    M=(f x xs);
+  |~>
+} qed;
