@@ -34,7 +34,6 @@ HeapWeightExpr.  HeapWeight ::= Integer;
 DRedWeight. RedWeight ::= "[" StackWeight "]";
 
 TAny.             Term3 ::= "?";
-TTermVar.         Term3 ::= "any" "(" CapitalIdent ")";
 TNonTerminating.  Term3 ::= "@" ;
 TVar.             Term3 ::= Var;
 TNum.             Term3 ::= Integer;

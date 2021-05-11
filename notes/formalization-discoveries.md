@@ -8,3 +8,5 @@ Beviset tar inte bort den tomma dummy reference-variabeln vid reduktionen. -dumm
 
 TODO
 -Just nu så ser den till att variabler är skilda när den substituerar in till bool-termerna. Den ska se till att det inte krockar när den substituterar till samma term, men när det är olika bool-termer, så ska det vara okej att variabelnamn krockar. Annars blir det konstigt med substitutionen - eventuellt. Just nu funkar det...
+
+After putting up the general things, I would like to let FAITH run through it to make sure that everything parses etc. It's not too hard, but requires some time.

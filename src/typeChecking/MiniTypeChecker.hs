@@ -210,7 +210,6 @@ instance Transformable UT.Term where
   type TransformedVersion UT.Term = T.Term
   transform :: UT.Term -> StCheckM T.Term
   transform (UT.TAny)                          = noSupport "TAny"
-  transform (UT.TTermVar capitalIdent)         = noSupport "TTermVar"
   transform (UT.TNonTerminating)               = return T.TNonTerminating
   transform (UT.TVar var)                      = do
     let tVar = getVarName var
