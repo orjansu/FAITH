@@ -556,10 +556,10 @@ checkArg (UT.CAAssign assignee value) = case assignee of
           _ -> throwError "Not a context."
       UTLaw.MetaVarMVIntegerVar (UTLaw.MVIntegerVar name) ->
         case value of
-          UT.CVIntExpr integer -> do
+          UT.CVSubTerm (UT.STTerm (UT.TNum integer)) -> do
             return $ Just (name, T.SIntegerVar integer)
-          _ -> throwError $ "Argument "++mvStr++" is not an integer "
-                ++"expression. Use int ( Term ) to indicate that it is."
+          _ -> throwError $ "Argument "++mvStr++" is not an integer, it is "
+                           ++show value
       UTLaw.MetaVarMVVar (UTLaw.MVVar name) -> do
         case value of
           UT.CVSubTerm (UT.STTerm (UT.TVar (UT.DVar (UT.Ident varName)))) ->

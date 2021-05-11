@@ -81,31 +81,31 @@ applySubstitution law sideCond substitutions forbiddenNames1 freeVars = do
                             map showSingle $
                               Map.toList substitutions
     showSingle (name, subst) = name ++ " -> "++showSubstitute subst
-    showSubstitute = \case
-      T.SLetBindings letBindings ->
-        showTypedTerm letBindings
-      T.SValue term -> showTypedTerm term
-      T.SContext term -> showTypedTerm term
-      T.SIntegerVar intExpr -> show intExpr
-      T.SVar string -> string
-      T.SVarVect strings -> show strings
-      T.SValueContext term -> showTypedTerm term
-      T.SReduction red -> showTypedTerm $ T.TRedWeight 1 red
-      T.SVarSet stringSet ->
-        let listForm = concat . intersperse ", " . Set.toList $ stringSet
-        in "{" ++ listForm ++"}"
-      T.STerm term -> showTypedTerm term
-      T.STerms terms -> let strs = map showTypedTerm terms
-                        in concat $ intersperse ", " strs
-      T.SPatterns ptns -> show ptns
-      T.SCaseStms stms -> let strStms = map showStm stms
-                              everything = concat $ intersperse ", " strStms
-                         in "{"++everything++"}"
-        where
-          showStm (constr, vars, term) =
-            let vars' = concat $ intersperse " " vars
-            in constr++" "++vars'++" -> "++showTypedTerm term
-      T.SConstructorName str -> str
+showSubstitute = \case
+  T.SLetBindings letBindings ->
+    showTypedTerm letBindings
+  T.SValue term -> showTypedTerm term
+  T.SContext term -> showTypedTerm term
+  T.SIntegerVar intExpr -> show intExpr
+  T.SVar string -> string
+  T.SVarVect strings -> show strings
+  T.SValueContext term -> showTypedTerm term
+  T.SReduction red -> showTypedTerm $ T.TRedWeight 1 red
+  T.SVarSet stringSet ->
+    let listForm = concat . intersperse ", " . Set.toList $ stringSet
+    in "{" ++ listForm ++"}"
+  T.STerm term -> showTypedTerm term
+  T.STerms terms -> let strs = map showTypedTerm terms
+                    in concat $ intersperse ", " strs
+  T.SPatterns ptns -> show ptns
+  T.SCaseStms stms -> let strStms = map showStm stms
+                          everything = concat $ intersperse ", " strStms
+                     in "{"++everything++"}"
+    where
+      showStm (constr, vars, term) =
+        let vars' = concat $ intersperse " " vars
+        in constr++" "++vars'++" -> "++showTypedTerm term
+  T.SConstructorName str -> str
 
 -- | Given a sidecondition and a set of substitutions (where all substitutions
 -- for the sidecondition are provided), the function checks if the
@@ -129,7 +129,8 @@ checkSideCondition (Law.WithSideCond boolTerm) substitutions = do
 -- has a name that is forbidden (in the forbidden names) or that one bound
 -- variable in one substitution has the same name as a bound variable in
 -- another substitution.
-checkSubstBVDistinct :: T.Substitutions -> Set.Set String -> CheckM [()]
+checkSubstBVDistinct :: HasCallStack =>
+                        T.Substitutions -> Set.Set String -> CheckM [()]
 checkSubstBVDistinct substitutions forbiddenNames = do
   Log.logInfoN . pack $ "Checking that the names of the bound variables in the "
     ++"substitutions are valid (i.e. distinct from each other and the free "
@@ -137,37 +138,40 @@ checkSubstBVDistinct substitutions forbiddenNames = do
   (flip evalStateT) forbiddenNames $
     mapM checkBVSubstitution $ Map.elems substitutions
   where
-    checkBVSubstitution :: T.Substitute -> StateT (Set.Set String) CheckM ()
-    checkBVSubstitution = \case
-      T.SLetBindings letBindings -> do
-        let (bindVars, _sw, _hw, terms) = unzip4 letBindings
-        checkBSSubstListBvsTerms bindVars terms
-      T.SValue term -> checkBVTerm term
-      T.SContext term -> checkBVTerm term
-      T.SIntegerVar intExpr -> return ()
-      T.SVar string -> return ()
-      T.SVarSet varSet -> return ()
-      T.SVarVect varVect -> return ()
-      T.SValueContext term -> checkBVTerm term
-      T.STerm term -> checkBVTerm term
-      T.STerms terms -> mapM checkBVTerm terms >> return ()
-      T.SPatterns ptns -> return ()
-      T.SCaseStms stms -> do
-        let (_, bindVars, terms) = unzip3 stms
-        checkBSSubstListBvsTerms (concat bindVars) terms
-      T.SConstructorName str -> return ()
-      T.SReduction red -> case red of
-        T.RApp T.THole var -> return ()
-        T.RCase T.THole stms -> do
+    checkBVSubstitution :: HasCallStack =>
+                           T.Substitute -> StateT (Set.Set String) CheckM ()
+    checkBVSubstitution substitute = do
+      Log.logInfoN . pack $ "Checking substitute "++showSubstitute substitute
+      case substitute of
+        T.SLetBindings letBindings -> do
+          let (bindVars, _sw, _hw, terms) = unzip4 letBindings
+          checkBSSubstListBvsTerms bindVars terms
+        T.SValue term -> checkBVTerm term
+        T.SContext term -> checkBVTerm term
+        T.SIntegerVar intExpr -> return ()
+        T.SVar string -> return ()
+        T.SVarSet varSet -> return ()
+        T.SVarVect varVect -> return ()
+        T.SValueContext term -> checkBVTerm term
+        T.STerm term -> checkBVTerm term
+        T.STerms terms -> mapM checkBVTerm terms >> return ()
+        T.SPatterns ptns -> return ()
+        T.SCaseStms stms -> do
           let (_, bindVars, terms) = unzip3 stms
           checkBSSubstListBvsTerms (concat bindVars) terms
-        T.RPlusWeight T.THole rw term -> checkBVTerm term
-        T.RAddConst _i T.THole -> return ()
-        T.RIsZero T.THole -> return ()
-        T.RSeq T.THole term -> checkBVTerm term
-        _ -> internalException $ "the non-reduction-context "
-          ++showTypedTerm (T.TRedWeight 1 red)++" got all the way to"
-          ++"substitution."
+        T.SConstructorName str -> return ()
+        T.SReduction red -> case red of
+          T.RApp T.THole var -> return ()
+          T.RCase T.THole stms -> do
+            let (_, bindVars, terms) = unzip3 stms
+            checkBSSubstListBvsTerms (concat bindVars) terms
+          T.RPlusWeight T.THole rw term -> checkBVTerm term
+          T.RAddConst _i T.THole -> return ()
+          T.RIsZero T.THole -> return ()
+          T.RSeq T.THole term -> checkBVTerm term
+          _ -> internalException $ "the non-reduction-context "
+            ++showTypedTerm (T.TRedWeight 1 red)++" got all the way to"
+            ++"substitution."
 
     checkBSSubstListBvsTerms bindVars terms = do
       let innerBVs = map getBoundVariables terms
@@ -177,7 +181,7 @@ checkSubstBVDistinct substitutions forbiddenNames = do
       forbiddenNames2 <- assertDisjointAndMerge shouldBeDistinct
       put forbiddenNames2
 
-    checkBVTerm :: T.Term -> StateT (Set.Set String) CheckM ()
+    checkBVTerm :: HasCallStack => T.Term -> StateT (Set.Set String) CheckM ()
     checkBVTerm term = do
       let bvSet = getBoundVariables term
       forbiddenNames1 <- get

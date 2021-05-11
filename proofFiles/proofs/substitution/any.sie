@@ -21,7 +21,7 @@ proposition: G free(any') |-
                    , y:ys -> s^(let { z = @
                                     , py = p <> y
                                     , anypys = {z}d^(any' <> p <> y <> ys)}
-                             in or <> py <> anypys)});
+                                in or <> py <> anypys)});
 proof: -simple -single{
   -heap-spike-intro-lr ctx=(let G in (\p. \xs. [.]))
                        M= (case xs of
@@ -29,7 +29,7 @@ proof: -simple -single{
                                  , y:ys -> let { py = p y
                                                , anypys = any' p y ys}
                                            in or py anypys})
-                       w=int(2);
+                       w=2;
   <~~> \p. \xs. [2]h^(case xs of
                       { [] -> False
                       , y:ys -> let { py = p y
@@ -42,7 +42,7 @@ proof: -simple -single{
     M=(let { py = p y
                   , anypys = any' p y ys}
               in or py anypys)
-    w=int(1);
+    w=1;
   <~~> \p. \xs. [2]h^(case xs of
                         { [] -> False
                         , y:ys -> s^(let { py = p y
@@ -55,7 +55,7 @@ proof: -simple -single{
                                            , anypys = any' p y ys}
                                     in or py anypys)}))
     M=False
-    w=int(1);
+    w=1;
   <~~> \p. \xs. [2]h^(case xs of
                         { [] -> s^False
                         , y:ys -> s^(let { py = p y

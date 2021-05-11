@@ -86,7 +86,6 @@
 -spike-algebra-13:          [w]s^M |~> M;
 -spike-algebra-14:          [w]h^M |~> M;
 
--spike-algebra-zero-stack-spike: [0]s^M <~> M; -- Just used in proof.
 
 -dummy-ref-algebra-1:   [w]^R[{X}d^M] <~> [w]s^{X}d^[w]^R[M];
 -dummy-ref-algebra-2: let G in {X}d^M <~> [|G|]h^{X}d^(let G in M)
@@ -125,3 +124,4 @@
 
 -- Laws that I added that I think are needed and valid
 -balloon-intro-untyped: M x <~~> M <> x;
+-spike-algebra-zero-stack-spike: [0]s^M <~> M; -- Just used in proof.

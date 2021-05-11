@@ -131,7 +131,6 @@ CAAssign.          CmdArgument ::= CmdAssignee "=" CmdValue ;
 CVSubTerm.         CmdValue    ::= SubTerm ;
 CVVarSet.          CmdValue    ::= VarSet;
 CVVarVect.         CmdValue    ::= "variables" "[" [Var] "]";
-CVIntExpr.         CmdValue    ::= "int" "(" Integer ")";
 CVLet.             CmdValue    ::= "let" LetBindings;
 CVPatterns.        CmdValue    ::= "patterns" "[" [Constructor] "]";
 CVCaseStms.        CmdValue    ::= "case" "{" [CaseStm] "}";
