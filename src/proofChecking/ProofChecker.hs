@@ -10,7 +10,6 @@ module ProofChecker where
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import qualified Data.Map.Strict as Map
-import qualified Data.Map.Lazy as LMap
 import Data.Text (pack, Text)
 import Data.List (permutations, intersperse, zip4, unzip4)
 import qualified Data.Set as Set
@@ -156,83 +155,20 @@ checkAlphaEqWrtLetReorder m n = do
       T.THole -> [bigTerm]
       T.TLet letBindings term ->
         let (vars, sws, hws, terms) = unzip4 letBindings
-        {-
-        assert $ distinct vars -- (vet jag)
-        -- (lazy maps)
-        init :: Map (String, Integer, Integer) T.Term
-        branchInner :: Map (String, Integer, Integer) [T.Term]
-        bInnerLists = elems branchInner :: [[T.Term]]
-        bCombinations = combinations bInnerLists :: [[T.Term]]
-        lets :: [Map (String, Integer, Integer) T.Term]
-        lets = map (go (keys init)) bCombinations
-          where go bindKeys terms = let a = zip bindKeys terms
-                                    in Map.fromList a
-        letsAllOrders :: [[T.LetBindings]]
-        termPerms = getAllLetPermutations terms
-        final = [T.TLet lbs term | lbs <- letsAllOrders, term <- termPerms]
-        -}
-        -- We know that all variables are distinct, so we can use (var, sw, hw)
-        -- as a key just as well as var.
-            --letMap = LMap.fromList $ zip (zip3 vars sws hws) terms
-            --  :: LMap.Map (String, Integer, Integer) T.Term
-            --branchInner = LMap.map getAllLetPermutations letMap
-            --  :: LMap.Map (String, Integer, Integer) [T.Term]
-            --bInnerLists = LMap.elems branchInner
-            --  :: [[T.Term]]
-            --bInnerCombinations = combinations bInnerLists
-            --  :: [[T.Term]]
-            --lets = combineLets (LMap.keys letMap) bInnerCombinations
-            --  :: [LMap.Map (String, Integer, Integer) T.Term]
-            --letsAllOrders = map toAllOrders lets
-            --  :: [[T.LetBindings]]
-            --letsAllOrdersConcat = concat letsAllOrders
-            --  :: [T.LetBindings]
-            --termPerms = getAllLetPermutations term
-            --  :: [T.Term]
-            --final = [T.TLet lbs t | lbs <- letsAllOrdersConcat, t <- termPerms]
-            --showAllThings =
-            --  "\nletMap:\t\t"++show (LMap.map showTypedTerm letMap)
-            --  ++"\nbranchInner:\t"++show (LMap.map (map showTypedTerm) --branchInner)
-            --  ++"\nbInnerLists:\t"++show (map (map showTypedTerm) bInnerLists)
-            --  ++"\nbInnerComb:\t"++show (map (map showTypedTerm) --bInnerCombinations)
-            --  ++"\nlets:\t\t"++show (map (LMap.map showTypedTerm) lets)
-            --  ++"\nletsAllOrders:\t"++show (map (map showTypedTerm) --letsAllOrders)
-            --  ++"\nletsAllOrdersCc:"++show (map showTypedTerm --letsAllOrdersConcat)
-            --  ++"\ntermPerms:\t"++ show (map showTypedTerm termPerms)
-            --  ++"\nfinal:\t"++show (map showTypedTerm final)
             a = map getAllLetPermutations terms :: [[T.Term]]
+            -- a = permutations of let:s in inner terms
             b = combinations a :: [[T.Term]]
+            -- b = combinations of permutations, which can make up a let
             c = map (zip4 vars sws hws) b :: [T.LetBindings]
+            -- c = b, but turned into actual let:s with binding variable and
+            -- weights
             d = map permutations c :: [[T.LetBindings]]
-            d1 = concat d :: [T.LetBindings]
-            e = getAllLetPermutations term :: [T.Term]
-            f = [T.TLet lbs term | lbs <- d1, term <- e]
-            showAllThings = "a:"++show (map (map showTypedTerm) a)
-                          ++"\nb:"++show (map (map showTypedTerm) b)
-                          ++"\nc:"++show (map showTypedTerm c)
-                          ++"\nd:"++show (map (map showTypedTerm) d)
-                          ++"\nd1:"++show (map showTypedTerm d1)
-                          ++"\ne:"++show (map showTypedTerm e)
-                          ++"\nf:"++show (map showTypedTerm f)
-            --innerLetPerms = map getBindingPerms letBindings
-            --innerCombined = combinations innerLetPerms :: [T.LetBindings]
-            --permsLB = concat $ map permutations innerCombined :: [T.LetBindings]
-            --permsTerm = getAllLetPermutations term
-            --combinedPerms = [(lbs, term) | lbs <- permsLB, term <- permsTerm]
-        in trace showAllThings f --trace showAllThings f --trace (showAllThings) map toLetBindings combinedPerms
-        where
-          combineLets _ [] = []
-          combineLets keys (termCombination:termCombinations) =
-            let curr = LMap.fromList $ zip keys termCombination
-                next = combineLets keys termCombinations
-                res = curr:next
-            in res
-
-          toAllOrders letMap =
-            let tups = LMap.toList letMap
-                lets = map (\((var, sw, hw), t) -> (var, sw, hw, t)) tups
-                allOrderLets = permutations lets
-            in allOrderLets
+            -- d = all permutations of every combination of let bindings
+            bindingPermutations = concat d :: [T.LetBindings]
+            -- since every permutation is equally relevant, we concatinate.
+            mainTermPermutations = getAllLetPermutations term :: [T.Term]
+        in [T.TLet lbs term | lbs <- bindingPermutations
+                              , term <- mainTermPermutations]
 
       T.TDummyBinds varSet term -> recursePerms term (T.TDummyBinds varSet)
       T.TStackSpikes sw term -> recursePerms term (T.TStackSpikes sw)
