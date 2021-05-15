@@ -14,7 +14,8 @@ TLet. Term ::= "let" "{" [LetBinding] "}" "in" Term;
 TDummyBinds. Term ::= "{" [Var] "}d^" Term;
 TStackSpikes. Term ::= "[" Integer "]s^" Term;
 THeapSpikes. Term ::= "[" Integer "]h^" Term;
-TRedWeight. Term ::= "[" Integer "]" Red;
+TRedWeight. Term ::= "[" Integer "]" "^" Red;
+TRAppNoW. Term ::= Term "<>" Var;
 TRed. Term ::= Red;
 
 LambdaVar.          Var ::= "a(" Integer ")";

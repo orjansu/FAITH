@@ -45,6 +45,8 @@ instance Convertible LNL.Term where
     let pTerm = toPrintable term
     in P.THeapSpikes hw pTerm
   toPrintable (LNL.TRedWeight 1 red) = P.TRed (toPrintable red)
+  toPrintable (LNL.TRedWeight 0 (LNL.RApp term var)) =
+    P.TRAppNoW (toPrintable term) (toPrintable var)
   toPrintable (LNL.TRedWeight redWeight red) = P.TRedWeight redWeight
                                                             (toPrintable red)
 

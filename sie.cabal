@@ -66,6 +66,7 @@ executable sie
                        transformers,
                        extra,
                        ghc,
-                       prelude-safeenum
+                       prelude-safeenum,
+                       Cabal
 
   default-language:    Haskell2010

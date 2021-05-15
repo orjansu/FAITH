@@ -17,6 +17,8 @@ import GHC.Stack (HasCallStack, callStack, prettyCallStack)
 import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.Text (pack, Text)
+import Distribution.Simple.Utils (fromUTF8BS)
+
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
 
@@ -37,7 +39,7 @@ runCheckM monadComputation =
 
 toLine :: Log.LogLine -> String
 toLine (loc, logsource, loglevel, logstr) =
-  show (loglevel, logstr)
+  fromUTF8BS $ Log.fromLogStr logstr
 
 assert :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
           Bool -> String -> m ()
