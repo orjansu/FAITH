@@ -28,12 +28,16 @@ token MVValueContext     ('V' 'c' 't' 'x');
 token MVReduction        ('R');
 token MVVarSet           ('X' | 'Y');
 token MVTerm             ('M' | 'N');
-token MVTerms            ('N' '_' 'i');
-token MVPatterns         ('p' 'a' 't' '_' 'i');
-token MVCaseStms          ('a' 'l' 't' 's' digit*);
+token MVTerms            ('N' '_' 'i'); -- See note below
+token MVPatterns         ('p' 'a' 't' '_' 'i'); -- See note below
+token MVCaseStms         ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
--- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
--- a way to share grammar between .cf files.
+-- NOTE: Currently, the system does not support multiple vectorized expressions.
+-- Therefore, MVPatterns and MVTerms may only match on one string (currently
+-- pat_i and N_i). If you wish to add multiple indexed expressions, you need to
+-- make sure that nested indexed expressions work (see Substitution.hs) and that
+-- the right terms are paired with the right patterns when checking arguments
+-- in MiniTypeChecker.hs.
 
 rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVTerms | MVPatterns | MVCaseStms | MVConstructorName;
 

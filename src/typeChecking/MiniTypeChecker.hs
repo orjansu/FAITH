@@ -219,7 +219,6 @@ checkTopLevelTerm term = do
 instance Transformable UT.Term where
   type TransformedVersion UT.Term = T.Term
   transform :: UT.Term -> StCheckM T.Term
-  transform (UT.TAny)                          = noSupport "TAny"
   transform (UT.TNonTerminating)               = return T.TNonTerminating
   transform (UT.TVar var)                      = do
     let tVar = getVarName var
@@ -314,7 +313,6 @@ transformPlus mrw1 t1 mrw2 t2 = do
 
 instance Transformable UT.LetBindings where
   type TransformedVersion UT.LetBindings = T.LetBindings
-  transform UT.LBSAny = fail "not implemented yet 12"
   transform (UT.LBSVar (UT.CapitalIdent name)) = do
     letBindings <- gets letBindings
     case Map.lookup name letBindings of
@@ -326,7 +324,6 @@ instance Transformable UT.LetBindings where
     where
       transformSingle :: UT.LetBinding
                      -> StCheckM (T.Name, T.StackWeight, T.HeapWeight, T.Term)
-      transformSingle UT.LBAny = fail "not implemented yet 13"
       transformSingle (UT.LBConcrete var UT.BSNoWeight term) = do
         let tVar = getVarName var
         tTerm <- transform term
@@ -500,6 +497,7 @@ instance Checkable UT.TransCmd where
         Log.logInfoN . pack $ "Checking arguments to transformation "
                               ++commandName
         context <- getContext args
+        checkVectorizedArgs args
         checkedMaybeArgs <- mapM checkArg args
         let checkedArgs = catMaybes checkedMaybeArgs
             substitutions = Map.fromList checkedArgs
@@ -530,12 +528,12 @@ getContext args = do
       UT.CAContext -> case value of
         UT.CVSubTerm (UT.STTerm term) -> Just term
         _ -> Nothing
-    getCtx _ = Nothing
 
+checkVectorizedArgs :: HasCallStack => [UT.CmdArgument] -> StCheckM ()
+checkVectorizedArgs = undefined
 
 checkArg :: HasCallStack => UT.CmdArgument
                             -> StCheckM (Maybe (String, T.Substitute))
-checkArg (UT.CAValue _) = noSupport "CAValue"
 checkArg (UT.CAAssign assignee value) = case assignee of
   UT.CASubTerm -> return Nothing
   UT.CAContext -> return Nothing

@@ -17,12 +17,10 @@ comment "{-" "-}";
 
 --------------- Terms ------------------------------
 
-LBSAny.   LetBindings ::= "?";
 LBSVar.   LetBindings ::= CapitalIdent;
 LBSSet.   LetBindings ::= "{" [LetBinding] "}";
 separator LetBinding ",";
 
-LBAny.      LetBinding ::= "?";
 LBConcrete. LetBinding ::= Var BindSymbol Term;
 
 BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
@@ -33,7 +31,6 @@ HeapWeightExpr.  HeapWeight ::= Integer;
 
 DRedWeight. RedWeight ::= "[" StackWeight "]";
 
-TAny.             Term3 ::= "?";
 TNonTerminating.  Term3 ::= "@" ;
 TVar.             Term3 ::= Var;
 TNum.             Term3 ::= Integer;
@@ -125,7 +122,6 @@ WeakCostEquiv.       ImpRel ::= "<~~>";
 token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 -- copied to SieLaws
 
-CAValue.           CmdArgument ::= CmdValue;
 CAAssign.          CmdArgument ::= CmdAssignee "=" CmdValue ;
 CVSubTerm.         CmdValue    ::= SubTerm ;
 CVVarSet.          CmdValue    ::= VarSet;
@@ -155,8 +151,5 @@ CmdGeneral. TransCmd ::= CommandName [CmdArgument];
 STWholeWithCtx. SubTerm ::= "whole";
 STShown.        SubTerm ::= "shown";
 STTerm.  SubTerm ::=  Term3  ;
-STGuess. SubTerm ::= "guess";
 
 STCAlphaEquiv.  SpecialTransCmd ::= "-alpha-equiv";
--- STCReorderCase. SpecialTransCmd ::= "-reorder-case" "(" [Var] ")";
--- STCReorderLet.  SpecialTransCmd ::= "-reorder-let" "(" [Var] ")";
