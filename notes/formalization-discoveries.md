@@ -6,6 +6,9 @@ you kinda don't check the side conditions.
 
 Beviset tar inte bort den tomma dummy reference-variabeln vid reduktionen. -dummy-reference-algebra-5 måste läggas till.
 
+--Case study 2
+many let's in the beginning... Remove sometimes? Använd ngn funktion för att automatiskt ta fram skilnaden mellan två termers string-representation.
+
 FRÅGOR
 det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
 

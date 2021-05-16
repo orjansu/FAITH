@@ -162,7 +162,7 @@ instance Checkable UT.Theorem where
                                        freeVars
                                        start
                                        impRel
-                                       goal) proof) = do
+                                       utGoal) proof) = do
     letContext <- case context of
       UT.WithContext (UT.CapitalIdent ctxVar) -> do
         letBindings1 <- gets letBindings
@@ -176,11 +176,12 @@ instance Checkable UT.Theorem where
     let T.DFreeVars termVars varVars = tFreeVars
     modify (\st -> st{freeVarVars = varVars})
     tStart <- checkTopLevelTerm start
-    tGoal <- checkTopLevelTerm goal
+    tGoal <- checkTopLevelTerm utGoal
     modify (\st -> st{start = tStart, goal = tGoal})
     tProof <- check proof
     tImpRel <- check impRel
-    let prop = T.DProposition tFreeVars tStart tImpRel tGoal
+    maybeChangedGoal <- gets goal -- might be changed because of the HereMarker
+    let prop = T.DProposition tFreeVars tStart tImpRel maybeChangedGoal
     return $ T.DTheorem prop tProof
 
 instance Checkable UT.Free where
