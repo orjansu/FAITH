@@ -134,11 +134,9 @@ checkAlphaEqWrtLetReorder m n = do
   orderedEq <- isAlphaEquiv m n
   if orderedEq
     then return ()
-    else do
+    else
       let permutations = getAllLetPermutations m
-          showPerms = showTerms permutations
-      Log.logInfoN . pack $ "permutations: \n"++showPerms
-      if any (isOrderedAlphaEq n) permutations
+      in if any (isOrderedAlphaEq n) permutations
               then return ()
               else throwCallstackError $ "Not alpha equivalent, even with "
                     ++ "reordering of let:s"

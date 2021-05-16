@@ -46,6 +46,7 @@ data MySt = MkSt { letBindings :: Map.Map String T.LetBindings
                  , goal :: T.Term
                  , freeVarVars :: Set.Set String
                  , lawMap :: Law.LawMap
+                 , isComplete :: Bool
                  }
 
 mkInitSt :: Law.LawMap -> MySt
@@ -59,6 +60,7 @@ mkInitSt lawMap = MkSt { letBindings = Map.empty
                        , goal = undefined
                        , freeVarVars = undefined
                        , lawMap = lawMap
+                       , isComplete = True
                        }
 
 newtype StCheckM a = Mk {getM :: (StateT MySt CheckM a)}
@@ -68,13 +70,16 @@ newtype StCheckM a = Mk {getM :: (StateT MySt CheckM a)}
 instance MonadFail StCheckM where
     fail str = throwError str
 
+type IsComplete = Bool
 typecheckProof :: (HasCallStack) =>
-                  UT.ProofScript -> Law.LawMap -> Either String T.ProofScript
+                  UT.ProofScript
+                  -> Law.LawMap
+                  -> Either String (T.ProofScript, IsComplete)
 typecheckProof proofScript lawMap =
   let initSt = mkInitSt lawMap
   in runStCheckM initSt $ check proofScript
 
-runStCheckM :: MySt -> StCheckM a -> Either String a
+runStCheckM :: MySt -> StCheckM a -> Either String (a, Bool)
 runStCheckM initSt monadic = do
   let res = runCheckM $
               (flip runStateT) initSt $
@@ -83,7 +88,7 @@ runStCheckM initSt monadic = do
   case res of
     Left errorMsgs -> let combined = intercalate "\n" errorMsgs
                       in Left combined
-    Right (a, _st) -> Right a
+    Right (a, st) -> Right (a, isComplete st)
 
 --- Utility
 -- converts the term M to let G in M if G is the context of the proof.
@@ -126,6 +131,10 @@ instance Checkable UT.ProofScript where
   type TypedVersion UT.ProofScript = T.ProofScript
   check (UT.DProofScript (UT.DProgBindings bindings) theorems) = do
     mapM addEntry bindings
+    cs <- gets constructors
+    lbs <- gets letBindings
+    assert (Map.keysSet cs `Set.disjoint` Map.keysSet lbs)
+      "constructors and let bindings must have different names"
     tTheorems <- mapM check theorems
     return $ T.DProofScript tTheorems
     where
@@ -425,6 +434,11 @@ instance Checkable UT.Proof where
         proofStep <- checkProofStep term1 transCmd imprel term2
         proofSteps <- checkSteps2 $ (UT.PSTerm term2):cmds
         return $ proofStep:proofSteps
+      checkSteps2 ((UT.PSTerm term):UT.PSHereMarker:steps) = do
+        modify (\st -> (st{isComplete = False}))
+        tTerm <- checkTopLevelTerm term
+        modify (\st -> (st{goal = tTerm}))
+        return []
       checkSteps2 ((UT.PSTerm term1)
                    :(UT.PSCmd transCmd)
                    :(UT.PSImpRel impRel)
@@ -443,8 +457,9 @@ instance Checkable UT.Proof where
                    --it is not lost.
       checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
         ++"step must be a term and every other a transformational command "
-        ++"and an improvement relation. Note that the HereMarker $ is not "
-        ++"supported yet."
+        ++"and an improvement relation. Note that the HereMarker $ is only "
+        ++"allowed after a term and that if the last term is not specified, "
+        ++"the improvement relation must be specified."
 
       checkProofStep :: UT.Term -> UT.TransCmd -> UT.ImpRel
                         -> UT.Term -> StCheckM T.ProofStep

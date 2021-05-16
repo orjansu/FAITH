@@ -29,19 +29,12 @@ proposition: G free(p xs) |-
       , b = map_a <> p <> xs}
   in foldr_a <> or <> a <> b
   <~>
-  let { a = False
-      , b = map_a <> p <> xs}
-  in (\f5 . \ z5 . \l5 .
-                    case l5 of
-                      { [] -> z5
-                      , a5:as5 -> let {t5 = foldr_a <> f5 <> z5 <> as5}
-                                  in f5 <> a5 <> t5}) <> or <> a <> b;
-  --let {ys1 = map_a <> p <> xs}
-  --in case ys1 of
-  --  { [] -> False
-  --  , a:as -> let { false = False
-  --                , t2 = foldr_a <> or <> false <> as}
-  --              in or <> a <> t2};
+  let {ys5 = map_a <> p <> xs}
+  in case ys5 of
+    { [] -> False
+    , a:as -> let { false = False
+                  , t5 = foldr_a <> or <> false <> as}
+                in or <> a <> t5};
   --[1]h^[2] case xs of
   --           [] -> s^False
   --           b : bs -> [1] let {z = @ --   foldr_a^n
@@ -79,7 +72,9 @@ proof: -simple -single {
              { [] -> z5
              , a5:as5 -> let {t5 = foldr_a <> f5 <> z5 <> as5}
                          in f5 <> a5 <> t5})
-    C = ([.] <> or <> a <> b);
+    C = (let { a = False
+             , b = map_a <> p <> xs}
+         in [.] <> or <> a <> b);
   <~>
   let { a = False
       , b = map_a <> p <> xs}
@@ -88,6 +83,25 @@ proof: -simple -single {
            { [] -> z5
            , a5:as5 -> let {t5 = foldr_a <> f5 <> z5 <> as5}
                        in f5 <> a5 <> t5}) <> or <> a <> b;
+  -balloon-reduction-lr
+    ctx = (let G in let { a = False
+                        , b = map_a <> p <> xs}
+                    in [.] <> a <> b)
+    M = (\ z5 . \l5 .
+           case l5 of
+             { [] -> z5
+             , a5:as5 -> let {t5 = foldr_a <> f5 <> z5 <> as5}
+                         in f5 <> a5 <> t5})
+    x=f5 y=or;
+  <~>
+  let { a = False
+      , b = map_a <> p <> xs}
+  in (\ z5 . \l5 .
+         case l5 of
+           { [] -> z5
+           , a5:as5 -> let {t5 = foldr_a <> or <> z5 <> as5}
+                       in or <> a5 <> t5}) <> a <> b;
+  $
 } qed;
 
 ---- post-induction

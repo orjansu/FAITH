@@ -71,7 +71,12 @@ runTypecheckProof proofScript lawMap =
       hPutStrLn stderr "ERROR"
       hPutStrLn stderr $ "Type error: " ++ err
       exitFailure
-    Right tree' -> return tree'
+    Right (tree', isComplete) ->
+      if isComplete
+        then return tree'
+        else do
+          putStrLn "NOTE: proof not complete. Checking until marker $."
+          return tree'
 
 runCheckDetailedProof :: T.ProofScript -> IO ()
 runCheckDetailedProof tTree =
