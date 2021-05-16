@@ -274,20 +274,20 @@ proof: -simple -single {
                 , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                             in or <> a5 <> t5})
     w=1
-    v=1
     M=xs
-    pat_i=patterns [ [], a5:as5 ]
+    pat_i=patterns [ [], a10:as10 ]
     N_i=terms [ [],  let { h7 = p <> a7
                          , t7 = map_a <> p <> as7}
-                     in h7:t7];
+                     in h7:t7]
+    v=1;
   <~> let { false = False}
       in h^ ([2] case xs of
         { [] -> case [] of
                   { [] -> false
-                  , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
-                              in or <> a5 <> t5}
-        , b:bs -> case let { h7 = p <> a7
-                           , t7 = map_a <> p <> as7}
+                  , a8:as8 -> let {t8 = foldr_a <> or <> false <> as8}
+                              in or <> a8 <> t8}
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
                        in h7:t7 of
                     { [] -> false
                     , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}

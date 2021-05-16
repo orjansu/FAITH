@@ -208,7 +208,7 @@ instance Checkable UT.Free where
 -- - Converts to T.Term.
 -- - Adds the implicit let of derivations in context (if there is one)
 -- - Stack weight expressions: See checkWeightExpr
-checkTopLevelTerm :: UT.Term -> StCheckM T.Term
+checkTopLevelTerm :: HasCallStack => UT.Term -> StCheckM T.Term
 checkTopLevelTerm term = do
   transformed <- transform term
   withLet <- withLetContext transformed
@@ -530,7 +530,59 @@ getContext args = do
         _ -> Nothing
 
 checkVectorizedArgs :: HasCallStack => [UT.CmdArgument] -> StCheckM ()
-checkVectorizedArgs = undefined
+checkVectorizedArgs args = do
+  let metaVars = catMaybes $ map getMeta args
+  pMetaVars <- mapM parsePair metaVars
+  let vectorized = filter (isVectorized . fst) pMetaVars
+  if length vectorized == 2
+    then do
+      Log.logInfoN . pack $ "Checking vectorized arguments (pat_i, N_i)"
+      let [patternsValue] = catMaybes $ map getPatI vectorized
+          [termsValue] = catMaybes $ map getTerms vectorized
+      case (patternsValue, termsValue) of
+        (UT.CVPatterns constructors , UT.CVTerms utTerms) -> do
+          assert (length constructors == length utTerms)
+            "vectorized expressions should have same length"
+          let caseStms = map toCaseStm $ zip constructors utTerms
+          tCaseStms <- mapM transform caseStms
+          let dummyTerm = T.TRedWeight 1 $ T.RCase (T.TNum 1) tCaseStms
+          checkArgumentTerm dummyTerm
+          assert (numHoles dummyTerm == 0) "should not be a context"
+        _ -> throwError "Values to vectorized expressions are of wrong type."
+    else assert (length vectorized == 0)
+          $ "You must supply all substitutions and there can only be one pair"
+          ++"of vectorized substitutions."
+  where
+    toCaseStm (constructor, args) = UT.CSConcrete constructor args
+
+    getTerms (UTLaw.MetaVarMVTerms _, value) = Just value
+    getTerms _ = Nothing
+
+    getPatI (UTLaw.MetaVarMVPatterns _, value) = Just value
+    getPatI _ = Nothing
+
+    isVectorized (UTLaw.MetaVarMVTerms _) = True
+    isVectorized (UTLaw.MetaVarMVPatterns _) = True
+    isVectorized _ = False
+
+    parsePair (mv, val) = do
+      pMv <- parseMetavar mv
+      return (pMv, val)
+
+    getMeta (UT.CAAssign UT.CASubTerm _) = Nothing
+    getMeta (UT.CAAssign UT.CAContext _) = Nothing
+    getMeta (UT.CAAssign (UT.CAMetaVar metavar) value) =
+      Just (getArgString metavar, value)
+
+parseMetavar :: String -> StCheckM UTLaw.MetaVar
+parseMetavar mvStr = case (ParSieLaws.pMetaVar (ParSieLaws.myLexer mvStr)) of
+           Left err -> throwError $ "Error when parsing metavariable: "++err
+           Right parsed -> return parsed
+
+getArgString :: UT.VarAnyType -> String
+getArgString metaVar = case metaVar of
+              UT.BigVar (UT.CapitalIdent str) -> str
+              UT.SmallVar (UT.Ident str) -> str
 
 checkArg :: HasCallStack => UT.CmdArgument
                             -> StCheckM (Maybe (String, T.Substitute))
@@ -538,13 +590,9 @@ checkArg (UT.CAAssign assignee value) = case assignee of
   UT.CASubTerm -> return Nothing
   UT.CAContext -> return Nothing
   UT.CAMetaVar metaVar -> do
-    let mvStr = case metaVar of
-                  UT.BigVar (UT.CapitalIdent str) -> str
-                  UT.SmallVar (UT.Ident str) -> str
+    let mvStr = getArgString metaVar
     logCheckArg mvStr
-    parMV <- case (ParSieLaws.pMetaVar (ParSieLaws.myLexer mvStr)) of
-               Left err -> throwError $ "Error when parsing metavariable: "++err
-               Right parsed -> return parsed
+    parMV <- parseMetavar mvStr
     case parMV of
       UTLaw.MetaVarMVLetBindings (UTLaw.MVLetBindings name) -> case value of
         UT.CVLet letBindings -> do
@@ -627,15 +675,10 @@ checkArg (UT.CAAssign assignee value) = case assignee of
       UTLaw.MetaVarMVTerms (UTLaw.MVTerms name) ->
         case value of
           UT.CVTerms utTerms -> do
-            tTerms <- mapM go utTerms
+            tTerms <- mapM transform utTerms
+            -- Terms have allready been checked in checkVectorizedArgs
             return $ Just (name, T.STerms tTerms)
           _ -> throwError "not terms"
-        where
-          go utTerm = do
-            tTerm <- transform utTerm
-            checkArgumentTerm tTerm
-            assert (numHoles tTerm == 0) "Should not be a context."
-            return tTerm
       UTLaw.MetaVarMVPatterns (UTLaw.MVPatterns name) ->
         case value of
           UT.CVPatterns constructors -> do
