@@ -393,15 +393,21 @@ instance Checkable UT.Proof where
   check (UT.PByFPInduction indVar baseCase indCase UT.DQed) =
     fail "not implemented yet"
   check (UT.PStraightForward steps UT.DQed) = do
+    checkMax1HereMarker
     tSteps <- checkSteps1 steps
     return $ T.Simple tSteps
     where
+      checkMax1HereMarker = do
+        let hereMarkers = filter (==UT.PSHereMarker) steps
+            numHereMarkers = length hereMarkers
+        assert (numHereMarkers == 1 || numHereMarkers == 0)
+          "You may only have 1 or 0 hereMarkers $"
+
       -- TODO: What happens when HereMarker is in the second or third term?
       -- TODO: maybe do something smarter, so that term2 isn't typechecked
       -- twice and since if a proof is t1 t2 t3, the returning list will
       -- be (t1, t2), (t2', t3), (t3', t4)
       -- make sure that t2 and t2' point to the same values.
-      -- TODO: HereMarker ($)
       checkSteps1 :: [UT.ProofStep] -> StCheckM T.SubProof
       checkSteps1 ((UT.PSCmd transCmd):(UT.PSImpRel imprel):[]) = do
         -- Replace first term with start and last term with goal.

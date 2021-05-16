@@ -197,7 +197,6 @@ proof: -simple -single {
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
-                              $
   -unfold-5-lr
     ctx= [.]
     G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
@@ -228,11 +227,11 @@ proof: -simple -single {
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5}));
   <~> let { false = False}
-      in h^(case (\f3 . \l3 . case l3 of
+      in h^(case (\f7 . \l7 . case l7 of
                                 { [] -> []
-                                , a3:as3 -> let { h3 = f3 <> a3
-                                                , t3 = map_a <> f3 <> as3}
-                                            in h3:t3}) <> p <> xs of
+                                , a7:as7 -> let { h7 = f7 <> a7
+                                                , t7 = map_a <> f7 <> as7}
+                                            in h7:t7}) <> p <> xs of
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
@@ -249,14 +248,15 @@ proof: -simple -single {
                                , t3 = map_a <> f3 <> as3}
                            in h3:t3});
   <~> let { false = False}
-      in h^(case (\l3 . case l3 of
+      in h^(case (\l7 . case l7 of
                           { [] -> []
-                          , a3:as3 -> let { h3 = p <> a3
-                                          , t3 = map_a <> p <> as3}
-                                      in h3:t3}) <> xs of
+                          , a7:as7 -> let { h7 = p <> a7
+                                          , t7 = map_a <> p <> as7}
+                                      in h7:t7}) <> xs of
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
+                              $
 } qed;
 
 --     let {false = False} in
