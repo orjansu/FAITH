@@ -72,6 +72,7 @@ checkBoundVariablesDistinct term =
         let (_cNames, args, terms) = unzip3 branches
         mapM checkBoundVar $ concat args
         mapM checkBoundVars terms
+        checkBoundVars term
         return ()
       nonBindingTerm -> applyOnSubtermsM nonBindingTerm
                                          ()
