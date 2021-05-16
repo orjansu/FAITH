@@ -30,23 +30,13 @@ proposition: G free(p xs) |-
   in foldr_a <> or <> a <> b
   <~>
   let {false = False} in
-  h^(case (case xs of
-            { [] -> []
-            , b:bs -> let { h6 = p <> b
-                          , t6 = map_a <> p <> bs}
-                      in h6:t6
-            }) of
-      { [] -> false
-      , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
-                  in or <> a5 <> t5});
-  --[1]h^([2] case xs of
-  --           { [] -> s^False
-  --           , b : bs -> [1]s^(let { z = @ --   foldr_a^n
-  --                                 , false = False
-  --                                 , mappbs = map_a <> p <> bs
-  --                                 , ds = {z}d^foldr_a <> false <> mappbs}
-  --                             in let {c = p <> b}
-  --                                in or <> c <> ds)});
+  [1]h^([2] case xs of
+             { [] -> s^False
+             , b : bs -> [1]s^(let { z = @ --   foldr_a^n
+                                   , mappbs = map_a <> p <> bs
+                                   , ds = {z}d^foldr_a <> false <> mappbs}
+                               in let {c = p <> b}
+                                  in or <> c <> ds)});
 proof: -simple -single {
   let { a = False
       , b = map_a <> p <> xs}
@@ -241,12 +231,12 @@ proof: -simple -single {
                     { [] -> false
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5}))
-    x=f3 y=p
-    M=(\l3 . case l3 of
+    x=f7 y=p
+    M=(\l8 . case l8 of
                { [] -> []
-               , a3:as3 -> let { h3 = f3 <> a3
-                               , t3 = map_a <> f3 <> as3}
-                           in h3:t3});
+               , a8:as8 -> let { h8 = f7 <> a8
+                               , t8 = map_a <> f7 <> as8}
+                           in h8:t8});
   <~> let { false = False}
       in h^(case (\l7 . case l7 of
                           { [] -> []
@@ -256,19 +246,55 @@ proof: -simple -single {
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
-                              $
+  -balloon-reduction-lr
+    ctx=(let G in let { false = False}
+        in h^(case [.] of
+                    { [] -> false
+                    , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
+                                in or <> a5 <> t5}))
+    x=l7 y=xs
+    M=(case l7 of
+         { [] -> []
+         , a7:as7 -> let { h7 = p <> a7
+                         , t7 = map_a <> p <> as7}
+                     in h7:t7});
+  <~> let { false = False}
+      in h^(case case xs of
+                          { [] -> []
+                          , a7:as7 -> let { h7 = p <> a7
+                                          , t7 = map_a <> p <> as7}
+                                      in h7:t7} of
+                  { [] -> false
+                  , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
+                              in or <> a5 <> t5});
+  -R-case-lr
+    ctx= (let G in let {false = False} in h^[.])
+    R=(case [.] of
+                { [] -> false
+                , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
+                            in or <> a5 <> t5})
+    w=1
+    v=1
+    M=xs
+    pat_i=patterns [ [], a5:as5 ]
+    N_i=terms [ [],  let { h7 = p <> a7
+                         , t7 = map_a <> p <> as7}
+                     in h7:t7];
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> case [] of
+                  { [] -> false
+                  , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
+                              in or <> a5 <> t5}
+        , b:bs -> case let { h7 = p <> a7
+                           , t7 = map_a <> p <> as7}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+$
 } qed;
-
---     let {false = False} in
---     h^case (case xs of
---               { [] -> []
---               , b:bs -> let { h6 = p <> b
---                             , t6 = map_a <> p <> bs}
---                         in h6:t6
---               }) of
---         { [] -> false
---         , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
---                     in or <> a5 <> t5}
 
 ---- post-induction
 --proposition: G free(p xs) |-

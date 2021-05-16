@@ -9,8 +9,10 @@ Beviset tar inte bort den tomma dummy reference-variabeln vid reduktionen. -dumm
 --Case study 2
 many let's in the beginning... Remove sometimes? Använd ngn funktion för att automatiskt ta fram skilnaden mellan två termers string-representation.
 
-Hittade en bugg i systemet.
+Hittade en bugg i systemet (glömt rekursivt call)
 Insåg att man kan råka göra bort sig om man har fler än 1 $
+Hittade en till bugg (glömt kolla substitutionerna inför side conditions)
+kanske jag ska ha (a:as) som tillåten syntax för en cons...
 
 FRÅGOR
 det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
