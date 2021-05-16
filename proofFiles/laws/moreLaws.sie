@@ -102,9 +102,9 @@
 -dummy-bind-intro: let {x = M} in N <~~> let {z = @, x = {z}d^M} in N
   if z is fresh;
 -stack-spike-def: [w]s^M =def= [w] case True of {True -> M};
--heap-spike-def: [w]h^M =def= let {x=[1,w]= @} in {x}d^M if x is fresh;
+-heap-spike-def:  [w]h^M =def= let {x=[1,w]= @} in {x}d^M if x is fresh;
 -stack-spike-intro: M <~~> [w]s^M;
--heap-spike-intro: M <~~> [w]h^M;
+-heap-spike-intro:  M <~~> [w]h^M;
 
 -lemma-5-5-1: [w]^R[M] |~> [w1]^R[M] if w >= w1;
 -lemma-5-5-2: [w] (M + [v] N) |~> [w1] (M + [v1] N) if w >= w1 && v >= v1;

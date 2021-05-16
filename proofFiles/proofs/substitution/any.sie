@@ -1,8 +1,8 @@
 bindings {
-G = { or = 1-- \a. \b. case a of
-            --           { True -> True
-            --           , False -> b
-            --           }
+G = { or = \a. \b. case a of
+                     { True -> True
+                     , False -> b
+                     }
     };
 }
 

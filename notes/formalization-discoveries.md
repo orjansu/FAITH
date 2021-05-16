@@ -6,6 +6,14 @@ you kinda don't check the side conditions.
 
 Beviset tar inte bort den tomma dummy reference-variabeln vid reduktionen. -dummy-reference-algebra-5 måste läggas till.
 
+FRÅGOR
+det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
+
+Hur gör man för att få 0 heap weight? - om det är en top level definition som allokeras högst en gång, t.ex. library definitions.
+
+hur ser anya' ut?
+
+
 TODO
 -Just nu så ser den till att variabler är skilda när den substituerar in till bool-termerna. Den ska se till att det inte krockar när den substituterar till samma term, men när det är olika bool-termer, så ska det vara okej att variabelnamn krockar. Annars blir det konstigt med substitutionen - eventuellt. Just nu funkar det...
 
