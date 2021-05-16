@@ -15,7 +15,6 @@ import Control.Monad.State (StateT, runStateT, get, put, MonadState, State
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import Control.Monad.Except (MonadError, throwError)
-import Data.Foldable (foldlM)
 
 import CheckMonad (CheckM, runCheckM, assert, assertInternal, internalException)
 import qualified MiniTypedAST as T
@@ -29,7 +28,7 @@ import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
 import ShowLaw (showLaw)
 import OtherUtils (applyOnLawSubterms, applyOnLawSubtermsM, applyAndRebuild)
 import LanguageLogic (reduce)
-import TermUtils (substituteFor, isAlphaEquiv)
+import TermUtils (substituteFor, isAlphaEquiv, showSubstitute)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -55,7 +54,6 @@ applySubstitution law sideCond substitutions forbiddenNames1 freeVars = do
       forbiddenNames2 = forbiddenNames1
                           `Set.union` boundSubstVars
                           `Set.union` freshVars
-  checkSubstBVDistinct substitutions forbiddenNames2
   res <- runSubstM substitutions forbiddenNames2 $ applyTermSubstM (-1) law
   let (finalTerm, forbiddenNames3) = res
       finalBV = getBoundVariables finalTerm
@@ -81,32 +79,6 @@ applySubstitution law sideCond substitutions forbiddenNames1 freeVars = do
                             map showSingle $
                               Map.toList substitutions
     showSingle (name, subst) = name ++ " -> "++showSubstitute subst
-showSubstitute = \case
-  T.SLetBindings letBindings ->
-    showTypedTerm letBindings
-  T.SValue term -> showTypedTerm term
-  T.SContext term -> showTypedTerm term
-  T.SIntegerVar intExpr -> show intExpr
-  T.SVar string -> string
-  T.SVarVect strings -> show strings
-  T.SValueContext term -> showTypedTerm term
-  T.SReduction red -> showTypedTerm $ T.TRedWeight 1 red
-  T.SVarSet stringSet ->
-    let listForm = concat . intersperse ", " . Set.toList $ stringSet
-    in "{" ++ listForm ++"}"
-  T.STerm term -> showTypedTerm term
-  T.STerms terms -> let strs = map showTypedTerm terms
-                    in concat $ intersperse ", " strs
-  T.SPatterns ptns -> show ptns
-  T.SCaseStms stms -> let strStms = map showStm stms
-                          everything = concat $ intersperse ", " strStms
-                     in "{"++everything++"}"
-    where
-      showStm (constr, vars, term) =
-        let vars' = concat $ intersperse " " vars
-        in constr++" "++vars'++" -> "++showTypedTerm term
-  T.SConstructorName str -> str
-
 -- | Given a sidecondition and a set of substitutions (where all substitutions
 -- for the sidecondition are provided), the function checks if the
 -- sideconditions hold. NOTE: since the only involvement of terms in the side-
@@ -119,93 +91,14 @@ showSubstitute = \case
 -- some way, this function (and possibly much else of the general approach)
 -- would need to be revised.
 checkSideCondition :: HasCallStack =>
-                      Law.SideCond -> T.Substitutions -> CheckM ()
-checkSideCondition Law.NoSideCond _ = return ()
-checkSideCondition (Law.WithSideCond boolTerm) substitutions = do
-  (res, _fv) <- runSubstM substitutions Set.empty $ evalBoolTerm boolTerm
+                      Law.SideCond
+                      -> T.Substitutions
+                      -> Set.Set String
+                      -> CheckM ()
+checkSideCondition Law.NoSideCond _ _ = return ()
+checkSideCondition (Law.WithSideCond boolTerm) substitutions forbiddenNames = do
+  (res, _fv) <- runSubstM substitutions forbiddenNames $ evalBoolTerm boolTerm
   assert (res == True) "The sideconditions must hold."
-
-
--- | Checks that none of the substitutions has a bound variable that
--- has a name that is forbidden (in the forbidden names) or that one bound
--- variable in one substitution has the same name as a bound variable in
--- another substitution.
-checkSubstBVDistinct :: HasCallStack =>
-                        T.Substitutions -> Set.Set String -> CheckM [()]
-checkSubstBVDistinct substitutions forbiddenNames = do
-  Log.logInfoN . pack $ "Checking that the names of the bound variables in the "
-    ++"substitutions are valid (i.e. distinct from each other and the free "
-    ++"variables)."
-  (flip evalStateT) forbiddenNames $
-    mapM checkBVSubstitution $ Map.elems substitutions
-  where
-    checkBVSubstitution :: HasCallStack =>
-                           T.Substitute -> StateT (Set.Set String) CheckM ()
-    checkBVSubstitution substitute = do
-      Log.logInfoN . pack $ "Checking substitute "++showSubstitute substitute
-      case substitute of
-        T.SLetBindings letBindings -> do
-          let (bindVars, _sw, _hw, terms) = unzip4 letBindings
-          checkBSSubstListBvsTerms bindVars terms
-        T.SValue term -> checkBVTerm term
-        T.SContext term -> checkBVTerm term
-        T.SIntegerVar intExpr -> return ()
-        T.SVar string -> return ()
-        T.SVarSet varSet -> return ()
-        T.SVarVect varVect -> return ()
-        T.SValueContext term -> checkBVTerm term
-        T.STerm term -> checkBVTerm term
-        T.STerms terms -> mapM checkBVTerm terms >> return ()
-        T.SPatterns ptns -> return ()
-        T.SCaseStms stms -> do
-          let (_, bindVars, terms) = unzip3 stms
-          checkBSSubstListBvsTerms (concat bindVars) terms
-        T.SConstructorName str -> return ()
-        T.SReduction red -> case red of
-          T.RApp T.THole var -> return ()
-          T.RCase T.THole stms -> do
-            let (_, bindVars, terms) = unzip3 stms
-            checkBSSubstListBvsTerms (concat bindVars) terms
-          T.RPlusWeight T.THole rw term -> checkBVTerm term
-          T.RAddConst _i T.THole -> return ()
-          T.RIsZero T.THole -> return ()
-          T.RSeq T.THole term -> checkBVTerm term
-          _ -> internalException $ "the non-reduction-context "
-            ++showTypedTerm (T.TRedWeight 1 red)++" got all the way to"
-            ++"substitution."
-
-    checkBSSubstListBvsTerms bindVars terms = do
-      let innerBVs = map getBoundVariables terms
-          bindVarSet = Set.fromList bindVars
-      forbiddenNames1 <- get
-      let shouldBeDistinct = forbiddenNames1:bindVarSet:innerBVs
-      forbiddenNames2 <- assertDisjointAndMerge shouldBeDistinct
-      put forbiddenNames2
-
-    checkBVTerm :: HasCallStack => T.Term -> StateT (Set.Set String) CheckM ()
-    checkBVTerm term = do
-      let bvSet = getBoundVariables term
-      forbiddenNames1 <- get
-      forbiddenNames2 <- assertDisjointAndMerge [bvSet, forbiddenNames1]
-      put forbiddenNames2
-
-    -- | asserts that every set in the list is disjoint from all other sets in
-    -- the list.
-    assertDisjointAndMerge :: (MonadError String m, Log.MonadLogger m,
-                              HasCallStack, Ord a, Show a) =>
-                      [Set.Set a] -> m (Set.Set a)
-    assertDisjointAndMerge sets = do
-      foldlM assertMerge2 Set.empty sets
-      where
-        assertMerge2 :: (MonadError String m, Log.MonadLogger m,
-                               HasCallStack, Ord a, Show a) =>
-                               Set.Set a -> Set.Set a -> m (Set.Set a)
-        assertMerge2 set1 set2 = do
-          assert (set1 `Set.disjoint` set2) $ "The variable(s) "
-            ++show (set1 `Set.intersection` set2)++" should not be used in "
-            ++"multiple bindings and should be distinct from the free "
-            ++"variables."
-          return $ set1 `Set.union` set2
 
 getFreshVariables :: HasCallStack =>
                      T.Substitutions -> Law.SideCond -> Set.Set String

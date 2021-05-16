@@ -1,14 +1,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module TermUtils (substituteFor, isAlphaEquiv, checkAlphaEquiv) where
+module TermUtils (substituteFor
+                 , isAlphaEquiv
+                 , checkAlphaEquiv
+                 , showSubstitute) where
 
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import Control.Monad.Except (MonadError)
 import qualified Data.Set as Set
-import Data.List.Extra (replace)
+import Data.List.Extra (replace, intersperse)
 import Data.Text (pack)
 
 import qualified MiniTypedAST as T
@@ -78,3 +82,30 @@ instance AlphaEq T.Term where
     Log.logDebugN . pack $ "| Locally nameless representation of N is "
       ++ showLNL lnlTerm2
     return (lnlTerm1 == lnlTerm2)
+
+showSubstitute :: T.Substitute -> String
+showSubstitute = \case
+  T.SLetBindings letBindings ->
+    showTypedTerm letBindings
+  T.SValue term -> showTypedTerm term
+  T.SContext term -> showTypedTerm term
+  T.SIntegerVar intExpr -> show intExpr
+  T.SVar string -> string
+  T.SVarVect strings -> show strings
+  T.SValueContext term -> showTypedTerm term
+  T.SReduction red -> showTypedTerm $ T.TRedWeight 1 red
+  T.SVarSet stringSet ->
+    let listForm = concat . intersperse ", " . Set.toList $ stringSet
+    in "{" ++ listForm ++"}"
+  T.STerm term -> showTypedTerm term
+  T.STerms terms -> let strs = map showTypedTerm terms
+                    in concat $ intersperse ", " strs
+  T.SPatterns ptns -> show ptns
+  T.SCaseStms stms -> let strStms = map showStm stms
+                          everything = concat $ intersperse ", " strStms
+                     in "{"++everything++"}"
+    where
+      showStm (constr, vars, term) =
+        let vars' = concat $ intersperse " " vars
+        in constr++" "++vars'++" -> "++showTypedTerm term
+  T.SConstructorName str -> str

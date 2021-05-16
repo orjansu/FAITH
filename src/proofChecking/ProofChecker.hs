@@ -105,7 +105,7 @@ checkStep globalImpRel
                                          (T.SContext context)
                                          substitutions
           forbiddenNames = varFreeVars
-      checkSideCondition sideCond substitutionsWctx
+      checkSideCondition sideCond substitutionsWctx varFreeVars
       substToLHS <- applySubstitution lawLHSctx
                                       sideCond
                                       substitutionsWctx
