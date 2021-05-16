@@ -197,6 +197,7 @@ proof: -simple -single {
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
+                              $
   -unfold-5-lr
     ctx= [.]
     G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
@@ -256,7 +257,6 @@ proof: -simple -single {
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
-  $
 } qed;
 
 --     let {false = False} in

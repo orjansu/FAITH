@@ -294,12 +294,14 @@ applyContext ctxName term = do
       return appliedWithNewNames
     else do
       res <- applyContext1 ctx term
-      --note that the bound variables of ctx are allready added to the forbidden
-      --names here, and any new variables needed when applying the context
-      --are added as they are found. So there should rather be an assertion
-      --that the bound variables of res are in the forbidden names here.
-      --TODO fix this after the bug is found.
-      addBVToForbiddenNames res
+      let resBV = getBoundVariables res
+      forbidden <- gets forbiddenNames
+      assertInternal (resBV `Set.isSubsetOf` forbidden)
+        $ "The context should have added its bound variables in the beginning, "
+        ++"so when used for the first time, its bound variables should have "
+        ++"been added. The new variables from the insertion should also have "
+        ++"allready been added. That is, "++show resBV++" should be a subset "
+        ++"of "++show forbidden++"."
       setToUsed ctxName
       return res
   where
