@@ -246,6 +246,8 @@ prepareTermForSubstitution metaVar term isUsed =
         $ "term M inserted the first time should only contain new "
           ++"names for bound variables. M="++showTypedTerm term++" BV(M)"
           ++"="++show termBV++" should be disjoint from "++show forbidden
+          ++". That is, "++show (termBV `Set.intersection` forbidden)
+          ++" should be empty."
       addBVToForbiddenNames term
       return term
 
@@ -292,6 +294,11 @@ applyContext ctxName term = do
       return appliedWithNewNames
     else do
       res <- applyContext1 ctx term
+      --note that the bound variables of ctx are allready added to the forbidden
+      --names here, and any new variables needed when applying the context
+      --are added as they are found. So there should rather be an assertion
+      --that the bound variables of res are in the forbidden names here.
+      --TODO fix this after the bug is found.
       addBVToForbiddenNames res
       setToUsed ctxName
       return res
