@@ -277,8 +277,8 @@ proof: -simple -single {
     v=1
     M=xs
     pat_i=patterns [ [], a10:as10 ]
-    N_i=terms [ [],  let { h7 = p <> a7
-                         , t7 = map_a <> p <> as7}
+    N_i=terms [ [],  let { h7 = p <> a10
+                         , t7 = map_a <> p <> as10}
                      in h7:t7];
   <~> let { false = False}
       in h^ ([2] case xs of

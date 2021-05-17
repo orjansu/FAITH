@@ -161,8 +161,13 @@ getBoundSubstVars substitutions law = case law of
       bvDecTerm = getBoundSubstVars substitutions decTerm
       bvCases = Set.unions $ map bvCase cases
       bvCase (Law.CSAlts _) = Set.empty
-      bvCase (Law.CSPatterns _pat_i term) =
-        getBoundSubstVars substitutions term
+      bvCase (Law.CSPatterns pat_i term) =
+        case Map.lookup pat_i substitutions of
+          Just (T.SPatterns patterns) ->
+            let (constructors, argss) = unzip patterns
+                argsBVs = Set.fromList $ concat argss
+            in argsBVs `Set.union` getBoundSubstVars substitutions term
+          _ -> substitutionNotfound pat_i
       bvCase (Law.CSConcrete (Law.CGeneral _name lawArgs) term) =
         case Map.lookup lawArgs substitutions of
           Just (T.SVarVect args) -> Set.fromList args

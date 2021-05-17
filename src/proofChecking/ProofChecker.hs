@@ -105,18 +105,27 @@ checkStep globalImpRel
                                          (T.SContext context)
                                          substitutions
           forbiddenNames = varFreeVars
+      Log.logInfoN . pack $ "Checking side conditions."
       checkSideCondition sideCond substitutionsWctx varFreeVars
+      Log.logInfoN . pack $ "Substituting into starting term (the "
+        ++"left hand side in a left-to-right transformation)"
       substToLHS <- applySubstitution lawLHSctx
                                       sideCond
                                       substitutionsWctx
                                       forbiddenNames
                                       varFreeVars
+      Log.logInfoN . pack $ "Checking that the substitutions into the starting "
+        ++"law term is alpha-equal to the starting term."
       checkAlphaEqWrtLetReorder term1 substToLHS
+      Log.logInfoN . pack $ "Substituting into law term of the transformed "
+        ++"side (the right hand side in a left-to-right transformation)"
       substToRHS <- applySubstitution lawRHSctx
                                       sideCond
                                       substitutionsWctx
                                       forbiddenNames
                                       varFreeVars
+      Log.logInfoN . pack $ "Checking that the substitutions into the "
+        ++"transformed term is alpha-equal to the transformed term."
       checkAlphaEqWrtLetReorder substToRHS term2
 
 -- | Given the law term L and two terms M and N,
