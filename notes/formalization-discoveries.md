@@ -19,12 +19,17 @@ om man ska vara noga så är dummy reference algebra-steget tre applikationer av
 jag gör felet med =[.] flera ggr, men jag kan inte ändra från x "=["v,w"]=" V
 till x "=" "["v,w"]=" V utan att introducera en shift/reduce konflikt, och jag orkar inte fixa den just nu. Notera iaf detta i användarmanualen.
 
+detta bevis skippade också att ta bort {}d^ efter reduktion.
+
+när man inte säger ngt menar man nog -lr. Jag knsk ska ta bort den och lägga
+till den automatiskt eller ngt.
+
 FRÅGOR
 det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
 
 Hur gör man för att få 0 heap weight? - om det är en top level definition som allokeras högst en gång, t.ex. library definitions.
 
-hur ser anya' ut?
+hur ser anya' ut? - any, fast med <> på applikationerna
 
 
 TODO

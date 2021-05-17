@@ -52,6 +52,12 @@ proof: -simple -single{
   |~> let {xs = let {ys = repeat x} in x : ys} in f x xs;
 }
 qed;
+
+--idk
+--proposition: G free(x f) |- let {xs = let {ys = repeat x} in x : ys} in f x xs
+--                   |~> let { g = \x' . \xs' . x' : xs'
+--                             xs = let {ys = repeat x} in g x ys} in f x xs
+
 --inductive case (after induction)
 proposition: G free(x f) |- let {xs = let {ys = x : ys} in x : ys} in f x xs
                         |~> let {xs = x : xs} in f x xs;

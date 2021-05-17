@@ -20,27 +20,26 @@ G = { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
                          { True -> True
                          , False -> b4
                          }
+    , false =[0,0]= False
     };
 }
 
 -- pre-induction
 proposition: G free(p xs) |-
-  let { a = False
-      , b = map_a <> p <> xs}
-  in foldr_a <> or <> a <> b
+  let { b = map_a <> p <> xs}
+  in foldr_a <> or <> false <> b
   <~>
-  let {false = False} in
-  [1]h^([2] case xs of
-             { [] -> s^False
-             , b : bs -> [1]s^(let { z = @ --   foldr_a^n
-                                   , mappbs = map_a <> p <> bs
-                                   , ds = {z}d^foldr_a <> false <> mappbs}
-                               in let {c = p <> b}
-                                  in or <> c <> ds)});
+  h^([2] case xs of
+           { [] -> s^false
+           , b : bs -> s^(let { z = @
+                              , ds = {z}d^(let {cs = map_a <> p <> bs}
+                                           in foldr_a <> or <> false <> cs)}
+                             in let {c = p <> b}
+                                in or <> c <> ds)});
+
 proof: -simple -single {
-  let { a = False
-      , b = map_a <> p <> xs}
-  in foldr_a <> or <> a <> b;
+  let {b = map_a <> p <> xs}
+  in foldr_a <> or <> false <> b;
   -unfold-5-lr
     ctx = [.]
     G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
@@ -59,6 +58,7 @@ proof: -simple -single {
                                 { True -> True
                                 , False -> b4
                                 }
+           , false =[0,0]= False
            }
     x = foldr_a
     V = (\f5 . \ z5 . \l5 .
@@ -66,21 +66,18 @@ proof: -simple -single {
              { [] -> z5
              , a5:as5 -> let {t5 = foldr_a <> f5 <> z5 <> as5}
                          in f5 <> a5 <> t5})
-    C = (let { a = False
-             , b = map_a <> p <> xs}
-         in [.] <> or <> a <> b);
+    C = (let { b = map_a <> p <> xs}
+         in [.] <> or <> false <> b);
   <~>
-  let { a = False
-      , b = map_a <> p <> xs}
+  let { b = map_a <> p <> xs}
   in (\f5 . \ z5 . \l5 .
          case l5 of
            { [] -> z5
            , a5:as5 -> let {t5 = foldr_a <> f5 <> z5 <> as5}
-                       in f5 <> a5 <> t5}) <> or <> a <> b;
+                       in f5 <> a5 <> t5}) <> or <> false <> b;
   -balloon-reduction-lr
-    ctx = (let G in let { a = False
-                        , b = map_a <> p <> xs}
-                    in [.] <> a <> b)
+    ctx = (let G in let { b = map_a <> p <> xs}
+                    in [.] <> false <> b)
     M = (\ z5 . \l5 .
            case l5 of
              { [] -> z5
@@ -88,72 +85,49 @@ proof: -simple -single {
                          in f5 <> a5 <> t5})
     x=f5 y=or;
   <~>
-  let { a = False
-      , b = map_a <> p <> xs}
+  let { b = map_a <> p <> xs}
   in (\ z5 . \l5 .
          case l5 of
            { [] -> z5
            , a5:as5 -> let {t5 = foldr_a <> or <> z5 <> as5}
-                       in or <> a5 <> t5}) <> a <> b;
+                       in or <> a5 <> t5}) <> false <> b;
   -balloon-reduction-lr
-    ctx = (let G in let { a = False
-                        , b = map_a <> p <> xs}
+    ctx = (let G in let {b = map_a <> p <> xs}
                     in [.] <> b)
-    x=z5 y=a
+    x=z5 y=false
     M=(\l5 . case l5 of
              { [] -> z5
              , a5:as5 -> let {t5 = foldr_a <> or <> z5 <> as5}
                          in or <> a5 <> t5});
   <~>
-  let { a = False
-      , b = map_a <> p <> xs}
+  let { b = map_a <> p <> xs}
   in (\l5 . case l5 of
-           { [] -> a
-           , a5:as5 -> let {t5 = foldr_a <> or <> a <> as5}
+           { [] -> false
+           , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                        in or <> a5 <> t5}) <> b;
   -balloon-reduction-lr
-    ctx = (let G in let { a = False
-                         , b = map_a <> p <> xs}
+    ctx = (let G in let { b = map_a <> p <> xs}
                     in [.])
     x=l5 y = b
     M=(case l5 of
-             { [] -> a
-             , a5:as5 -> let {t5 = foldr_a <> or <> a <> as5}
+             { [] -> false
+             , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                          in or <> a5 <> t5});
   <~>
-  let { false = False
-      , ys5 = map_a <> p <> xs}
+  let { ys5 = map_a <> p <> xs}
   in (case ys5 of
            { [] -> false
            , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                        in or <> a5 <> t5});
-  -- extra step needed because the proof doesn't treat false as a constructor,
-  -- but a variable.
-  -let-flatten-rl
-    G1 = let {false = False}
-    G2 = let {ys5 = map_a <> p <> xs}
-    M = (case ys5 of
-             { [] -> false
-             , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
-                         in or <> a5 <> t5})
-    ctx = (let G in [.]);
-    <~>
-    let { false = False}
-    in let {ys5 = map_a <> p <> xs}
-       in (case ys5 of
-                { [] -> false
-                , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
-                            in or <> a5 <> t5});
   -let-R-lr
-    ctx = (let G in let {false = False} in [.])
+    ctx = (let G in [.])
     G = let {ys5 = map_a <> p <> xs}
     w=1
     R=(case [.] of { [] -> false
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5})
     M=ys5;
-  <~> let { false = False}
-      in (case (let {ys5 = map_a <> p <> xs} in ys5) of
+  <~> (case (let {ys5 = map_a <> p <> xs} in ys5) of
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
@@ -162,19 +136,16 @@ proof: -simple -single {
     v=1
     w=1
     M=(map_a <> p <> xs)
-    ctx=(let G in let { false = False}
-        in (case [.] of
+    ctx=(let G in (case [.] of
                     { [] -> false
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5}));
-  <~> let { false = False}
-      in (case h^(map_a <> p <> xs) of
+  <~> (case h^(map_a <> p <> xs) of
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
   -spike-algebra-2-lr
-    ctx=(let G in let { false = False}
-                  in [.])
+    ctx=(let G in [.])
     w=1
     R=(case [.] of
                 { [] -> false
@@ -182,8 +153,7 @@ proof: -simple -single {
                             in or <> a5 <> t5})
     v=1
     M=(map_a <> p <> xs);
-  <~> let { false = False}
-      in h^(case map_a <> p <> xs of
+  <~> h^(case map_a <> p <> xs of
                   { [] -> false
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
@@ -204,6 +174,7 @@ proof: -simple -single {
                                 { True -> True
                                 , False -> b4
                                 }
+           , false =[0,0]= False
            }
     V= (\f3 . \l3 . case l3 of
         { [] -> []
@@ -211,13 +182,11 @@ proof: -simple -single {
                         , t3 = map_a <> f3 <> as3}
                     in h3:t3})
     x=map_a
-    C=(let { false = False}
-        in h^(case [.] <> p <> xs of
+    C=(h^(case [.] <> p <> xs of
                     { [] -> false
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5}));
-  <~> let { false = False}
-      in h^(case (\f7 . \l7 . case l7 of
+  <~> h^(case (\f7 . \l7 . case l7 of
                                 { [] -> []
                                 , a7:as7 -> let { h7 = f7 <> a7
                                                 , t7 = map_a <> f7 <> as7}
@@ -226,8 +195,7 @@ proof: -simple -single {
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
   -balloon-reduction-lr
-    ctx=(let G in let { false = False}
-        in h^(case [.] <> xs of
+    ctx=(let G in h^(case [.] <> xs of
                     { [] -> false
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5}))
@@ -237,8 +205,7 @@ proof: -simple -single {
                , a8:as8 -> let { h8 = f7 <> a8
                                , t8 = map_a <> f7 <> as8}
                            in h8:t8});
-  <~> let { false = False}
-      in h^(case (\l7 . case l7 of
+  <~> h^(case (\l7 . case l7 of
                           { [] -> []
                           , a7:as7 -> let { h7 = p <> a7
                                           , t7 = map_a <> p <> as7}
@@ -247,8 +214,7 @@ proof: -simple -single {
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
   -balloon-reduction-lr
-    ctx=(let G in let { false = False}
-        in h^(case [.] of
+    ctx=(let G in h^(case [.] of
                     { [] -> false
                     , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                                 in or <> a5 <> t5}))
@@ -258,8 +224,7 @@ proof: -simple -single {
          , a7:as7 -> let { h7 = p <> a7
                          , t7 = map_a <> p <> as7}
                      in h7:t7});
-  <~> let { false = False}
-      in h^(case case xs of
+  <~> h^(case case xs of
                           { [] -> []
                           , a7:as7 -> let { h7 = p <> a7
                                           , t7 = map_a <> p <> as7}
@@ -268,7 +233,7 @@ proof: -simple -single {
                   , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
                               in or <> a5 <> t5});
   -R-case-lr
-    ctx= (let G in let {false = False} in h^[.])
+    ctx= (let G in h^[.])
     R=(case [.] of
                 { [] -> false
                 , a5:as5 -> let {t5 = foldr_a <> or <> false <> as5}
@@ -280,8 +245,7 @@ proof: -simple -single {
     N_i=terms [ [],  let { h7 = p <> a10
                          , t7 = map_a <> p <> as10}
                      in h7:t7];
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> case [] of
                   { [] -> false
                   , a10:as10 -> let {t5 = foldr_a <> or <> false <> as10}
@@ -294,8 +258,7 @@ proof: -simple -single {
                                 in or <> a9 <> t9}
         });
   -reduction-lr
-    ctx = (let G in let { false = False}
-        in h^ ([2] case xs of
+    ctx = (let G in h^ ([2] case xs of
           { [] -> [.]
           , b:bs -> case let { h7 = p <> b
                              , t7 = map_a <> p <> bs}
@@ -312,8 +275,7 @@ proof: -simple -single {
     V= []
     X={or foldr_a}
     N=false;
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> s^{or foldr_a}d^false
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -323,8 +285,7 @@ proof: -simple -single {
                                 in or <> a9 <> t9}
         });
   -dummy-ref-algebra-7-rl
-    ctx=(let G in let { false = False}
-        in h^ ([2] case xs of
+    ctx=(let G in h^ ([2] case xs of
           { [] -> s^[.]
           , b:bs -> case let { h7 = p <> b
                              , t7 = map_a <> p <> bs}
@@ -336,8 +297,7 @@ proof: -simple -single {
     X={or}
     Y={foldr_a}
     M=false;
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> s^{or}d^{foldr_a}d^false
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -364,6 +324,7 @@ proof: -simple -single {
                              { True -> True
                              , False -> b4
                              }
+        , false =[0,0]= False
         }
     x=foldr_a
     w=0
@@ -372,8 +333,7 @@ proof: -simple -single {
                             { [] -> z2
                             , a2:as2 -> let {t2 = foldr_a <> f2 <> z2 <> as2}
                                         in f2 <> a2 <> t2})
-    C=(let { false = False}
-        in h^ ([2] case xs of
+    C=( h^ ([2] case xs of
           { [] -> s^{or}d^[.]
           , b:bs -> case let { h7 = p <> b
                              , t7 = map_a <> p <> bs}
@@ -383,8 +343,7 @@ proof: -simple -single {
                                   in or <> a9 <> t9}
           }))
     M=false;
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> s^{or}d^{}d^false
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -394,8 +353,7 @@ proof: -simple -single {
                                 in or <> a9 <> t9}
         });
   -dummy-ref-algebra-5-lr
-  ctx=(let G in let { false = False}
-      in h^ ([2] case xs of
+  ctx=(let G in h^ ([2] case xs of
         { [] -> s^{or}d^[.]
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -405,8 +363,7 @@ proof: -simple -single {
                                 in or <> a9 <> t9}
         }))
     M=false;
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> s^{or}d^false
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -434,6 +391,7 @@ proof: -simple -single {
                             , t3 = map_a <> f3 <> as3}
                         in h3:t3
             }
+        , false =[0,0]= False
         }
     x=or
     w=0
@@ -442,8 +400,7 @@ proof: -simple -single {
                    , False -> b4
                    })
     M=false
-    C=(let { false = False}
-        in h^ ([2] case xs of
+    C=(h^ ([2] case xs of
           { [] -> s^[.]
           , b:bs -> case let { h7 = p <> b
                              , t7 = map_a <> p <> bs}
@@ -452,8 +409,7 @@ proof: -simple -single {
                       , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
                                   in or <> a9 <> t9}
           }));
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> s^{}d^false
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -463,8 +419,7 @@ proof: -simple -single {
                                 in or <> a9 <> t9}
         });
   -dummy-ref-algebra-5-lr
-    ctx=(let G in let { false = False}
-        in h^ ([2] case xs of
+    ctx=(let G in h^ ([2] case xs of
           { [] -> s^[.]
           , b:bs -> case let { h7 = p <> b
                              , t7 = map_a <> p <> bs}
@@ -474,8 +429,7 @@ proof: -simple -single {
                                   in or <> a9 <> t9}
           }))
     M=false;
-  <~> let { false = False}
-      in h^ ([2] case xs of
+  <~> h^ ([2] case xs of
         { [] -> s^false
         , b:bs -> case let { h7 = p <> b
                            , t7 = map_a <> p <> bs}
@@ -484,19 +438,167 @@ proof: -simple -single {
                     , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
                                 in or <> a9 <> t9}
         });
-        $
+  -let-R-rl
+    ctx=(let G
+         in h^ ([2] case xs of
+          { [] -> s^false
+          , b:bs -> [.]
+          }))
+    R=(case [.] of
+                { [] -> false
+                , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                            in or <> a9 <> t9})
+    G=let { h7 = p <> b, t7 = map_a <> p <> bs}
+    M=(h7:t7)
+    w=1;
+  <~> h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> let { h7 = p <> b
+                      , t7 = map_a <> p <> bs}
+                  in case h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+  -reduction-lr
+    ctx=(let G
+         in h^ ([2] case xs of
+          { [] -> s^false
+          , b:bs -> let { h7 = p <> b
+                        , t7 = map_a <> p <> bs}
+                    in [.]
+          }))
+    w=1
+    R=(case [.] of
+      { [] -> false
+      , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                  in or <> a9 <> t9})
+    V=(h7:t7)
+    X={}
+    N=(let {t = foldr_a <> or <> false <> t7}
+       in or <> h7 <> t);
+  <~> h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> let { h7 = p <> b
+                      , t7 = map_a <> p <> bs}
+                  in s^{}d^(let {t9 = foldr_a <> or <> false <> t7}
+                            in or <> h7 <> t9)
+        });
+  -dummy-ref-algebra-5-lr
+    ctx=(let G
+         in h^ ([2] case xs of
+          { [] -> s^false
+          , b:bs -> let { h7 = p <> b
+                        , t7 = map_a <> p <> bs}
+                    in s^[.]
+          }))
+    M=(let {t9 = foldr_a <> or <> false <> t7}
+              in or <> h7 <> t9);
+  <~>  h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> let { h7 = p <> b
+                      , t7 = map_a <> p <> bs}
+                  in s^(let {t9 = foldr_a <> or <> false <> t7}
+                        in or <> h7 <> t9)
+        });
+  -spike-algebra-3-lr
+    ctx=(let G
+        in h^ ([2] case xs of
+          { [] -> s^false
+          , b:bs -> [.]
+          }))
+    G= let { h7 = p <> b
+           , t7 = map_a <> p <> bs}
+    v=1
+    M=(let {t9 = foldr_a <> or <> false <> t7}
+       in or <> h7 <> t9);
+  <~> h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> s^(let { h7 = p <> b
+                         , t7 = map_a <> p <> bs}
+                     in let {t9 = foldr_a <> or <> false <> t7}
+                        in or <> h7 <> t9)
+        });
+  -let-flatten-lr
+    ctx = (let G in h^ ([2] case xs of
+                      { [] -> s^false
+                      , b:bs -> s^[.]
+                      }))
+    G1 = let { h7 = p <> b, t7 = map_a <> p <> bs}
+    G2= let {t9 = foldr_a <> or <> false <> t7}
+    M=(or <> h7 <> t9);
+  <~> h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> s^(let { c = p <> b
+                         , cs = map_a <> p <> bs
+                         , ds = foldr_a <> or <> false <> cs}
+                     in or <> c <> ds)
+        });
+  -let-flatten-rl
+    ctx=(let G
+        in h^ ([2] case xs of
+          { [] -> s^false
+          , b:bs -> s^[.]
+          }))
+    G1= let {cs = map_a <> p <> bs, ds = foldr_a <> or <> false <> cs}
+    G2= let { c = p <> b}
+    M=(or <> c <> ds);
+  <~>  h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> s^(let { cs = map_a <> p <> bs
+                         , ds = foldr_a <> or <> false <> cs}
+                     in let {c = p <> b}
+                        in or <> c <> ds)
+        });
+  -let-let'-lr
+    ctx=(let G in h^ ([2] case xs of
+                    { [] -> s^false
+                    , b:bs -> s^[.]
+                    }))
+    G1=let {cs = map_a <> p <> bs}
+    x=ds
+    v=1 w=1
+    M=(foldr_a <> or <> false <> cs)
+    N=(let {c = p <> b}
+       in or <> c <> ds)
+    G2=let {z = @};
+  <~> h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> s^(let { z = @
+                         , ds = {z}d^(let {cs = map_a <> p <> bs}
+                                      in foldr_a <> or <> false <> cs)}
+                     in let {c = p <> b}
+                        in or <> c <> ds)
+        });
 } qed;
 
 ---- post-induction
 --proposition: G free(p xs) |-
---  [1]h^[2] case xs of
---             [] -> s^False
---             b : bs -> [1] let { z = @
---                               , ds = {z}d^(any_a <> p <> bs}
---                           in let {c = p <> b}
---                              in or <> c <> ds
+--  h^ ([2] case xs of
+--        { [] -> s^false
+--        , b:bs -> s^(let { z = @
+--                         , ds = {z}d^(any_a <> p <> bs)}
+--                     in let {c = p <> b}
+--                        in or <> c <> ds)
+--        })
 --  <~>
 --  any_a <> p <> xs;
 --proof: -simple -single {
---
+--  h^ ([2] case xs of
+--    { [] -> s^false
+--    , b:bs -> s^(let { z = @
+--                     , ds = {z}d^(let {cs = map_a <> p <> bs}
+--                                  in foldr_a <> or <> false <> cs)}
+--                 in let {c = p <> b}
+--                    in or <> c <> ds)
+--    })
+--  -let-R
+--  <~> h^ ([2] case xs of
+--        { [] -> s^false
+--        , b:bs -> s^(let { z = @
+--                         , ds = {z}d^(let {cs = map_a <> p <> bs}
+--                                      in foldr_a <> or <> false <> cs)}
+--                     in let {c = p <> b}
+--                        in or <> c <> ds)
+--        })
 --} qed;
