@@ -687,8 +687,11 @@ checkAllSubstitutionsProvided law
                               substMap = do
   let metaVars = getAllMetaVars law
       substitutedVars = Map.keysSet substMap
-  assert (metaVars == substitutedVars)
-    "Currently, you need to specify all substitutions."
+  assert (metaVars == substitutedVars) $
+    "Currently, you need to specify exactly all substitutions. Subsitution(s) "
+    ++show (metaVars Set.\\ substitutedVars)++" (if any) are still needed and "
+    ++show (substitutedVars Set.\\ metaVars)++" (if any) are not specified in "
+    ++"the corresponding law."
 
 isReductionContext :: T.Term -> Bool
 isReductionContext outerTerm =

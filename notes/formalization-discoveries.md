@@ -14,6 +14,11 @@ Insåg att man kan råka göra bort sig om man har fler än 1 $
 Hittade en till bugg (glömt kolla substitutionerna inför side conditions)
 kanske jag ska ha (a:as) som tillåten syntax för en cons...
 
+om man ska vara noga så är dummy reference algebra-steget tre applikationer av dummy reference algebra (7,3,5,3,5)
+
+jag gör felet med =[.] flera ggr, men jag kan inte ändra från x "=["v,w"]=" V
+till x "=" "["v,w"]=" V utan att introducera en shift/reduce konflikt, och jag orkar inte fixa den just nu. Notera iaf detta i användarmanualen.
+
 FRÅGOR
 det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
 
@@ -25,4 +30,6 @@ hur ser anya' ut?
 TODO
 -Just nu så ser den till att variabler är skilda när den substituerar in till bool-termerna. Den ska se till att det inte krockar när den substituterar till samma term, men när det är olika bool-termer, så ska det vara okej att variabelnamn krockar. Annars blir det konstigt med substitutionen - eventuellt. Just nu funkar det...
 
-After putting up the general things, I would like to let FAITH run through it to make sure that everything parses etc. It's not too hard, but requires some time.
+After putting up the general things, I would like to let FAITH run through it to make sure that everything parses etc. It's not too hard, but requires some time. - delvis löst av $
+
+Kontexter med flera hål stöds, men jag har inte använt dem än.

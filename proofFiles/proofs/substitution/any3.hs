@@ -293,7 +293,198 @@ proof: -simple -single {
                     , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
                                 in or <> a9 <> t9}
         });
-$
+  -reduction-lr
+    ctx = (let G in let { false = False}
+        in h^ ([2] case xs of
+          { [] -> [.]
+          , b:bs -> case let { h7 = p <> b
+                             , t7 = map_a <> p <> bs}
+                         in h7:t7 of
+                      { [] -> false
+                      , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                  in or <> a9 <> t9}
+          }))
+    w=1
+    R=(case [.] of
+              { [] -> false
+              , a10:as10 -> let {t5 = foldr_a <> or <> false <> as10}
+                          in or <> a10 <> t5})
+    V= []
+    X={or foldr_a}
+    N=false;
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^{or foldr_a}d^false
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+  -dummy-ref-algebra-7-rl
+    ctx=(let G in let { false = False}
+        in h^ ([2] case xs of
+          { [] -> s^[.]
+          , b:bs -> case let { h7 = p <> b
+                             , t7 = map_a <> p <> bs}
+                         in h7:t7 of
+                      { [] -> false
+                      , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                  in or <> a9 <> t9}
+          }))
+    X={or}
+    Y={foldr_a}
+    M=false;
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^{or}d^{foldr_a}d^false
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+  -dummy-ref-algebra-3-lr
+    ctx = [.]
+    G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+                           { [] -> s^False
+                           , y1:ys1 -> s^(let { z1 = @
+                                            , a1 = p1 <> y1
+                                            , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                        in or <> a1 <> b1)})
+        , map_a =[0,0]= \f3 . \l3 . case l3 of
+            { [] -> []
+            , a3:as3 -> let { h3 = f3 <> a3
+                            , t3 = map_a <> f3 <> as3}
+                        in h3:t3
+            }
+        , or =[0,0]= \a4. \b4. case a4 of
+                             { True -> True
+                             , False -> b4
+                             }
+        }
+    x=foldr_a
+    w=0
+    V= (\f2 . \ z2 . \l2 .
+                          case l2 of
+                            { [] -> z2
+                            , a2:as2 -> let {t2 = foldr_a <> f2 <> z2 <> as2}
+                                        in f2 <> a2 <> t2})
+    C=(let { false = False}
+        in h^ ([2] case xs of
+          { [] -> s^{or}d^[.]
+          , b:bs -> case let { h7 = p <> b
+                             , t7 = map_a <> p <> bs}
+                         in h7:t7 of
+                      { [] -> false
+                      , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                  in or <> a9 <> t9}
+          }))
+    M=false;
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^{or}d^{}d^false
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+  -dummy-ref-algebra-5-lr
+  ctx=(let G in let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^{or}d^[.]
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        }))
+    M=false;
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^{or}d^false
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+  -dummy-ref-algebra-3-lr
+    ctx= [.]
+    G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+                           { [] -> s^False
+                           , y1:ys1 -> s^(let { z1 = @
+                                            , a1 = p1 <> y1
+                                            , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                        in or <> a1 <> b1)})
+        , foldr_a =[0,0]= \f2 . \ z2 . \l2 .
+                          case l2 of
+                            { [] -> z2
+                            , a2:as2 -> let {t2 = foldr_a <> f2 <> z2 <> as2}
+                                        in f2 <> a2 <> t2}
+        , map_a =[0,0]= \f3 . \l3 . case l3 of
+            { [] -> []
+            , a3:as3 -> let { h3 = f3 <> a3
+                            , t3 = map_a <> f3 <> as3}
+                        in h3:t3
+            }
+        }
+    x=or
+    w=0
+    V=(\a4. \b4. case a4 of
+                   { True -> True
+                   , False -> b4
+                   })
+    M=false
+    C=(let { false = False}
+        in h^ ([2] case xs of
+          { [] -> s^[.]
+          , b:bs -> case let { h7 = p <> b
+                             , t7 = map_a <> p <> bs}
+                         in h7:t7 of
+                      { [] -> false
+                      , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                  in or <> a9 <> t9}
+          }));
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^{}d^false
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+  -dummy-ref-algebra-5-lr
+    ctx=(let G in let { false = False}
+        in h^ ([2] case xs of
+          { [] -> s^[.]
+          , b:bs -> case let { h7 = p <> b
+                             , t7 = map_a <> p <> bs}
+                         in h7:t7 of
+                      { [] -> false
+                      , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                  in or <> a9 <> t9}
+          }))
+    M=false;
+  <~> let { false = False}
+      in h^ ([2] case xs of
+        { [] -> s^false
+        , b:bs -> case let { h7 = p <> b
+                           , t7 = map_a <> p <> bs}
+                       in h7:t7 of
+                    { [] -> false
+                    , a9:as9 -> let {t9 = foldr_a <> or <> false <> as9}
+                                in or <> a9 <> t9}
+        });
+        $
 } qed;
 
 ---- post-induction
