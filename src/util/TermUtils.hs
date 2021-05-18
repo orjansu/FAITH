@@ -6,7 +6,8 @@
 module TermUtils (substituteFor
                  , isAlphaEquiv
                  , checkAlphaEquiv
-                 , showSubstitute) where
+                 , showSubstitute
+                 , computeDifference) where
 
 import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
@@ -15,6 +16,7 @@ import qualified Data.Set as Set
 import Data.List.Extra (replace, intersperse)
 import Data.Text (pack)
 
+import qualified LocallyNameless as LNL
 import qualified MiniTypedAST as T
 import TermCorrectness (checkBoundVariablesDistinct, getFreeVariables
                        , getBoundVariables)
@@ -109,3 +111,57 @@ showSubstitute = \case
         let vars' = concat $ intersperse " " vars
         in constr++" "++vars'++" -> "++showTypedTerm term
   T.SConstructorName str -> str
+
+neq = "\n/=\n"
+
+computeDifference :: LNL.Term -> LNL.Term -> String
+computeDifference t1 t2 | t1 == t2 = "[error, no difference]"
+computeDifference (LNL.TLam term1)
+                  (LNL.TLam term2) = computeDifference term1 term2
+computeDifference (LNL.TLet letBindings1 term1)
+                  (LNL.TLet letBindings2 term2)
+  | letBindings1 == letBindings2 = computeDifference term1 term2
+  | term1 == term2 = lbDiff letBindings1 letBindings2
+  | otherwise = showLNL (LNL.TLet letBindings1 term1)
+                ++neq++showLNL (LNL.TLet letBindings2 term2)
+  where
+    lbDiff lbs1 lbs2 = let diff = takeWhile (\(a,b) -> a==b) $ zip lbs1 lbs2
+                           (dlbs1, dlbs2) = unzip diff
+                       in showLBs dlbs1++neq++showLBs dlbs2
+    showLBs lbs = let mid = concat $ intersperse ", " $ map showLNL lbs
+                  in "{" ++mid++ "}"
+computeDifference (LNL.TDummyBinds varSet1 term1)
+                  (LNL.TDummyBinds varSet2 term2)
+  | varSet1 == varSet2 = computeDifference term1 term2
+  | otherwise = showLNL (LNL.TDummyBinds varSet1 term1)
+                ++neq++showLNL (LNL.TDummyBinds varSet2 term2)
+computeDifference (LNL.TStackSpikes stackWeight1 term1)
+                  (LNL.TStackSpikes stackWeight2 term2)
+  | stackWeight1 == stackWeight2 = computeDifference term1 term2
+  | otherwise = showLNL (LNL.TStackSpikes stackWeight1 term1)
+                ++neq++ showLNL (LNL.TStackSpikes stackWeight2 term2)
+computeDifference (LNL.THeapSpikes heapWeight1 term1)
+                  (LNL.THeapSpikes heapWeight2 term2)
+  | heapWeight1 == heapWeight2 = computeDifference term1 term2
+  | otherwise = showLNL (LNL.THeapSpikes heapWeight1 term1)
+                ++neq++showLNL (LNL.THeapSpikes heapWeight2 term2)
+computeDifference (LNL.TRedWeight redWeight1 red1)
+                  (LNL.TRedWeight redWeight2 red2)
+  | redWeight1 == redWeight2 = case (red1, red2) of
+    (LNL.RApp term1 var1 , LNL.RApp term2 var2)
+      | var1 == var2 -> computeDifference term1 term2
+    (LNL.RCase dTerm1 branches1, LNL.RCase dTerm2 branches2)
+      | branches1 == branches2 -> computeDifference dTerm1 dTerm2
+    (LNL.RPlusWeight term11 rw1 term12, LNL.RPlusWeight term21 rw2 term22)
+      | term11 == term21 && rw1 == rw2 -> computeDifference term12 term22
+      | rw1 == rw2 && term12 ==  term22 -> computeDifference term11 term21
+    (LNL.RAddConst int1 term1, LNL.RAddConst int2 term2)
+      | int1 == int2 -> computeDifference term1 term2
+    (LNL.RIsZero term1, LNL.RIsZero term2) -> computeDifference term1 term2
+    (LNL.RSeq term11 term12, LNL.RSeq term21 term22)
+      | term11 == term21 -> computeDifference term12 term22
+      | term12 == term22 -> computeDifference term11 term21
+    (_,_) -> showLNL red1 ++neq++showLNL red2
+  | otherwise = showLNL (LNL.TRedWeight redWeight1 red1)
+                ++neq++showLNL (LNL.TRedWeight redWeight2 red2)
+computeDifference t1 t2 = showLNL t1++neq++showLNL t2

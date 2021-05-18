@@ -1,9 +1,9 @@
 bindings {
-G = { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+G = { any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
                        { [] -> s^False
                        , y1:ys1 -> s^(let { z1 = @
                                         , a1 = p1 <> y1
-                                        , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                        , b1 = {z1}d^(any_a <> p1 <> ys1)}
                                     in or <> a1 <> b1)})
     , foldr_a =[0,0]= \f2 . \ z2 . \l2 .
                       case l2 of
@@ -42,11 +42,11 @@ proof: -simple -single {
   in foldr_a <> or <> false <> b;
   -unfold-5-lr
     ctx = [.]
-    G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+    G= let { any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
                               { [] -> s^False
                               , y1:ys1 -> s^(let { z1 = @
                                                , a1 = p1 <> y1
-                                               , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                               , b1 = {z1}d^(any_a <> p1 <> ys1)}
                                            in or <> a1 <> b1)})
            , map_a =[0,0]= \f3 . \l3 . case l3 of
                { [] -> []
@@ -159,11 +159,11 @@ proof: -simple -single {
                               in or <> a5 <> t5});
   -unfold-5-lr
     ctx= [.]
-    G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+    G= let { any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
                               { [] -> s^False
                               , y1:ys1 -> s^(let { z1 = @
                                                , a1 = p1 <> y1
-                                               , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                               , b1 = {z1}d^(any_a <> p1 <> ys1)}
                                            in or <> a1 <> b1)})
            , foldr_a =[0,0]= \f2 . \ z2 . \l2 .
                              case l2 of
@@ -308,11 +308,11 @@ proof: -simple -single {
         });
   -dummy-ref-algebra-3-lr
     ctx = [.]
-    G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+    G= let { any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
                            { [] -> s^False
                            , y1:ys1 -> s^(let { z1 = @
                                             , a1 = p1 <> y1
-                                            , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                            , b1 = {z1}d^(any_a <> p1 <> ys1)}
                                         in or <> a1 <> b1)})
         , map_a =[0,0]= \f3 . \l3 . case l3 of
             { [] -> []
@@ -374,11 +374,11 @@ proof: -simple -single {
         });
   -dummy-ref-algebra-3-lr
     ctx= [.]
-    G= let { any_a =[0,0]= \p1. \xs1. [2]h^(case xs1 of
+    G= let { any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
                            { [] -> s^False
                            , y1:ys1 -> s^(let { z1 = @
                                             , a1 = p1 <> y1
-                                            , b1 = {z1}d^(any_a <> p1 <> y1 <> ys1)}
+                                            , b1 = {z1}d^(any_a <> p1 <> ys1)}
                                         in or <> a1 <> b1)})
         , foldr_a =[0,0]= \f2 . \ z2 . \l2 .
                           case l2 of
@@ -572,33 +572,111 @@ proof: -simple -single {
         });
 } qed;
 
----- post-induction
---proposition: G free(p xs) |-
---  h^ ([2] case xs of
---        { [] -> s^false
---        , b:bs -> s^(let { z = @
---                         , ds = {z}d^(any_a <> p <> bs)}
---                     in let {c = p <> b}
---                        in or <> c <> ds)
---        })
---  <~>
---  any_a <> p <> xs;
---proof: -simple -single {
---  h^ ([2] case xs of
---    { [] -> s^false
---    , b:bs -> s^(let { z = @
---                     , ds = {z}d^(let {cs = map_a <> p <> bs}
---                                  in foldr_a <> or <> false <> cs)}
---                 in let {c = p <> b}
---                    in or <> c <> ds)
---    })
---  -let-R
---  <~> h^ ([2] case xs of
---        { [] -> s^false
---        , b:bs -> s^(let { z = @
---                         , ds = {z}d^(let {cs = map_a <> p <> bs}
---                                      in foldr_a <> or <> false <> cs)}
---                     in let {c = p <> b}
---                        in or <> c <> ds)
---        })
---} qed;
+-- post-induction
+proposition: G free(p xs) |-
+  h^ ([2] case xs of
+            { [] -> s^false
+            , b:bs -> s^(let { z = @
+                             , ds = {z}d^(any_a <> p <> bs)}
+                         in let {c = p <> b}
+                            in or <> c <> ds)
+            })
+  <~>
+  any_a <> p <> xs;
+proof: -simple -single {
+  h^ ([2] case xs of
+            { [] -> s^false
+            , b:bs -> s^(let { z = @
+                             , ds = {z}d^(any_a <> p <> bs)}
+                         in let {c = p <> b}
+                            in or <> c <> ds)
+            });
+  -let-flatten-lr
+    ctx=(let G in h^ ([2] case xs of
+              { [] -> s^false
+              , b:bs -> s^[.]
+              }))
+    G1=let { z = @, ds = {z}d^(any_a <> p <> bs)}
+    G2=let {c = p <> b}
+    M=(or <> c <> ds);
+  <~> h^ ([2] case xs of
+            { [] -> s^false
+            , b:bs -> s^(let { z = @
+                             , ds = {z}d^(any_a <> p <> bs)
+                             , c = p <> b}
+                         in or <> c <> ds)
+            });
+  -unfold-5-lr
+    ctx = [.]
+    G=let { any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
+                           { [] -> s^False
+                           , y1:ys1 -> s^(let { z1 = @
+                                            , a1 = p1 <> y1
+                                            , b1 = {z1}d^(any_a <> p1 <> ys1)}
+                                        in or <> a1 <> b1)})
+        , foldr_a =[0,0]= \f2 . \ z2 . \l2 .
+                          case l2 of
+                            { [] -> z2
+                            , a2:as2 -> let {t2 = foldr_a <> f2 <> z2 <> as2}
+                                        in f2 <> a2 <> t2}
+        , map_a =[0,0]= \f3 . \l3 . case l3 of
+            { [] -> []
+            , a3:as3 -> let { h3 = f3 <> a3
+                            , t3 = map_a <> f3 <> as3}
+                        in h3:t3
+            }
+        , or =[0,0]= \a4. \b4. case a4 of
+                             { True -> True
+                             , False -> b4
+                             }
+        }
+    x=false
+    V=False
+    C=(h^ ([2] case xs of
+              { [] -> s^[.]
+              , b:bs -> s^(let { z = @
+                               , ds = {z}d^(any_a <> p <> bs)
+                               , c = p <> b}
+                           in or <> c <> ds)
+              }));
+  <~> h^ ([2] case xs of
+            { [] -> s^False
+            , b:bs -> s^(let { z = @
+                             , ds = {z}d^(any_a <> p <> bs)
+                             , c = p <> b}
+                         in or <> c <> ds)
+            });
+  -reduction-rl
+    ctx = (let G in [.])
+    w=0
+    R=([.] p)
+    V=(\p9 . h^ ([2] case xs of
+              { [] -> s^False
+              , b:bs -> s^(let { z9 = @
+                               , ds9 = {z9}d^(any_a <> p9 <> bs)
+                               , c9 = p9 <> b}
+                           in or <> c9 <> ds9)
+              }))
+    N=((\p8 . h^ ([2] case xs of
+              { [] -> s^False
+              , b8:bs8 -> s^(let { z8 = @
+                               , ds8 = {z8}d^(any_a <> p8 <> bs8)
+                               , c8 = p8 <> b8}
+                           in or <> c8 <> ds8)
+              })) p)
+    X={};
+  <~> [0]s^{}d^((\p9 . h^ ([2] case xs of
+            { [] -> s^False
+            , b:bs -> s^(let { z = @
+                             , ds = {z}d^(any_a <> p9 <> bs)
+                             , c = p9 <> b}
+                         in or <> c <> ds)
+            })) <> p);
+            $
+} qed;
+--any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
+--                       { [] -> s^False
+--                       , y1:ys1 -> s^(let { z1 = @
+--                                        , a1 = p1 <> y1
+--                                        , b1 = {z1}d^(any_a <> p1 <> ys1)}
+--                                    in or <> a1 <> b1)})

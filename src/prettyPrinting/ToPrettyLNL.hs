@@ -1,16 +1,18 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
-module ToPrettyLNL (showLNL) where
+module ToPrettyLNL (showLNL, Convertible, PrintVersion) where
 
 import qualified Data.Set as Set
 
 import qualified LocallyNameless as LNL
 import qualified AbsLNL as P
-import PrintLNL (printTree)
+import PrintLNL (printTree, Print)
 import OtherUtils (filterNoise)
 
-showLNL :: LNL.Term -> String
+showLNL :: (Convertible a, Print (PrintVersion a)) => a -> String
 showLNL = filterNoise . printTree . toPrintable
 
 class Convertible a where
@@ -31,9 +33,7 @@ instance Convertible LNL.Term where
   toPrintable (LNL.TLet letBindings term) = P.TLet (convertLbs letBindings)
                                                    (toPrintable term)
     where
-      convertLbs = map convertLB
-      convertLB (1, 1,term) = P.LBNoWeight (toPrintable term)
-      convertLB (sw, hw, term) = P.LBWeight sw hw (toPrintable term)
+      convertLbs = map toPrintable
   toPrintable (LNL.TDummyBinds varSet term) = P.TDummyBinds (convertVS varSet)
                                                             (toPrintable term)
     where
@@ -49,6 +49,11 @@ instance Convertible LNL.Term where
     P.TRAppNoW (toPrintable term) (toPrintable var)
   toPrintable (LNL.TRedWeight redWeight red) = P.TRedWeight redWeight
                                                             (toPrintable red)
+
+instance Convertible (Integer, Integer, LNL.Term) where
+  type PrintVersion (Integer, Integer, LNL.Term) = P.LetBinding
+  toPrintable (1, 1,term) = P.LBNoWeight (toPrintable term)
+  toPrintable (sw, hw, term) = P.LBWeight sw hw (toPrintable term)
 
 instance Convertible LNL.Red where
   type PrintVersion LNL.Red = P.Red

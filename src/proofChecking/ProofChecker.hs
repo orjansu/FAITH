@@ -26,7 +26,7 @@ import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
 import Substitution (applySubstitution, checkSideCondition)
 import OtherUtils (applyOnLawSubterms)
-import TermUtils (isAlphaEquiv)
+import TermUtils (isAlphaEquiv, computeDifference)
 
 import Debug.Trace (trace)
 
@@ -148,9 +148,12 @@ checkAlphaEqWrtLetReorder m n = do
       in if any (isOrderedAlphaEq n) permutations
               then return ()
               else throwCallstackError $ "Not alpha equivalent, even with "
-                    ++ "reordering of let:s"
+                    ++ "reordering of let:s. Non-reordered difference: \n"
+                    ++nonReorderedDiff
   where
-    showTerms terms = concat $ intersperse "\n" $ map showTypedTerm terms
+    nonReorderedDiff = let (lnl1, _) = toLocallyNameless m
+                           (lnl2, _) = toLocallyNameless n
+                       in computeDifference lnl1 lnl2
 
     getAllLetPermutations :: T.Term -> [T.Term]
     getAllLetPermutations bigTerm = case bigTerm of

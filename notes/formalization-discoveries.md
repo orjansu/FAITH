@@ -24,6 +24,29 @@ detta bevis skippade också att ta bort {}d^ efter reduktion.
 när man inte säger ngt menar man nog -lr. Jag knsk ska ta bort den och lägga
 till den automatiskt eller ngt.
 
+I och med att inlining inte har ngn space equvalence när funktionen inte är rekursiv, verkar det som att jag inte kan inline:a false till False när allting är klart. Därför verkar det som att beviset hänger delvis på att false=False
+är en top-level definition som därmed kan ha 0 i hw och sw. Altså måste jag lägga till false =[0,0]= False som en top-level definition för att allt ska funka. Intressant är i alla fall att jag försökte göra detta och FAITH sa emot.
+
+Jag insåg att jag hade en lite annan version av any_a eftersom jag
+faktiskt hade följt den desugarade versionen av any_a istället för den som blir om man använder den sugarade versionen och hur man unsugarrar den till punkt och pricka. Dvs
+jag använde
+`let { z = @
+     , a = p <> y
+     , b = {z}d^(any_a <> p <> ys)}
+in or <> a <> b`
+medans Gustavsson och Sands sa att de använde den övre, men när de kommer till den i post-induktion-steget av beviset, använder de
+`let { z = @ }
+in or <> (p <> y) <> {z}d^(any_a <> p <> ys)`
+vilket om man mekaniskt unsugarar det blir
+`let { z = @}
+ in let {ds = {z}d^(any_a <> p <> bs)}
+    in (let {c = p <> b}
+        in or <> c) <> ds)`
+
+-Det är rätt störigt att man måste ändra överallt på orelaterade grejer om man vill gå tillbaka i beviset. Med matching och pretty-printing skulle detta lösas.
+-Det skulle vara coolt om man kunde referera till andra substitutioner när man specificerar dem, men ev bara nödvändigt vid reduction.
+-skulle vara najs att printa sideconditions, men man kan istället bara kommentera ut dem i lagfilen
+
 FRÅGOR
 det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
 

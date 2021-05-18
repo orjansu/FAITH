@@ -211,6 +211,7 @@ instance Checkable UT.Free where
 checkTopLevelTerm :: UT.Term -> StCheckM T.Term
 checkTopLevelTerm term = do
   transformed <- transform term
+  Log.logInfoN . pack $ "checking term "++showTypedTerm transformed
   withLet <- withLetContext transformed
   expectedFreeVars <- gets freeVarVars
   checkTypedTerm withLet expectedFreeVars
