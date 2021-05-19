@@ -18,6 +18,7 @@ import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.Text (pack, Text)
 import Distribution.Simple.Utils (fromUTF8BS)
+import Data.Maybe (catMaybes)
 
 import qualified MiniTypedAST as T
 import ShowTypedTerm (showTypedTerm)
@@ -35,15 +36,16 @@ runCheckM monadComputation =
                     monadComputation
   in case r of
     (Right a, logs) -> Right a
-    (Left errorMsg, logs) -> Left $ (map toLine logs) ++["\n"++errorMsg]
+    (Left errorMsg, logs) -> let logLines = catMaybes $ map toLine logs
+                             in Left $ logLines ++[errorMsg]
 
 hiddenLevels = [Log.LevelDebug]
 
-toLine :: Log.LogLine -> String
+toLine :: Log.LogLine -> Maybe String
 toLine (loc, logsource, loglevel, logstr)
-  | loglevel `elem` hiddenLevels = ""
+  | loglevel `elem` hiddenLevels = Nothing
   | otherwise = let mid = fromUTF8BS $ Log.fromLogStr logstr
-                in mid ++"\n"
+                in Just $ mid
 
 assert :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
           Bool -> String -> m ()

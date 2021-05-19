@@ -85,9 +85,8 @@ runCheckDetailedProof tTree =
     Just errorMsgs -> do
       let relevantMsgs = drop (length errorMsgs - 11) errorMsgs
       hPutStrLn stderr "Error when checking proof. Last 10 logs and error:"
-      mapM (hPutStr stderr) relevantMsgs
-      hPutStrLn stderr ""
-      let fullLog = concat $ errorMsgs
+      mapM (hPutStrLn stderr) relevantMsgs
+      let fullLog = concat $ intersperse "\n" errorMsgs
       let logFile = "proofLog.hs"
       writeFile logFile fullLog
       hPutStrLn stderr $ "Full logs can be found in "++logFile

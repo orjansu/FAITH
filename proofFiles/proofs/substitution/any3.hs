@@ -741,13 +741,13 @@ proof: -simple -single {
     w=0
     R=([.] xs)
     X={}
-    V=(\xs9 . ((\p9 . h^ ([2] case xs9 of
+    V=((\xs9 . \p9 . h^ ([2] case xs9 of
               { [] -> s^False
               , b:bs -> s^(let { z = @
                                , ds = {z}d^(any_a <> p9 <> bs)
                                , c = p9 <> b}
                            in or <> c <> ds)
-              })) <> p))
+              })) <> p)
     N=((\q . h^ ([2] case xs of
               { [] -> s^False
               , b9:bs9 -> s^(let { z' = @
