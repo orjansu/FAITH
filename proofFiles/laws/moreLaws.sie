@@ -1,4 +1,6 @@
 -- This should contain all laws that are part of space improvement from Gustavsson and Sands' paper.
+-- note that all relations involving =def= <~> and <~~> have the suffix -lr
+-- or -rl to indicate if you mean the left-to-right or right-to-left direction.
 
 -reduction: [w]^R[V] <~> [w]s^{X}d^N if (R[V] ~~> N) && (FV(R[V]) = FV({X}d^N));
 --the reduction ~~> is implemented in code. It is in LanguageLogic.hs.

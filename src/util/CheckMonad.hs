@@ -35,11 +35,15 @@ runCheckM monadComputation =
                     monadComputation
   in case r of
     (Right a, logs) -> Right a
-    (Left errorMsg, logs) -> Left $ (map toLine logs) ++ [errorMsg]
+    (Left errorMsg, logs) -> Left $ (map toLine logs) ++["\n"++errorMsg]
+
+hiddenLevels = [Log.LevelDebug]
 
 toLine :: Log.LogLine -> String
-toLine (loc, logsource, loglevel, logstr) =
-  fromUTF8BS $ Log.fromLogStr logstr
+toLine (loc, logsource, loglevel, logstr)
+  | loglevel `elem` hiddenLevels = ""
+  | otherwise = let mid = fromUTF8BS $ Log.fromLogStr logstr
+                in mid ++"\n"
 
 assert :: (MonadError String m, Log.MonadLogger m, HasCallStack) =>
           Bool -> String -> m ()

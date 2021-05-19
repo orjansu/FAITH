@@ -213,7 +213,7 @@ getBoundSubstVars substitutions law = case law of
 -- TODO: check that you do not substitute into a binding position.
 applyTermSubstM :: HasCallStack => Int -> Law.Term -> SubstM T.Term
 applyTermSubstM index bigLawTerm = do
-  Log.logInfoN . pack $ "substituting into law "++showLaw bigLawTerm
+  Log.logDebugN . pack $ "substituting into law "++showLaw bigLawTerm
   case bigLawTerm of
     Law.TValueMetaVar mvName -> do
       T.SValue value <- getSubstitute mvName
