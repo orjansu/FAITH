@@ -1,0 +1,1 @@
+-test: M x + M x + N x |~> 1;

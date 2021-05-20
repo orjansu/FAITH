@@ -28,7 +28,8 @@ import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
 import ShowLaw (showLaw)
 import OtherUtils (applyOnLawSubterms, applyOnLawSubtermsM, applyAndRebuild)
 import LanguageLogic (reduce)
-import TermUtils (substituteFor, isAlphaEquiv, showSubstitute)
+import TermUtils (substituteFor, isAlphaEquiv, showSubstitute
+                 , computeDifference)
 
 -- | Given M, sigma and S, where M is a law term with meta-
 -- variables, sigma is a substitution that substitutes all meta-
@@ -448,7 +449,15 @@ evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
     ++showTypedTerm substituted
   result <- reduce substituted
   tTerm <- applyTermSubstM (-1) lTerm
-  liftCheckM $ result `isAlphaEquiv` tTerm
+  res <- liftCheckM $ result `isAlphaEquiv` tTerm
+  if (res == False)
+    then do
+      let (lnlRes, _) = toLocallyNameless result
+          (lnlTerm,_) = toLocallyNameless tTerm
+      Log.logInfoN . pack $ "Not equal to N. Difference: "
+          ++computeDifference lnlRes lnlTerm
+    else return ()
+  return res
 evalBoolTerm (Law.BTAnd lBoolTerm1 lBoolTerm2) = do
   b1 <- evalBoolTerm lBoolTerm1
   b2 <- evalBoolTerm lBoolTerm2

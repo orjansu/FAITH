@@ -646,7 +646,7 @@ proof: -simple -single {
                              , c = p <> b}
                          in or <> c <> ds)
             });
-    -spike-algebra-zero-stack-spike-rl
+  -spike-algebra-zero-stack-spike-rl
       ctx=(let G in [.])
       M=(h^ ([2] case xs of
                 { [] -> s^False
@@ -681,12 +681,12 @@ proof: -simple -single {
   -reduction-rl
     ctx = (let G in [.])
     w=0
-    R=([.] p)
-    V=(\p9 . h^ ([2] case xs of
+    R=([.] xs)
+    V=(\xs2 . h^ ([2] case xs2 of
               { [] -> s^False
               , b:bs -> s^(let { z9 = @
-                               , ds9 = {z9}d^(any_a <> p9 <> bs)
-                               , c9 = p9 <> b}
+                               , ds9 = {z9}d^(any_a <> p <> bs)
+                               , c9 = p <> b}
                            in or <> c9 <> ds9)
               }))
     N=(h^ ([2] case xs of
@@ -697,72 +697,99 @@ proof: -simple -single {
                            in or <> c8 <> ds8)
               }))
     X={};
-  <~> (\p9 . h^ ([2] case xs of
+  <~> (\xs2 . h^ ([2] case xs2 of
             { [] -> s^False
             , b:bs -> s^(let { z = @
-                             , ds = {z}d^(any_a <> p9 <> bs)
-                             , c = p9 <> b}
+                             , ds = {z}d^(any_a <> p <> bs)
+                             , c = p <> b}
                          in or <> c <> ds)
-            })) <> p;
+            })) <> xs;
   -spike-algebra-zero-stack-spike-rl
-    ctx = (let G in [.])
-    M=((\p9 . h^ ([2] case xs of
+    ctx = (let G in [.] <> xs)
+    M=(\xs2 . h^ ([2] case xs2 of
               { [] -> s^False
               , b:bs -> s^(let { z = @
-                               , ds = {z}d^(any_a <> p9 <> bs)
-                               , c = p9 <> b}
+                               , ds = {z}d^(any_a <> p <> bs)
+                               , c = p <> b}
                            in or <> c <> ds)
-              })) <> p);
-  <~> [0]s^((\p9 . h^ ([2] case xs of
+              }));
+  <~> [0]s^(\xs2 . h^ ([2] case xs2 of
             { [] -> s^False
             , b:bs -> s^(let { z = @
-                             , ds = {z}d^(any_a <> p9 <> bs)
-                             , c = p9 <> b}
+                             , ds = {z}d^(any_a <> p <> bs)
+                             , c = p <> b}
                          in or <> c <> ds)
-            })) <> p);
+            })) <> xs;
   -dummy-ref-algebra-5-rl
-    ctx=(let G in [0]s^[.])
-    M=((\p9 . h^ ([2] case xs of
+    ctx=(let G in [0]s^[.] <> xs)
+    M=(\xs2 . h^ ([2] case xs2 of
               { [] -> s^False
               , b:bs -> s^(let { z = @
-                               , ds = {z}d^(any_a <> p9 <> bs)
-                               , c = p9 <> b}
+                               , ds = {z}d^(any_a <> p <> bs)
+                               , c = p <> b}
                            in or <> c <> ds)
-              })) <> p);
-  <~> [0]s^{}d^((\p9 . h^ ([2] case xs of
+              }));
+  <~> [0]s^{}d^(\xs2 . h^ ([2] case xs2 of
             { [] -> s^False
             , b:bs -> s^(let { z = @
-                             , ds = {z}d^(any_a <> p9 <> bs)
-                             , c = p9 <> b}
+                             , ds = {z}d^(any_a <> p <> bs)
+                             , c = p <> b}
                          in or <> c <> ds)
-            })) <> p);
+            })) <> xs;
   -reduction-rl
-    ctx=(let G in [.])
+    ctx=(let G in [.] <> xs)
     w=0
-    R=([.] xs)
+    R=([.] p)
     X={}
-    V=((\xs9 . \p9 . h^ ([2] case xs9 of
+    V=(\q . \xs3 . h^ ([2] case xs3 of
+              { [] -> s^False
+              , e:es -> s^(let { z' = @
+                               , fs = {z'}d^(any_a <> q <> es)
+                               , y = q <> e}
+                           in or <> y <> fs)
+              }))
+    N=(\xs2 . h^ ([2] case xs2 of
               { [] -> s^False
               , b:bs -> s^(let { z = @
-                               , ds = {z}d^(any_a <> p9 <> bs)
-                               , c = p9 <> b}
+                               , ds = {z}d^(any_a <> p <> bs)
+                               , c = p <> b}
                            in or <> c <> ds)
-              })) <> p)
-    N=((\q . h^ ([2] case xs of
-              { [] -> s^False
-              , b9:bs9 -> s^(let { z' = @
-                                 , ds9 = {z'}d^(any_a <> q <> bs9)
-                                 , c9 = q <> b9}
-                           in or <> c9 <> ds9)
-              })) <> p);
-  <~> (\xs9 . \p9 . h^ ([2] case xs9 of
+              }));
+  <~> (\p9 . \xs9 . h^ ([2] case xs9 of
             { [] -> s^False
             , b:bs -> s^(let { z = @
                              , ds = {z}d^(any_a <> p9 <> bs)
                              , c = p9 <> b}
                          in or <> c <> ds)
             })) <> p <> xs;
-            $
+  -unfold-5-rl
+    ctx = [.]
+    G=let {foldr_a =[0,0]= \f2 . \ z2 . \l2 .
+                          case l2 of
+                            { [] -> z2
+                            , a2:as2 -> let {t2 = foldr_a <> f2 <> z2 <> as2}
+                                        in f2 <> a2 <> t2}
+        , map_a =[0,0]= \f3 . \l3 . case l3 of
+            { [] -> []
+            , a3:as3 -> let { h3 = f3 <> a3
+                            , t3 = map_a <> f3 <> as3}
+                        in h3:t3
+            }
+        , or =[0,0]= \a4. \b4. case a4 of
+                             { True -> True
+                             , False -> b4
+                             }
+        , false =[0,0]= False
+        }
+    x=any_a
+    V=( \p1. \xs1. h^([2]case xs1 of
+                           { [] -> s^False
+                           , y1:ys1 -> s^(let { z1 = @
+                                            , a1 = p1 <> y1
+                                            , b1 = {z1}d^(any_a <> p1 <> ys1)}
+                                        in or <> a1 <> b1)}))
+    C=([.] <> p <> xs);
+  <~> any_a <> p <> xs;
 } qed;
 
 {-

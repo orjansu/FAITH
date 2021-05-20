@@ -122,29 +122,25 @@ computeDifference (LNL.TLet letBindings1 term1)
                   (LNL.TLet letBindings2 term2)
   | letBindings1 == letBindings2 = computeDifference term1 term2
   | term1 == term2 = lbDiff letBindings1 letBindings2
-  | otherwise = showLNL (LNL.TLet letBindings1 term1)
-                ++neq++showLNL (LNL.TLet letBindings2 term2)
   where
-    lbDiff lbs1 lbs2 = let diff = takeWhile (\(a,b) -> a==b) $ zip lbs1 lbs2
-                           (dlbs1, dlbs2) = unzip diff
-                       in showLBs dlbs1++neq++showLBs dlbs2
+    lbDiff lbs1 lbs2 =
+      let diff = filter (\(a,b) -> a /= b) $ zip lbs1 lbs2
+          (dlbs1, dlbs2) = unzip diff
+      in case diff of
+        [((sw1, hw1, t1), (sw2, hw2, t2))]
+          |sw1 == sw2 && hw1 == hw2 -> computeDifference t1 t2
+        _ -> showLBs dlbs1++neq++showLBs dlbs2
     showLBs lbs = let mid = concat $ intersperse ", " $ map showLNL lbs
                   in "{" ++mid++ "}"
 computeDifference (LNL.TDummyBinds varSet1 term1)
                   (LNL.TDummyBinds varSet2 term2)
   | varSet1 == varSet2 = computeDifference term1 term2
-  | otherwise = showLNL (LNL.TDummyBinds varSet1 term1)
-                ++neq++showLNL (LNL.TDummyBinds varSet2 term2)
 computeDifference (LNL.TStackSpikes stackWeight1 term1)
                   (LNL.TStackSpikes stackWeight2 term2)
   | stackWeight1 == stackWeight2 = computeDifference term1 term2
-  | otherwise = showLNL (LNL.TStackSpikes stackWeight1 term1)
-                ++neq++ showLNL (LNL.TStackSpikes stackWeight2 term2)
 computeDifference (LNL.THeapSpikes heapWeight1 term1)
                   (LNL.THeapSpikes heapWeight2 term2)
   | heapWeight1 == heapWeight2 = computeDifference term1 term2
-  | otherwise = showLNL (LNL.THeapSpikes heapWeight1 term1)
-                ++neq++showLNL (LNL.THeapSpikes heapWeight2 term2)
 computeDifference (LNL.TRedWeight redWeight1 red1)
                   (LNL.TRedWeight redWeight2 red2)
   | redWeight1 == redWeight2 = case (red1, red2) of

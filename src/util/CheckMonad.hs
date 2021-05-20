@@ -39,7 +39,7 @@ runCheckM monadComputation =
     (Left errorMsg, logs) -> let logLines = catMaybes $ map toLine logs
                              in Left $ logLines ++[errorMsg]
 
-hiddenLevels = [Log.LevelDebug]
+hiddenLevels = []--[Log.LevelDebug]
 
 toLine :: Log.LogLine -> Maybe String
 toLine (loc, logsource, loglevel, logstr)

@@ -47,6 +47,12 @@ vilket om man mekaniskt unsugarar det blir
 -Det skulle vara coolt om man kunde referera till andra substitutioner när man specificerar dem, men ev bara nödvändigt vid reduction.
 -skulle vara najs att printa sideconditions, men man kan istället bara kommentera ut dem i lagfilen
 
+jag trodde ett tag att jag skulle behöva en regel
+`(\ a. \b. M) x y <~> s^((\a. (\b. M) x) y)`
+men insåg först att det var fel, att jag menade
+`(\ a. \b. M) y x <~> s^((\a. (\b. M) x) y)`
+och sen att man kan ta sig mellan dem mha reduction osv.
+
 FRÅGOR
 det rekursiva har vanliga any i det rekursiva anropet. Är det meningen? - nej, det är ett fel i tesen.
 

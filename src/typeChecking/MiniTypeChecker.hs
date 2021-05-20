@@ -463,7 +463,7 @@ instance Checkable UT.Proof where
       checkSteps2 ((UT.PSTerm _ ):[]) = return []
                    --The last term is in the next-to-last proof step too, so
                    --it is not lost.
-      checkSteps2 _ = fail $ "Ordering of proof steps are invalid. Every other "
+      checkSteps2 l = fail $ "Ordering of proof steps are invalid. Every other "
         ++"step must be a term and every other a transformational command "
         ++"and an improvement relation. Note that the HereMarker $ is only "
         ++"allowed after a term and that if the last term is not specified, "

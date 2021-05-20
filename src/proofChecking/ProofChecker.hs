@@ -105,8 +105,6 @@ checkStep globalImpRel
                                          (T.SContext context)
                                          substitutions
           forbiddenNames = varFreeVars
-      Log.logInfoN . pack $ "Checking side conditions."
-      checkSideCondition sideCond substitutionsWctx varFreeVars
       Log.logInfoN . pack $ "Substituting into starting term (the "
         ++"left hand side in a left-to-right transformation)"
       substToLHS <- applySubstitution lawLHSctx
@@ -127,6 +125,8 @@ checkStep globalImpRel
       Log.logInfoN . pack $ "Checking that the substitutions into the "
         ++"transformed term is alpha-equal to the transformed term."
       checkAlphaEqWrtLetReorder substToRHS term2
+      Log.logInfoN . pack $ "Checking side conditions."
+      checkSideCondition sideCond substitutionsWctx varFreeVars
 
 -- | Given the law term L and two terms M and N,
 -- this function checks alpha equivalance of M and N. If L contains let-terms
