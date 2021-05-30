@@ -572,6 +572,23 @@ proof: -simple -single {
         });
 } qed;
 
+{-
+Induction is not implemented, so this is in comments. However, if it was
+implemented, the step would probably look like this.
+  -ih
+    ctx= [.]
+    G=G
+    C=(h^ ([2] case xs of
+          { [] -> s^false
+          , b:bs -> s^(let { z = @
+                           , ds = {z}d^([.])}
+                       in let {c = p <> b}
+                          in or <> c <> ds)
+          }))
+    p=p
+    xs=bs
+-}
+
 -- post-induction
 proposition: G free(p xs) |-
   h^ ([2] case xs of
@@ -791,16 +808,3 @@ proof: -simple -single {
     C=([.] <> p <> xs);
   <~> any_a <> p <> xs;
 } qed;
-
-{-
-introducera [0]s^ och {}d^
-gör reduction-rl för p
-introducera [0]s^ och {}d^
-gör reduction-rl för xs
--}
---any_a =[0,0]= \p1. \xs1. h^([2]case xs1 of
---                       { [] -> s^False
---                       , y1:ys1 -> s^(let { z1 = @
---                                        , a1 = p1 <> y1
---                                        , b1 = {z1}d^(any_a <> p1 <> ys1)}
---                                    in or <> a1 <> b1)})

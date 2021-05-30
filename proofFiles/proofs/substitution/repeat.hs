@@ -24,6 +24,7 @@ proof: -simple -single{
     M=(x:xs);
   |~> let {xs = x : xs} in f <> x <> xs;
 } qed;
+
 --inductive case (before induction)
 proposition: G free(x f) |- let {xs = [0]s^(\x2. let {ys = repeat x2}
                                                 in x : ys) x} in f <> x <> xs
@@ -52,6 +53,7 @@ proof: -simple -single{
     w=1
     M=(let {ys = repeat x} in x : ys);
   |~> let {xs = let {ys = repeat x} in x : ys} in f <> x <> xs;
+  -- Start of extra work needed because meta-variable M is not implemented.
   -dummy-ref-algebra-5-rl
     ctx=(let G in let {xs = let {ys = repeat x} in [.]} in f <> x <> xs)
     M=(x : ys);
@@ -152,6 +154,9 @@ proof: -simple -single{
 }
 qed;
 {-
+This would be the induction step if induction was implemented, but now
+it is in comments and there are two separate proofs instead.
+
   <~> let {xs = let {g =[0,0]= (\a. \as . a : as)}
                 in let { ys = repeat^n x} in g <> x <> ys}
       in f <> x <> xs;
@@ -167,12 +172,12 @@ qed;
       in f <> x <> xs;
 -}
 
+-- inductive case (after induction)
 proposition: G free(x f) |-
       let {xs = let {g =[0,0]= (\a. \as . a : as)}
                 in let {ys = x : ys} in g <> x <> ys}
       in f <> x <> xs
-      |~> let {xs = let {ys = x : ys} in x : ys}
-          in f <> x <> xs;
+      |~> let {xs = x : xs} in f <> x <> xs;
 proof: -simple -single{
   -unfold-5-lr
     ctx=(let G in let {xs = [.]} in f <> x <> xs)
@@ -183,15 +188,50 @@ proof: -simple -single{
   <~> let {xs = let {g =[0,0]= (\a. \as . a : as)}
                 in let {ys = x : ys} in (\b. \bs . b : bs) <> x <> ys}
       in f <> x <> xs;
-      $
-} qed;
-
---inductive case (after induction)
-proposition: G free(x f) |- let {xs = let {ys = x : ys}
-                                      in x : ys}
-                            in f <> x <> xs
-                        |~> let {xs = x : xs} in f <> x <> xs;
-proof: -simple -single{
+  -balloon-reduction-lr
+    ctx= (let G in let {xs = let {g =[0,0]= (\a. \as . a : as)}
+                  in let {ys = x : ys} in [.] <> ys}
+        in f <> x <> xs)
+    x=b
+    M=(\bs . b : bs)
+    y=x;
+  <~> let {xs = let {g =[0,0]= (\a. \as . a : as)}
+                in let {ys = x : ys} in (\bs . x : bs) <> ys}
+      in f <> x <> xs;
+  -balloon-reduction-lr
+    ctx=(let G in let {xs = let {g =[0,0]= (\a. \as . a : as)}
+                            in let {ys = x : ys} in [.]}
+                  in f <> x <> xs)
+    M=(x : bs)
+    x=bs
+    y=ys;
+  <~> let {xs = let {g =[0,0]= (\a. \as . a : as)}
+                in let {ys = x : ys} in x : ys}
+      in f <> x <> xs;
+  -gc-lr
+    ctx=(let G in  let {xs = [.]}
+                   in f <> x <> xs)
+    G1 = let {}
+    G2 = let {g =[0,0]= (\a. \as . a : as)}
+    X={}
+    M=(let {ys = x : ys} in x : ys);
+  <~> let {xs = {}d^(let {}
+                     in let {ys = x : ys} in x : ys)}
+      in f <> x <> xs;
+  -dummy-ref-algebra-5-lr
+    ctx=(let G in let {xs = [.]}
+                  in f <> x <> xs)
+    M=(let {} in let {ys = x : ys} in x : ys);
+  <~> let {xs = (let {} in let {ys = x : ys} in x : ys)}
+      in f <> x <> xs;
+  -empty-let-lr
+    ctx = (let G in let {xs = [.]}
+                    in f <> x <> xs)
+    N=(let {ys = x : ys} in x : ys);
+  <~> let {xs = let {ys = x : ys} in x : ys}
+      in f <> x <> xs;
+  -- End of extra work needed because general metavariable M is not
+  -- implemented.
   -value-merge'
     ctx=(let G in [.])
     G=let {}
@@ -199,5 +239,5 @@ proof: -simple -single{
     y=ys
     V=(x:ys)
     M=(f <> x <> xs);
-  |~>
+  |~> let {xs = x : xs} in f <> x <> xs;
 } qed;

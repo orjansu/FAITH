@@ -17,7 +17,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Common as Com
 import Common (trueName, falseName)
-import OtherUtils (distinct)
+import OtherUtils (distinct, applyOnLawSubterms, applyOnLawSubtermsM)
 
 typecheckLaws :: UT.LawList -> Either [String] T.LawMap
 typecheckLaws lawList = runCheckM typecheckLaws'
@@ -384,18 +384,158 @@ getVarName (UT.DVar (UT.MVVar varStr)) = varStr
 -- - not (... ReducesTo ...) is not supported.
 -- - the N of R[V] ~~> N may not contain indexed expressions.
 checkLaw :: T.Law -> CheckM ()
-checkLaw (T.DLaw _name term1 _imprel term2 _sidecond) = do
+checkLaw (T.DLaw _name term1 _imprel term2 sidecond) = do
   mapM checkTerm [term1, term2]
+  checkNot sidecond
+  checkReduction sidecond
   return ()
   where
     checkTerm t = do
+      checkNiOnlyInCase t
       checkLetBindingsNotCopied t
       checkMetaBindVarsNotCopied t
       checkCaseStatements t
 
+-- - not (... isfresh ...) and not (... areFresh ...) are not supported.
+-- - not (... ReducesTo ...) is not supported.
+checkNot :: T.SideCond -> CheckM ()
+checkNot T.NoSideCond = return ()
+checkNot (T.WithSideCond bt) = go bt
+  where
+    go (T.BTSizeEq _ _) = return ()
+    go (T.BTSetEq _ _) = return ()
+    go (T.BTSubsetOf _ _) = return ()
+    go (T.BTIn _ _) = return ()
+    go (T.BTNot bt) = go2 bt
+    go (T.BTLE _ _) = return ()
+    go (T.BTGE _ _) = return ()
+    go (T.BTGT _ _) = return ()
+    go (T.BTIsFresh _) = return ()
+    go (T.BTAreFresh _) = return ()
+    go (T.BTReducesTo _ _ _) = return ()
+    go (T.BTAnd bt1 bt2) = do
+      go bt1
+      go bt2
+
+    go2 (T.BTIsFresh _) = throwError errorMsg
+    go2 (T.BTAreFresh _) = throwError errorMsg
+    go2 (T.BTReducesTo _ _ _) = throwError errorMsg
+    go2 (T.BTAnd bt1 bt2) = do
+      go2 bt1
+      go2 bt2
+    go2 (T.BTNot bt) = go bt
+    go2 (T.BTSizeEq _ _) = return ()
+    go2 (T.BTSetEq _ _) = return ()
+    go2 (T.BTSubsetOf _ _) = return ()
+    go2 (T.BTIn _ _) = return ()
+    go2 (T.BTLE _ _) = return ()
+    go2 (T.BTGE _ _) = return ()
+    go2 (T.BTGT _ _) = return ()
+    errorMsg = "You may not negate isFresh, areFresh or ~~>."
+
+-- - the N of R[V] ~~> N may not contain indexed expressions.
+checkReduction (T.NoSideCond) = return ()
+checkReduction (T.WithSideCond bt) = go bt
+  where
+    go (T.BTSizeEq _ _) = return ()
+    go (T.BTSetEq _ _) = return ()
+    go (T.BTSubsetOf _ _) = return ()
+    go (T.BTIn _ _) = return ()
+    go (T.BTNot bt) = go bt
+    go (T.BTLE _ _) = return ()
+    go (T.BTGE _ _) = return ()
+    go (T.BTGT _ _) = return ()
+    go (T.BTIsFresh _) = return ()
+    go (T.BTAreFresh _) = return ()
+    go (T.BTReducesTo _ _ term) = assert (not (containsIndexed term))
+      "in R[V] ~~> N, N may not contain vectorized expressions."
+    go (T.BTAnd bt1 bt2) = do
+      go bt1
+      go bt2
+
+    containsIndexed (T.TMVTerms _) = True
+    containsIndexed (T.TDummyBinds vs term) =
+      containsIndexed term || vsContains vs
+      where
+        vsContains vs = case vs of
+          T.VSConcrete _ -> False
+          T.VSMetaVar _ -> False
+          T.VSVectMeta _ -> False
+          T.VSFreeVars vc -> case vc of
+            T.VCTerm term -> containsIndexed term
+            T.VCMetaVarContext _ -> False
+            T.VCMetaVarRed _ -> False
+            T.VCValueContext _ -> False
+          T.VSDomain _ -> False
+          T.VSUnion vs1 vs2 -> vsContains vs1 || vsContains vs2
+          T.VSDifference vs1 vs2 -> vsContains vs1 || vsContains vs2
+    containsIndexed otherLaw = applyOnLawSubterms otherLaw
+                                                  False
+                                                  containsIndexed
+                                                  or
+-- -N_i is only used inside Case statements
+checkNiOnlyInCase :: T.Term -> CheckM ()
+checkNiOnlyInCase = \case
+  T.TMVTerms ni -> throwError $ ni++" may only be used in case branches."
+  T.TDummyBinds vs term -> do
+    checkNiOnlyInCase term
+    checkNiCase vs
+    where
+      checkNiCase vs = case vs of
+        T.VSConcrete _ -> return ()
+        T.VSMetaVar _ -> return ()
+        T.VSVectMeta _ -> return ()
+        T.VSFreeVars vc -> case vc of
+          T.VCTerm term -> checkNiOnlyInCase term
+          T.VCMetaVarContext _ -> return ()
+          T.VCMetaVarRed _ -> return ()
+          T.VCValueContext _ -> return ()
+        T.VSDomain _ -> return ()
+        T.VSUnion vs1 vs2 -> do
+          checkNiCase vs1
+          checkNiCase vs2
+        T.VSDifference vs1 vs2 -> do
+          checkNiCase vs1
+          checkNiCase vs2
+  T.TRedWeight _ (T.RCase term _stms) ->
+    checkNiOnlyInCase term
+    -- I do not check in _stms, because it is ok if they contain N_i.
+  otherTerm -> applyOnLawSubtermsM otherTerm () checkNiOnlyInCase (const ())
+
+-- -letbinding-metavariables are not copied
 checkLetBindingsNotCopied :: T.Term -> CheckM ()
-checkLetBindingsNotCopied _ = do
+checkLetBindingsNotCopied _ =
   Log.logInfoN . pack $ "Skipping check checkLetBindingsNotCopied for now."
+  --go Map.empty term
+--  where
+--    go lbMetas t = case t of
+--      T.TLet (T.LBSBoth metas moreConcrete) term -> do
+--        checkLetBindingsNotCopied term
+--        mapM (checkMetas lbMetas) metas
+--        mapM (checkMoreConcrete lbMetas) moreConcrete
+--        return ()
+--     T.TDummyBinds vs term -> do
+--       go lbMetas term
+--       checkLBCase vs
+--       where
+--         checkLBCase vs = case vs of
+--           T.VSConcrete _ -> return ()
+--           T.VSMetaVar _ -> return ()
+--           T.VSVectMeta _ -> return ()
+--           T.VSFreeVars vc -> case vc of
+--             T.VCTerm term -> checkLBOnlyInCase term
+--             T.VCMetaVarContext _ -> return ()
+--             T.VCMetaVarRed _ -> return ()
+--             T.VCValueContext _ -> return ()
+--           T.VSDomain _ -> return ()
+--           T.VSUnion vs1 vs2 -> do
+--             checkLBCase vs1
+--             checkLBCase vs2
+--           T.VSDifference vs1 vs2 -> do
+--             checkLBCase vs1
+--             checkLBCase vs2
+--    checkMetas = undefined
+--    checkMoreConcrete = undefined
 
 checkMetaBindVarsNotCopied :: T.Term -> CheckM ()
 checkMetaBindVarsNotCopied _ =

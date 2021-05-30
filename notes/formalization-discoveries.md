@@ -24,8 +24,7 @@ detta bevis skippade också att ta bort {}d^ efter reduktion.
 när man inte säger ngt menar man nog -lr. Jag knsk ska ta bort den och lägga
 till den automatiskt eller ngt.
 
-I och med att inlining inte har ngn space equvalence när funktionen inte är rekursiv, verkar det som att jag inte kan inline:a false till False när allting är klart. Därför verkar det som att beviset hänger delvis på att false=False
-är en top-level definition som därmed kan ha 0 i hw och sw. Altså måste jag lägga till false =[0,0]= False som en top-level definition för att allt ska funka. Intressant är i alla fall att jag försökte göra detta och FAITH sa emot.
+I och med att inlining inte har ngn space equvalence när funktionen inte är rekursiv, verkar det som att jag inte kan inline:a false till False när allting är klart. Därför verkar det som att beviset hänger delvis på att false=False är en top-level definition som därmed kan ha 0 i hw och sw. Altså måste jag lägga till false =[0,0]= False som en top-level definition för att allt ska funka. Intressant är i alla fall att jag försökte göra detta och FAITH sa emot.
 
 Jag insåg att jag hade en lite annan version av any_a eftersom jag
 faktiskt hade följt den desugarade versionen av any_a istället för den som blir om man använder den sugarade versionen och hur man unsugarrar den till punkt och pricka. Dvs

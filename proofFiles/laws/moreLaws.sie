@@ -22,7 +22,6 @@
 -let-let: let G1 {x =[v,w]= let G2 in M} in N
       <~> let G2 {x =[v,w]= let G1 in M} in N
   if dom G1 union dom G2 subsetof FV(M) && |G1| = |G2|;
-  --parenthesis needed? - no, because left associative.
 
 -let-alts: let G1 in [w] case M of {pat_i -> let G2 in N_i}
        <~> let G2 in [w] case M of {pat_i -> let G1 in N_i}
@@ -126,5 +125,5 @@
 
 -- Laws that I added that I think are needed and valid
 -balloon-intro-untyped: M x <~~> M <> x;
--spike-algebra-zero-stack-spike: [0]s^M <~> M; -- Just used in proof.
+-spike-algebra-zero-stack-spike: [0]s^M <~> M;
 -spike-algebra-zero-heap-spike: [0]h^M <~> M;
