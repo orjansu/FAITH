@@ -2,7 +2,16 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 {-# LANGUAGE LambdaCase #-}
 
-module TermCorrectness where
+module TermCorrectness ( checkTypedTerm
+                       , checkBoundVariablesDistinct
+                       , checkFreeVars
+                       , getBoundVariables
+                       , numHoles
+                       , isValue
+                       , getAllMetaVars
+                       , getFreeVariables
+                       , getAllVariables
+                        ) where
 
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.Except (ExceptT, MonadError, throwError, runExceptT)
@@ -18,6 +27,7 @@ import qualified TypedLawAST as Law
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import CheckMonad (assert, assertTerm)
+import OtherUtils (applyOnSubtermsM, applyOnSubterms)
 
 -- | given M and S, where S is the set of variables that are allowed to be free
 -- in M, checks that:
@@ -47,13 +57,10 @@ checkBoundVariablesDistinct term =
     Right () -> return ()
   where
     checkBoundVars :: T.Term -> ExceptT String (State (Set.Set String)) ()
-    checkBoundVars term = case term of
-      T.TVar var                 -> return ()
-      T.TNum integer             -> return ()
+    checkBoundVars = \case
       T.TLam var term            -> do
         checkBoundVar var
         checkBoundVars term
-      T.THole                    -> return ()
       T.TLet letBindings term    -> do
         mapM checkBVLB letBindings
         checkBoundVars term
@@ -61,12 +68,16 @@ checkBoundVariablesDistinct term =
           checkBVLB (name, sw, hw, term) = do
             checkBoundVar name
             checkBoundVars term
-      T.TDummyBinds varSet term  -> checkBoundVars term
-      T.TRedWeight redWeight red -> case red of
-        T.RApp term var -> checkBoundVars term
-        T.RPlusWeight t1 rw t2 -> do
-          checkBoundVars t1
-          checkBoundVars t2
+      T.TRedWeight redWeight (T.RCase term branches) -> do
+        let (_cNames, args, terms) = unzip3 branches
+        mapM checkBoundVar $ concat args
+        mapM checkBoundVars terms
+        checkBoundVars term
+        return ()
+      nonBindingTerm -> applyOnSubtermsM nonBindingTerm
+                                         ()
+                                         checkBoundVars
+                                         (const ())
 
     checkBoundVar :: (MonadError String m, MonadState (Set.Set String) m) =>
                       String -> m ()
@@ -103,69 +114,172 @@ checkFreeVars term expectedFreeVars = do
 -- | Returns the set of bound variables in a term.
 -- does no further checks on the correctness of the term.
 getBoundVariables :: T.Term -> Set.Set String
-getBoundVariables term = case term of
-  T.TVar var -> Set.empty
-  T.TNum integer -> Set.empty
+getBoundVariables = \case
   T.TLam var term -> Set.singleton var `Set.union` getBoundVariables term
-  T.THole -> Set.empty
   T.TLet letBindings term -> boundVarsLBS `Set.union` getBoundVariables term
     where
       boundVarsLBS = Set.unions . map getLBBound $ letBindings
       getLBBound (var, _sw, _hw, term) =
         Set.singleton var `Set.union` getBoundVariables term
-  T.TDummyBinds varSet term -> getBoundVariables term
-  T.TRedWeight redWeight red -> case red of
-    T.RApp term var -> getBoundVariables term
-    T.RPlusWeight t1 rw t2 ->
-      getBoundVariables t1 `Set.union` getBoundVariables t2
+  T.TRedWeight _ (T.RCase term branches) ->
+    let boundInTerm = getBoundVariables term
+        (_cNames, args, terms) = unzip3 branches
+        boundInCase = Set.fromList $ concat args
+        boundInTerms = Set.unions $ map getBoundVariables terms
+    in Set.unions [boundInTerm, boundInCase, boundInTerms]
+  nonBindingTerm -> applyOnSubterms nonBindingTerm
+                                    Set.empty
+                                    getBoundVariables
+                                    Set.unions
 
 -- | Returns the number of holes in a term or context
 numHoles :: T.Term -> Integer
-numHoles (T.TVar _var) = 0
-numHoles (T.TNum _integer) = 0
-numHoles (T.TLam _var term) = numHoles term
 numHoles (T.THole) = 1
-numHoles (T.TLet letBindings term) = numHoles term + numHolesInLBS
-  where
-    numHolesInLBS = sum $ map numHolesInLB letBindings
-    numHolesInLB (_var, _sw, _hw, term) = numHoles term
-numHoles (T.TDummyBinds _varSet term) = numHoles term
-numHoles (T.TRedWeight _redWeight red) = case red of
-  T.RApp term _var -> numHoles term
-  T.RPlusWeight t1 _rw t2 -> numHoles t1 + numHoles t2
+numHoles nonHole = applyOnSubterms nonHole
+                                   0
+                                   numHoles
+                                   sum
 
 isValue :: T.Term -> Bool
-isValue (T.TVar _var) = False
-isValue (T.TNum _integer) = True
-isValue (T.TLam _var _term) = True
-isValue (T.THole) = False
-isValue (T.TLet _letBindings _term) = False
-isValue (T.TDummyBinds _varSet term) = isValue term
+isValue (T.TNonTerminating)              = False
+isValue (T.TVar _var)                    = False
+isValue (T.TNum _integer)                = True
+isValue (T.TConstructor _ _)             = True
+isValue (T.TLam _var _term)              = True
+isValue (T.THole)                        = False
+isValue (T.TLet _letBindings _term)      = False
+isValue (T.TDummyBinds _varSet _term)    = False
+isValue (T.TStackSpikes _sw _term)       = False
+isValue (T.THeapSpikes _hw _term)        = False
 isValue (T.TRedWeight _redWeight _redFD) = False
 
-getAllMetaVars :: Law.Term -> Set.Set String
+getAllMetaVars :: Law.Law -> Set.Set String
 getAllMetaVars = \case
-  Law.TValueMetaVar mvName -> Set.singleton mvName
-  Law.TVar mvName -> Set.singleton mvName
-  Law.TAppCtx mvName term ->
-    Set.singleton mvName `Set.union` getAllMetaVars term
-  Law.TLet letBindings term -> lbsMetas `Set.union` getAllMetaVars term
-    where
-      lbsMetas = case letBindings of
-        Law.LBSBoth (Law.MBSMetaVar mv1) concreteLets ->
-          let metasFromConcrete = Set.unions $ map concreteLBMetas concreteLets
-          in Set.insert mv1 metasFromConcrete
-      concreteLBMetas (varMV, sw, hw, lbterm) =
-        Set.singleton varMV
-          `Set.union` getIntExprMetas sw
-          `Set.union` getIntExprMetas hw
-          `Set.union` getAllMetaVars lbterm
-  Law.TDummyBinds (Law.VSConcrete varSet) term ->
-    varSet `Set.union` getAllMetaVars term
-  where
-    getIntExprMetas :: Law.IntExpr -> Set.Set String
-    getIntExprMetas (Law.IEVar mv) = Set.singleton mv
-    getIntExprMetas (Law.IENum _) = Set.empty
+  Law.DLaw _name term1 _imprel term2 sideCondition ->
+    Set.unions [getMetaVars term1, getMetaVars term2, getMetaVars sideCondition]
+
+class MetaVarContainer a where
+  getMetaVars :: a -> Set.Set String
+
+instance MetaVarContainer Law.Term where
+  getMetaVars = \case
+    Law.TValueMetaVar mvName -> Set.singleton mvName
+    Law.TGeneralMetaVar mvName -> Set.singleton mvName
+    Law.TMVTerms mvName -> Set.singleton mvName
+    Law.TVar mvName -> Set.singleton mvName
+    Law.TAppCtx mvName term ->
+      Set.singleton mvName `Set.union` getMetaVars term
+    Law.TAppValCtx metaV term ->
+      Set.singleton metaV `Set.union` getMetaVars term
+    Law.TNonTerminating -> Set.empty
+    Law.TNum _ -> Set.empty
+    Law.TConstructor (Law.CGeneral name args) -> Set.fromList [name, args]
+    Law.TStackSpikes iexpr term -> getMetaVars iexpr
+                                     `Set.union` getMetaVars term
+    Law.THeapSpikes iexpr term -> getMetaVars iexpr
+                                     `Set.union` getMetaVars term
+    Law.TDummyBinds lVarSet term ->
+      getMetaVars lVarSet `Set.union` getMetaVars term
+    Law.TSubstitution term x y -> getMetaVars term
+                                    `Set.union` Set.fromList [x,y]
+    Law.TLam var term -> Set.insert var $ getMetaVars term
+    Law.TLet letBindings term -> getMetaVars letBindings
+                                   `Set.union` getMetaVars term
+    Law.TRedWeight iexpr reduction -> Set.unions [getMetaVars iexpr
+                                                 , getMetaVars reduction]
+
+
+instance MetaVarContainer Law.IntExpr where
+  getMetaVars (Law.IEVar mv) = Set.singleton mv
+  getMetaVars (Law.IENum _) = Set.empty
+  getMetaVars (Law.IESizeBind metaG) = Set.singleton metaG
+  getMetaVars (Law.IEPlus ie1 ie2) = getMetaVars ie1 `Set.union` getMetaVars ie2
+  getMetaVars (Law.IEMinus ie1 ie2) = getMetaVars ie1
+                                        `Set.union` getMetaVars ie2
+
+instance MetaVarContainer Law.VarSet where
+  getMetaVars (Law.VSConcrete varSet) = varSet
+  getMetaVars (Law.VSMetaVar metaX) = Set.singleton metaX
+  getMetaVars (Law.VSVectMeta xs) = Set.singleton xs
+  getMetaVars (Law.VSFreeVars varContainer) = getMetaVars varContainer
+  getMetaVars (Law.VSDomain metaG) = Set.singleton metaG
+  getMetaVars (Law.VSUnion lVarSet1 lVarSet2) =
+    getMetaVars lVarSet1 `Set.union` getMetaVars lVarSet2
+  getMetaVars (Law.VSDifference lVarSet1 lVarSet2) =
+    getMetaVars lVarSet1 `Set.union` getMetaVars lVarSet2
+
+instance MetaVarContainer Law.VarContainer where
+  getMetaVars (Law.VCTerm term) = getMetaVars term
+  getMetaVars (Law.VCMetaVarContext metaC) = Set.singleton metaC
+  getMetaVars (Law.VCMetaVarRed metaR) = Set.singleton metaR
+  getMetaVars (Law.VCValueContext metaVctx) = Set.singleton metaVctx
+
+instance MetaVarContainer Law.LetBindings where
+  getMetaVars (Law.LBSBoth metaBindSet concreteLets) =
+    let lawMVs = Set.unions $ map getMetaVars metaBindSet
+        metasFromConcrete = Set.unions $ map getMetaVars concreteLets
+    in lawMVs `Set.union` metasFromConcrete
+
+instance MetaVarContainer Law.LetBinding where
+  getMetaVars (Law.LBConcrete varMV sw hw lbterm) =
+    Set.singleton varMV
+      `Set.union` getMetaVars sw
+      `Set.union` getMetaVars hw
+      `Set.union` getMetaVars lbterm
+  getMetaVars (Law.LBVectorized varVect1 sw hw varVect2) =
+    Set.fromList [varVect1, varVect2]
+      `Set.union` getMetaVars sw
+      `Set.union` getMetaVars hw
+
+instance MetaVarContainer Law.MetaBindSet where
+  getMetaVars (Law.MBSMetaVar gamma) = Set.singleton gamma
+  getMetaVars (Law.MBSSubstitution gamma x y) = Set.fromList [gamma, x, y]
+
+instance MetaVarContainer Law.Reduction where
+  getMetaVars (Law.RMetaVar metaR term) = Set.insert metaR $ getMetaVars term
+  getMetaVars (Law.RApp term x) = Set.insert x $ getMetaVars term
+  getMetaVars (Law.RPlusW term1 intExpr term2) =
+    Set.unions [getMetaVars term1, getMetaVars intExpr, getMetaVars term2]
+  getMetaVars (Law.RCase term branches) =
+    getMetaVars term `Set.union` (Set.unions (map getMetaVars branches))
+  getMetaVars (Law.RAddConst intExpr term) =
+    getMetaVars intExpr `Set.union` getMetaVars term
+  getMetaVars (Law.RIsZero term) = getMetaVars term
+  getMetaVars (Law.RSeq term1 term2) =
+    getMetaVars term1 `Set.union` getMetaVars term2
+
+instance MetaVarContainer Law.CaseStm where
+  getMetaVars (Law.CSAlts alts) = Set.singleton alts
+  getMetaVars (Law.CSPatterns string term) =
+    Set.insert string $ getMetaVars term
+  getMetaVars (Law.CSConcrete (Law.CGeneral c xs) term) =
+    Set.fromList [c,xs] `Set.union` getMetaVars term
+
+instance MetaVarContainer Law.SideCond where
+  getMetaVars Law.NoSideCond = Set.empty
+  getMetaVars (Law.WithSideCond bt) = getMetaVars bt
+
+instance MetaVarContainer Law.BoolTerm where
+  getMetaVars (Law.BTSizeEq metaG1 metaG2) = Set.fromList [metaG1, metaG2]
+  getMetaVars (Law.BTSetEq varSet1 varSet2) =
+    getMetaVars varSet1 `Set.union` getMetaVars varSet2
+  getMetaVars (Law.BTSubsetOf varSet1 varSet2) =
+    getMetaVars varSet1 `Set.union` getMetaVars varSet2
+  getMetaVars (Law.BTIn var varSet) =
+    Set.insert var $ getMetaVars varSet
+  getMetaVars (Law.BTNot boolTerm) = getMetaVars boolTerm
+  getMetaVars (Law.BTLE intExpr1 intExpr2) =
+    getMetaVars intExpr1 `Set.union` getMetaVars intExpr2
+  getMetaVars (Law.BTGE intExpr1 intExpr2) =
+    getMetaVars intExpr1 `Set.union` getMetaVars intExpr2
+  getMetaVars (Law.BTGT intExpr1 intExpr2) =
+    getMetaVars intExpr1 `Set.union` getMetaVars intExpr2
+  getMetaVars (Law.BTIsFresh var) = Set.singleton var
+  getMetaVars (Law.BTAreFresh xs) = Set.singleton xs
+  getMetaVars (Law.BTReducesTo metaR metaV term) =
+    Set.fromList [metaR, metaV] `Set.union` getMetaVars term
+  getMetaVars (Law.BTAnd boolTerm1 boolTerm2) =
+    getMetaVars boolTerm1 `Set.union` getMetaVars boolTerm2
 
 -- | given M, returns the free variables of M.
 getFreeVariables :: T.Term -> Set.Set String
@@ -176,10 +290,8 @@ getFreeVariables term = let (_, freeVars) = toLocallyNameless term
 -- regardless of if the variables are free or bound
 getAllVariables :: T.Term -> Set.Set String
 getAllVariables (T.TVar var) = Set.singleton var
-getAllVariables (T.TNum integer) = Set.empty
 getAllVariables (T.TLam var term) = Set.singleton var
-                                    `Set.union` getAllVariables term
-getAllVariables (T.THole) = Set.empty
+                                      `Set.union` getAllVariables term
 getAllVariables (T.TLet letBindings term) =
   getLBSVars letBindings `Set.union` getAllVariables term
   where
@@ -189,45 +301,14 @@ getAllVariables (T.TLet letBindings term) =
                                        in Set.insert name termSet
 getAllVariables (T.TDummyBinds varSet term) = varSet
                                               `Set.union` getAllVariables term
-getAllVariables (T.TRedWeight _redWeight red) =
-  case red of
-    T.RApp term var -> let termSet = getAllVariables term
-                       in Set.insert var termSet
-    T.RPlusWeight term1 _rw term2 ->
-      getAllVariables term1 `Set.union` getAllVariables term2
-
--- | given a context, returns the set of variables that are bound in every
--- hole.
-getHoleBoundVars :: T.Term -> Set.Set String
-getHoleBoundVars ctx = (flip evalState) Set.empty $ getHoleBoundVarsM ctx
-  where
-    getHoleBoundVarsM :: T.Term -> State (Set.Set String) (Set.Set String)
-    getHoleBoundVarsM = \case
-      T.TVar var -> return Set.empty
-      T.TNum integer -> return Set.empty
-      T.TLam var term -> do
-        bound1 <- get
-        let bound2 = Set.insert var bound1
-        put bound2
-        innerHoleBounds <- getHoleBoundVarsM term
-        put bound1
-        return innerHoleBounds
-      T.THole -> get
-      T.TLet letBindings term -> do
-        let (bindingVars, _sw, _hw, terms) = unzip4 letBindings
-        bound1 <- get
-        let bound2 = (Set.fromList bindingVars) `Set.union` bound1
-        put bound2
-        innerHoleBoundsList <- mapM getHoleBoundVarsM $ term:terms
-        let innerHoleBounds = intersections innerHoleBoundsList
-        put bound1
-        return innerHoleBounds
-        where
-          intersections = foldl Set.intersection Set.empty
-      T.TDummyBinds _varSet term -> getHoleBoundVarsM term
-      T.TRedWeight _redWeight red -> case red of
-        T.RApp term _var -> getHoleBoundVarsM term
-        T.RPlusWeight term1 _rw term2 -> do
-          innerHoleBounds1 <- getHoleBoundVarsM term1
-          innerHoleBounds2 <- getHoleBoundVarsM term2
-          return $ innerHoleBounds1 `Set.intersection` innerHoleBounds2
+getAllVariables (T.TRedWeight _ (T.RApp term var)) =
+  let termSet = getAllVariables term
+  in Set.insert var termSet
+getAllVariables (T.TRedWeight _ (T.RCase term branches)) =
+  let termSet = getAllVariables term
+      (cNames, boundVars, terms) = unzip3 branches
+      boundSet = Set.fromList $ concat boundVars
+      termsSet = Set.unions $ map getAllVariables terms
+  in Set.unions [termSet, boundSet, termsSet]
+getAllVariables constructWithNoVariables =
+  applyOnSubterms constructWithNoVariables Set.empty getAllVariables Set.unions

@@ -17,28 +17,29 @@ StrongImprovementRL. ImpRel ::= "<~|";
 WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
-Reduction.           ImpRel ::= "~~>";
 
 token MVLetBindings      ('G' digit*);
 token MVValue            ('V');
 token MVContext          ('C' | 'D');
-token MVIntegerVar       ('v' | 'w' | 'n' | 'm' | 'i' | 'j');
-token MVVar              ('x' | 'y' | 'f');
+token MVIntegerVar       ('v' digit* | 'w' digit* | 'n' | 'm' | 'i' | 'j');
+token MVVar              ('x' | 'y' | 'f' | 'z');
 token MVVarVect          ('x' 's' | 'y' 's');
 token MVValueContext     ('V' 'c' 't' 'x');
 token MVReduction        ('R');
-token MVVarSet           ('X');
+token MVVarSet           ('X' | 'Y');
 token MVTerm             ('M' | 'N');
-token MVPattern          ('p' 'a' 't');
-token MVCaseStm          ('a' 'l' 't' 's' digit*);
+token MVTerms            ('N' '_' 'i');
+token MVPatterns         ('p' 'a' 't' '_' 'i');
+token MVCaseStms          ('a' 'l' 't' 's' digit*);
 token MVConstructorName  ('c' digit*);
 -- NOTE: This is copied to Sie.cf and both should be equal. I have not yet found
 -- a way to share grammar between .cf files.
 
-rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVPattern | MVCaseStm | MVConstructorName;
+rules MetaVar ::= MVLetBindings | MVValue | MVContext | MVIntegerVar | MVVar | MVVarVect | MVValueContext | MVReduction | MVVarSet | MVTerm | MVTerms | MVPatterns | MVCaseStms | MVConstructorName;
 
 TValueMetaVar.    Term4 ::= MVValue;
 TGeneralMetaVar.  Term4 ::= MVTerm;
+TMVTerms.         Term4 ::= MVTerms;
 TVar.             Term4 ::= Var;
 TAppCtx.          Term4 ::= MVContext "[" Term "]";
 TAppValCtx.       Term4 ::= MVValueContext "[" Term "]";
@@ -58,6 +59,7 @@ TSubstitution.    Term3  ::= Term4 "[" Var "/" Var "]";
 
 TRApp.        Term2 ::= Term2 Var;
 TRAppW.       Term2 ::= RedWeight "(" Term2 Var ")";
+TRAppNoW.     Term2 ::= Term2 "<>" Var;
 
 TRPlus.    Term1    ::= Term1 "+" Term2;
 TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
@@ -68,7 +70,7 @@ TLam.             Term  ::= "\\" Var "." Term ;
 TLet.             Term  ::= "let" LetBindings "in" Term;
 
 TRCase.       Term ::= MaybeRedWeight "case" Term "of" "{" [CaseStm] "}";
-TRAddConst.   Term ::= MaybeRedWeight "add" Integer Term1;
+TRAddConst.   Term ::= MaybeRedWeight "add" IntExpr Term1;
 TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
 TRSeq.        Term ::= MaybeRedWeight "seq" Term4 Term4;
 
@@ -78,11 +80,16 @@ WithRedWeight. MaybeRedWeight ::= RedWeight;
 NoRedWeight.   MaybeRedWeight ::= ;
 
 separator Var "";
-VSMetaVar.  VarSet ::= MVVarSet;
-VSConcrete. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
-_.          VarSet ::= "{" VarSet "}";
-VSFreeVars. VarSet ::= "FV" "(" VarContainer ")";
-VSDomain.   VarSet ::= "dom" MVLetBindings;
+VSMetaVar.  VarSet1 ::= MVVarSet;
+VSVectMeta. VarSet1 ::= "{" MVVarVect "}";
+VSConcrete. VarSet1 ::= "{" [Var] "}"; -- variables are separated by space.
+_.          VarSet1 ::= "{" VarSet "}";
+VSFreeVars. VarSet1 ::= "FV" "(" VarContainer ")";
+VSDomain.   VarSet1 ::= "dom" MVLetBindings;
+VSUnion.        VarSet ::= VarSet "union" VarSet1;
+VSDifference.   VarSet ::= VarSet "\\\\" VarSet1;
+coercions VarSet 1;
+
 DVar.    Var ::= MVVar;
 
 VCTerm.           VarContainer ::= Term;
@@ -90,26 +97,24 @@ VCMetaVarContext. VarContainer ::= MVContext;
 VCMetaVarRed.     VarContainer ::= MVReduction;
 VCValueContext.   VarContainer ::= MVValueContext;
 
--- TODO indexing
-CSAlts.     CaseStm ::= MVCaseStm;
-CSPattern.  CaseStm ::= MVPattern "->" Term;
+CSAlts.     CaseStm ::= MVCaseStms;
+CSPatterns. CaseStm ::= MVPatterns "->" Term;
 CSConcrete. CaseStm ::= Constructor "->" Term;
 separator CaseStm ",";
 
-DConstructor. Constructor ::= MVConstructorName MVVarVect;
-
-CTrue.        Constructor ::= "true";
-
-CFalse.       Constructor ::= "false";
+CGeneral.     Constructor ::= MVConstructorName MVVarVect;
+CTrue.        Constructor ::= "True";
+CFalse.       Constructor ::= "Talse";
 
 LBSOnlyMeta. LetBindings ::= [MetaBindSet];
 LBSBoth.     LetBindings ::= [MetaBindSet] "{" [LetBinding] "}";
 
-MBSMetaVar.  MetaBindSet ::= MVLetBindings;
+MBSMetaVar.      MetaBindSet ::= MVLetBindings;
 MBSSubstitution. MetaBindSet ::= MVLetBindings "[" Var "/" Var "]";
 separator MetaBindSet "";
 
-DLetBinding. LetBinding ::= Var BindSymbol Term;
+LBConcrete.   LetBinding ::= Var BindSymbol Term;
+LBVectorized. LetBinding ::= MVVarVect BindSymbol MVVarVect;
 separator LetBinding ",";
 BSWeights.   BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight.  BindSymbol ::= "=";
@@ -122,6 +127,7 @@ DIntegerVar. IntegerVar ::= MVIntegerVar;
 
 IEVar.   IntExpr1 ::= IntegerVar;
 IENum.   IntExpr1 ::= Integer;
+IESizeBind. IntExpr1 ::= "|" MVLetBindings "|";
 IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
 IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
 coercions IntExpr 1;
@@ -132,12 +138,17 @@ DRedWeight. RedWeight ::= "[" StackWeight "]";
 NoSideCond. SideCond ::= ;
 WithSideCond. SideCond ::= "if" BoolTerm;
 
-BTSizeEq.   BoolTerm ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
-BTSetEq.    BoolTerm ::= SetTerm "=" SetTerm;
-BTSubsetOf. BoolTerm ::= SetTerm "subsetof" SetTerm;
-BTIn.       BoolTerm ::= Var "in" SetTerm;
+BTSizeEq.    BoolTerm1 ::= "|" MVLetBindings "|" "=" "|" MVLetBindings "|";
+BTSetEq.     BoolTerm1 ::= VarSet "=" VarSet;
+BTSubsetOf.  BoolTerm1 ::= VarSet "subsetof" VarSet;
+BTIn.        BoolTerm1 ::= Var "in" VarSet;
+BTNot.       BoolTerm1 ::= "not" BoolTerm1 ;
+BTLE.        BoolTerm1 ::= IntExpr "=<" IntExpr;
+BTGE.        BoolTerm1 ::= IntExpr ">=" IntExpr;
+BTGT.        BoolTerm1 ::= IntExpr ">" IntExpr;
+BTIsFresh.   BoolTerm1 ::= Var "is" "fresh";
+BTAreFresh.  BoolTerm1 ::= MVVarVect "are" "fresh";
+BTReducesTo. BoolTerm1 ::= MVReduction "[" MVValue "]" "~~>" Term;
+BTAnd.       BoolTerm ::= BoolTerm "&&" BoolTerm1;
 
-STMetaBindSet.  SetTerm1 ::= MetaBindSet;
-STVarSet.       SetTerm1 ::= VarSet;
-STUnion.        SetTerm ::= SetTerm "union" SetTerm1;
-coercions SetTerm 1;
+coercions BoolTerm 1;

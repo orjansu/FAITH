@@ -30,6 +30,7 @@ main = do
   tProofScript <- runTypecheckProof proofTree tLaws
   runCheckDetailedProof tProofScript
 
+
 getInputs :: IO (String, String)
 getInputs = do
   args <- getArgs
@@ -70,7 +71,12 @@ runTypecheckProof proofScript lawMap =
       hPutStrLn stderr "ERROR"
       hPutStrLn stderr $ "Type error: " ++ err
       exitFailure
-    Right tree' -> return tree'
+    Right (tree', isComplete) ->
+      if isComplete
+        then return tree'
+        else do
+          putStrLn "NOTE: proof not complete. Checking until marker $."
+          return tree'
 
 runCheckDetailedProof :: T.ProofScript -> IO ()
 runCheckDetailedProof tTree =
@@ -80,7 +86,7 @@ runCheckDetailedProof tTree =
       let relevantMsgs = drop (length errorMsgs - 11) errorMsgs
       hPutStrLn stderr "Error when checking proof. Last 10 logs and error:"
       mapM (hPutStrLn stderr) relevantMsgs
-      let fullLog = concat $ intersperse "\n " errorMsgs
-      let logFile = "proofLog.txt"
+      let fullLog = concat $ intersperse "\n" errorMsgs
+      let logFile = "proofLog.hs"
       writeFile logFile fullLog
       hPutStrLn stderr $ "Full logs can be found in "++logFile

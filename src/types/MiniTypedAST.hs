@@ -33,12 +33,16 @@ type HeapWeight = Integer
 type SubTerm = Term
 
 data Term
-    = TVar Var
+    = TNonTerminating
+    | TVar Var
     | TNum Integer
+    | TConstructor String [Var]
     | TLam Var Term
     | THole
     | TLet LetBindings Term
     | TDummyBinds VarSet Term
+    | TStackSpikes StackWeight Term
+    | THeapSpikes HeapWeight Term
     | TRedWeight RedWeight Red
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
@@ -46,7 +50,11 @@ type VarSet = Set Var
 
 data Red
     = RApp Term Var
+    | RCase Term [(String, [Var], Term)]
     | RPlusWeight Term RedWeight Term
+    | RAddConst Integer Term
+    | RIsZero Term
+    | RSeq Term Term
   deriving (C.Eq, C.Ord, C.Show, C.Read)
 
 type RedWeight = Integer --I will add expressions here later
@@ -98,18 +106,15 @@ data Substitute
   = SLetBindings LetBindings
   | SValue Term
   | SContext Term
-  | SIntegerVar IntExpr
+  | SIntegerVar Integer
   | SVar String
-  | SVarSet (Set String) -- Not used yet
+  | SVarVect [String]
+  | SValueContext Term
+  | SReduction Red
+  | SVarSet (Set String)
   | STerm Term
---  | SVarVect TODO support the following later:
---  | SValueContext
---  | SReduction
---  | SPattern
---  | SCaseStm
---  | SConstructorName
-  deriving (C.Eq, C.Ord, C.Read)
-
-data IntExpr
-  = IENum Integer
+  | STerms [Term]
+  | SPatterns [(String, [Var])]
+  | SCaseStms [(String, [Var], Term)]
+  | SConstructorName String
   deriving (C.Eq, C.Ord, C.Read)

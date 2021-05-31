@@ -7,7 +7,8 @@ DProofScript. ProofScript ::= ProgBindings [Theorem];
 DProgBindings. ProgBindings ::= "bindings" "{" [ProgBinding] "}";
 terminator ProgBinding ";";
 
-DProgBinding. ProgBinding ::= CapitalIdent "="  LetBindings  ;
+PBLet. ProgBinding ::= CapitalIdent "="  LetBindings;
+PBConstructor. ProgBinding ::= CapitalIdent "(" Integer ")";
 
 token CapitalIdent (upper letter*);
 
@@ -27,20 +28,12 @@ LBConcrete. LetBinding ::= Var BindSymbol Term;
 BSWeights.  BindSymbol ::= "=[" StackWeight "," HeapWeight "]=";
 BSNoWeight. BindSymbol ::= "=";
 
-StackWeightExpr. StackWeight ::= IntExpr;
-HeapWeightExpr.  HeapWeight ::= IntExpr;
-
-IEAny.   IntExpr1 ::= "?";
-IEVar.   IntExpr1 ::= Ident;
-IENum.   IntExpr1 ::= Integer;
-IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
-IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
-coercions IntExpr 1;
+StackWeightExpr. StackWeight ::= Integer;
+HeapWeightExpr.  HeapWeight ::= Integer;
 
 DRedWeight. RedWeight ::= "[" StackWeight "]";
 
 TAny.             Term3 ::= "?";
-TTermVar.         Term3 ::= "any" "(" CapitalIdent ")";
 TNonTerminating.  Term3 ::= "@" ;
 TVar.             Term3 ::= Var;
 TNum.             Term3 ::= Integer;
@@ -55,6 +48,7 @@ TDummyBinds.      Term3  ::= VarSet "d^" Term3;
 
 TRApp.     Term2    ::= Term2 Var;
 TRAppW.    Term2    ::= RedWeight "(" Term2 Var ")";
+TRAppNoW.  Term2    ::= Term2 "<>" Var ;
 
 TRPlus.    Term1    ::= Term1 "+" Term2;
 TRPlusW1.  Term1    ::= RedWeight "(" Term1 "+" Term2 ")";
@@ -70,15 +64,25 @@ TRIsZero.     Term ::= MaybeRedWeight "iszero" Term1;
 TRSeq.        Term ::= MaybeRedWeight "seq" Term3 Term3;
 
 coercions Term 3;
+separator Term ",";
 
 WithRedWeight. MaybeRedWeight ::= RedWeight;
 NoRedWeight.   MaybeRedWeight ::= ;
 
+IEAny.   IntExpr1 ::= "?";
+IEVar.   IntExpr1 ::= Ident;
+IENum.   IntExpr1 ::= Integer;
+IEPlus.  IntExpr  ::= IntExpr "+" IntExpr1;
+IEMinus. IntExpr  ::= IntExpr "-" IntExpr1;
+coercions IntExpr 1;
+
 DIndExpr. IndExpr ::= IntExpr1;
-CGeneral. Constructor ::= CapitalIdent "(" [Var] ")";
-CCons. Constructor ::= Var ":" Var;
-CTrue. Constructor ::= "true";
-CFalse. Constructor ::= "false";
+CGeneralWArgs.  Constructor ::= CapitalIdent "(" [Var] ")" ;
+CGeneralNoArgs. Constructor ::= CapitalIdent;
+CNil.           Constructor ::= "[]";
+CCons.          Constructor ::= Var ":" Var;
+separator Constructor ",";
+
 DVar. Var ::= Ident;
 separator Var "";
 DVarSet. VarSet ::= "{" [Var] "}"; -- variables are separated by space.
@@ -114,20 +118,23 @@ separator VarAnyType " ";
 DefinedEqual.        ImpRel ::= "=def=";
 StrongImprovementLR. ImpRel ::= "|~>";
 WeakImprovementLR.   ImpRel ::= "|~~>";
-StrongImprovementRL. ImpRel ::= "<~|";
-WeakImprovementRL.   ImpRel ::= "<~~|";
 StrongCostEquiv.     ImpRel ::= "<~>";
 WeakCostEquiv.       ImpRel ::= "<~~>";
+-- right-left variants do not make sense in the proof language
 
 token CommandName ('-' (letter | '@' ) (letter | '-' | '@' | digit| '\'')*);
 -- copied to SieLaws
 
-CAValue.          CmdArgument ::= CmdValue;
-CAAssign.         CmdArgument ::= CmdAssignee "=" CmdValue ;
-CVSubTerm.        CmdValue    ::= SubTerm ;
-CVVarSet.         CmdValue    ::= VarSet;
-CVIntExpr.        CmdValue    ::= "int" "(" IntExpr ")";
-CVLet.            CmdValue    ::= "let" LetBindings;
+CAValue.           CmdArgument ::= CmdValue;
+CAAssign.          CmdArgument ::= CmdAssignee "=" CmdValue ;
+CVSubTerm.         CmdValue    ::= SubTerm ;
+CVVarSet.          CmdValue    ::= VarSet;
+CVVarVect.         CmdValue    ::= "variables" "[" [Var] "]";
+CVLet.             CmdValue    ::= "let" LetBindings;
+CVPatterns.        CmdValue    ::= "patterns" "[" [Constructor] "]";
+CVCaseStms.        CmdValue    ::= "case" "{" [CaseStm] "}";
+CVTerms.           CmdValue    ::= "terms" "[" [Term] "]";
+CVConsPre.         CmdValue    ::= "(:)";
 CAMetaVar.        CmdAssignee ::= VarAnyType;
 CASubTerm.        CmdAssignee ::= "subterm";
 CAContext.        CmdAssignee ::= "ctx";

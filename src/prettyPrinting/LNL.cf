@@ -4,13 +4,18 @@
 
 entrypoints Term;
 
+TNonTerminating. Term ::= "@";
 TVar. Term ::= Var;
 TNum. Term ::= Integer;
-THole. Term ::= "[.]";
+TConstructor. Term ::= Ident "(" [Var] ")";
 TLam. Term ::= "(\\" Term ")";
+THole. Term ::= "[.]";
 TLet. Term ::= "let" "{" [LetBinding] "}" "in" Term;
 TDummyBinds. Term ::= "{" [Var] "}d^" Term;
-TRedWeight. Term ::= "[" Integer "]" Red;
+TStackSpikes. Term ::= "[" Integer "]s^" Term;
+THeapSpikes. Term ::= "[" Integer "]h^" Term;
+TRedWeight. Term ::= "[" Integer "]" "^" Red;
+TRAppNoW. Term ::= Term "<>" Var;
 TRed. Term ::= Red;
 
 LambdaVar.          Var ::= "a(" Integer ")";
@@ -24,5 +29,14 @@ LBNoWeight. LetBinding ::= Term;
 separator LetBinding ",";
 
 RApp. Red ::= Term Var;
+RCase. Red ::= "case" Term "of" "{" [CaseStm] "}";
 RPlusWeight. Red ::= Term "+" "[" Integer"]" Term;
 RPlus. Red ::= Term "+" Term;
+RAddConst. Red ::= "add" Integer Term;
+RIsZero. Red ::= "iszero" Term;
+RSeq. Red ::= "seq" Term Term;
+
+DCaseStm. CaseStm ::= Ident "->" Term;
+separator CaseStm ",";
+DCVar. CVar ::= Var;
+separator CVar " ";

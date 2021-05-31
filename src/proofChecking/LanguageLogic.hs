@@ -1,15 +1,31 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module LanguageLogic (impRelImplies) where
+module LanguageLogic (impRelImplies
+                     , reduce) where
 
 {- This file contains logic specific to space improvement theory. It does
 however not contain the logic for the binding structure. This is handled in the
 other files. It might be that these functions might be implemented as parsed
 in the laws file later.
+note that the name for true, false, cons and nil
+are in Common.hs for inheritance reasons.
 -}
+
+import qualified Control.Monad.Logger as Log
+import GHC.Stack (HasCallStack)
+import Control.Monad.Except (MonadError)
+import Data.List (find, intersperse)
 
 import qualified Common as Com
 import qualified AbsSie as UT
+import qualified MiniTypedAST as T
+import TermUtils (substituteFor)
+import CheckMonad (throwCallstackError, assert, internalException)
+import TermCorrectness (isValue)
+import OtherUtils (distinct)
+import ShowTypedTerm (showTypedTerm)
+import Common (trueName, falseName)
 
 class ImpRelRepresentation a where
   -- | If given two improvement relations I1 ans I2 (<~>, <~~>, |~>, |~~>, =def=
@@ -35,8 +51,6 @@ instance ImpRelRepresentation UT.ImpRel where
   <~> =def= = False
   <~> _     = True
   |~> |~~>  = True
-  <~| <~~|  = True
-  <~~> <~~| = True
   <~~> |~~> = True
   _ _ = False
   -}
@@ -45,8 +59,44 @@ instance ImpRelRepresentation UT.ImpRel where
   impRelImplies UT.StrongCostEquiv UT.DefinedEqual = False
   impRelImplies UT.StrongCostEquiv _ = True
   impRelImplies UT.StrongImprovementLR UT.WeakImprovementLR = True
-  impRelImplies UT.StrongImprovementRL UT.WeakImprovementRL = True
   impRelImplies UT.WeakCostEquiv UT.StrongCostEquiv = False
   impRelImplies UT.WeakCostEquiv UT.WeakImprovementLR = True
-  impRelImplies UT.WeakCostEquiv UT.WeakImprovementRL = True
   impRelImplies _ _ = False
+
+-- | given R and V, returns N such that R[V] ~~> N, where ~~> is reduction.
+-- R is a reduction, since the weight is needed to make it into
+-- a term, and that is not specific to the reduction.
+-- note that R must be a reduction context and V must be a value.
+-- the monad is for input checking in substitution.
+-- Throws an error if the reduction is unsuccessful.
+reduce :: (HasCallStack, Log.MonadLogger m, MonadError String m) =>
+          T.Term -> m T.Term
+reduce (T.TRedWeight 1 reduction) = case reduction of
+  (T.RApp (T.TLam x term) y) -> substituteFor term y x
+  (T.RCase (T.TConstructor cj ys) branches) ->
+    case find (\(ci, _,_) -> ci == cj) branches of
+      Just (_cj, xsj, tMj) -> do
+        substituteAll tMj ys xsj
+        where
+          substituteAll term [] [] = return term
+          substituteAll term (y:ys) (x:xs) = do
+            term' <- substituteFor term y x
+            substituteAll term' ys xs
+          substituteAll _ _ _ = internalException
+                                  "substitution params not same length."
+      Nothing -> throwCallstackError $ "reduction not possible. "++cj++" is "
+        ++"not one of the possible cases in "++names
+        where names = let (cNames, _, _) = unzip3 branches
+                      in concat $ intersperse ", " cNames
+  (T.RSeq tV tM) -> do
+    assert (isValue tV)
+      $ "in seq V M, V must be a value. V="++showTypedTerm tV
+    return tM
+  (T.RPlusWeight (T.TNum m) w tN) -> return $ T.TRedWeight w (T.RAddConst m tN)
+  (T.RAddConst m (T.TNum n)) -> return $ T.TNum (m + n)
+  (T.RIsZero (T.TNum m)) | m == 0 -> return $ T.TConstructor trueName []
+                         | otherwise -> return $ T.TConstructor falseName []
+  _ -> throwCallstackError $ "Reduction failed. Type error in inputs "
+          ++"R[V] = "++showTypedTerm (T.TRedWeight 1 reduction)
+reduce t = internalException $
+              "tried to reduce a non-reduction "++showTypedTerm t

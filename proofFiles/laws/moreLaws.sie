@@ -1,7 +1,9 @@
 -- This should contain all laws that are part of space improvement from Gustavsson and Sands' paper.
+-- note that all relations involving =def= <~> and <~~> have the suffix -lr
+-- or -rl to indicate if you mean the left-to-right or right-to-left direction.
 
 -reduction: [w]^R[V] <~> [w]s^{X}d^N if (R[V] ~~> N) && (FV(R[V]) = FV({X}d^N));
---the reduction ~~> is implemented in code. It will be in LanguageLogic.hs.
+--the reduction ~~> is implemented in code. It is in LanguageLogic.hs.
 -unfold-1: let G {x =[v,w]= V} in C[x] |~> let G {x =[v,w]= V} in C[{x}d^V];
 -unfold-2: let G {x =[v,w]= V} in C[x]
        <~| let G {x =[v,w]= V} in C[{x}d^[v]s^V];
@@ -20,7 +22,6 @@
 -let-let: let G1 {x =[v,w]= let G2 in M} in N
       <~> let G2 {x =[v,w]= let G1 in M} in N
   if dom G1 union dom G2 subsetof FV(M) && |G1| = |G2|;
-  --parenthesis needed?
 
 -let-alts: let G1 in [w] case M of {pat_i -> let G2 in N_i}
        <~> let G2 in [w] case M of {pat_i -> let G1 in N_i}
@@ -74,7 +75,7 @@
   if dom G subsetof FV(M);
 -spike-algebra-4:  let G in [v]h^M <~>  [v+|G|]h^(let G in M)
   if dom G subsetof FV(M);
--spike-algebra-5:  [w] case M of {pat_i -> [w]s^N_i}
+-spike-algebra-5: [w] case M of {pat_i -> [w]s^N_i}
               <~> [w] case M of {pat_i -> N_i};
 -spike-algebra-6:      [w]s^[v]s^M <~> [v]s^M if w =< v;
 -spike-algebra-7:      [w]h^[v]h^M <~> [v]h^M if w =< v;
@@ -86,26 +87,25 @@
 -spike-algebra-13:          [w]s^M |~> M;
 -spike-algebra-14:          [w]h^M |~> M;
 
--spike-algebra-zero-stack-spike: [0]s^M <~> M; -- Just used in proof.
 
--dummy-ref-algebra-1: [w]^R[{X}d^M] <~> [w]s^{X}d^[w]^R[M];
+-dummy-ref-algebra-1:   [w]^R[{X}d^M] <~> [w]s^{X}d^[w]^R[M];
 -dummy-ref-algebra-2: let G in {X}d^M <~> [|G|]h^{X}d^(let G in M)
                                           if dom G subsetof FV(M);
 -dummy-ref-algebra-3: let G {x =[w,0]=V} in C[{x}d^M]
                   <~> let G {x =[w,0]=V} in C[{FV(V)\\{x}}d^M];
--dummy-ref-algebra-4: [w]^R[{X}d^M] <~> [w]^R[M] if X subsetof FV(R);
--dummy-ref-algebra-5: {}d^M <~> M;
--dummy-ref-algebra-6: {X union Y}d^M <~> {X}d^M if Y subsetof FV(M);
--dummy-ref-algebra-7: {X}d^{Y}d^M <~> {X union Y}d^M;
--dummy-ref-algebra-8: {X}d^M |~> M;
+-dummy-ref-algebra-4:   [w]^R[{X}d^M] <~> [w]^R[M] if X subsetof FV(R);
+-dummy-ref-algebra-5:           {}d^M <~> M;
+-dummy-ref-algebra-6:  {X union Y}d^M <~> {X}d^M if Y subsetof FV(M);
+-dummy-ref-algebra-7:     {X}d^{Y}d^M <~> {X union Y}d^M;
+-dummy-ref-algebra-8:          {X}d^M |~> M;
 
 -dummy-ref-def: {xs}d^M =def= let {ys = xs} in M if ys are fresh;
 -dummy-bind-intro: let {x = M} in N <~~> let {z = @, x = {z}d^M} in N
   if z is fresh;
 -stack-spike-def: [w]s^M =def= [w] case True of {True -> M};
--heap-spike-def: [w]h^M =def= let {x=[1,w]= @} in {x}d^M if x is fresh;
+-heap-spike-def:  [w]h^M =def= let {x=[1,w]= @} in {x}d^M if x is fresh;
 -stack-spike-intro: M <~~> [w]s^M;
--heap-spike-intro: M <~~> [w]h^M;
+-heap-spike-intro:  M <~~> [w]h^M;
 
 -lemma-5-5-1: [w]^R[M] |~> [w1]^R[M] if w >= w1;
 -lemma-5-5-2: [w] (M + [v] N) |~> [w1] (M + [v1] N) if w >= w1 && v >= v1;
@@ -122,3 +122,8 @@
 -balloon-reduction: (\x.M) <> y <~> M [y/x]   if y in FV(M[y/x]);
 
 -unfold-weak: let G {x=[v,w]=V} in C[x] <~~> let G{x=[v,w]=V} in C[{x}d^V];
+
+-- Laws that I added that I think are needed and valid
+-balloon-intro-untyped: M x <~~> M <> x;
+-spike-algebra-zero-stack-spike: [0]s^M <~> M;
+-spike-algebra-zero-heap-spike: [0]h^M <~> M;

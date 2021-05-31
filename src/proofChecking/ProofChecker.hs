@@ -11,7 +11,7 @@ import qualified Control.Monad.Logger as Log
 import GHC.Stack (HasCallStack)
 import qualified Data.Map.Strict as Map
 import Data.Text (pack, Text)
-import Data.List (permutations, intersperse)
+import Data.List (permutations, intersperse, zip4, unzip4)
 import qualified Data.Set as Set
 
 import qualified MiniTypedAST as T
@@ -24,7 +24,11 @@ import ToPrettyLNL (showLNL)
 import ShowTypedTerm (showTypedTerm)
 import CheckMonad (CheckM, runCheckM, assert, assertInternal
                   , throwCallstackError)
-import Substitution (applySubstitution)
+import Substitution (applySubstitution, checkSideCondition)
+import OtherUtils (applyOnLawSubterms)
+import TermUtils (isAlphaEquiv, computeDifference)
+
+import Debug.Trace (trace)
 
 -- | Checks whether a detailed proof script is correct. Returns a [String],
 -- containing a log and error message if it is incorrect, and Nothing
@@ -60,10 +64,10 @@ checkProofSteps :: HasCallStack =>
                    -> CheckM ()
 checkProofSteps (T.Simple proofSteps) start globalImpRel freeVars goal = do
   let (T.PSMiddle startTerm _ _ _) = head proofSteps
-  checkAlphaEquiv start startTerm
+  checkAlphaEqWrtLetReorder start startTerm
   mapM (checkStep globalImpRel freeVars) proofSteps
   let (T.PSMiddle _ _ _ endTerm) = last proofSteps
-  checkAlphaEquiv goal endTerm
+  checkAlphaEqWrtLetReorder goal endTerm
 
 -- | Checks if a single step is valid. This computation may be run
 -- independently in parallel for each step to speed things up if that is an
@@ -82,13 +86,14 @@ checkStep globalImpRel
   assert (localImpRel `Lang.impRelImplies` globalImpRel)
     $ show localImpRel ++ " should imply "++ show globalImpRel
   case command of
-    T.AlphaEquiv -> checkAlphaEquiv term1 term2
+    T.AlphaEquiv -> checkAlphaEqWrtLetReorder term1 term2
     T.Law context
-          (Law.DLaw lawName lawLHS lawImpRel lawRHS _sideCond)
+          (Law.DLaw lawName lawLHS lawImpRel lawRHS sideCond)
           substitutions -> do
       assert (lawImpRel == localImpRel)
-        $ "The improvement relation of the law must be the same as the "
-        ++"improvement relation in the proof"
+        $ "The improvement relation of the law ("++show localImpRel++")"
+        ++ "must be the same as the improvement relation in the proof ("
+        ++ show lawImpRel++")"
       let ctxKey = "ctx"
       assertInternal (Map.notMember ctxKey substitutions) $ "The substitution "
         ++"map (i.e. substitutions from the law) should not contain a "
@@ -100,40 +105,28 @@ checkStep globalImpRel
                                          (T.SContext context)
                                          substitutions
           forbiddenNames = varFreeVars
-      substToLHS <- applySubstitution lawLHSctx substitutionsWctx forbiddenNames
+      Log.logInfoN . pack $ "Substituting into starting term (the "
+        ++"left hand side in a left-to-right transformation)"
+      substToLHS <- applySubstitution lawLHSctx
+                                      sideCond
+                                      substitutionsWctx
+                                      forbiddenNames
                                       varFreeVars
-      checkRuleAlphaEquiv lawLHSctx term1 substToLHS
-      substToRHS <- applySubstitution lawRHSctx substitutionsWctx forbiddenNames
+      Log.logInfoN . pack $ "Checking that the substitutions into the starting "
+        ++"law term is alpha-equal to the starting term."
+      checkAlphaEqWrtLetReorder term1 substToLHS
+      Log.logInfoN . pack $ "Substituting into law term of the transformed "
+        ++"side (the right hand side in a left-to-right transformation)"
+      substToRHS <- applySubstitution lawRHSctx
+                                      sideCond
+                                      substitutionsWctx
+                                      forbiddenNames
                                       varFreeVars
-      checkRuleAlphaEquiv lawRHSctx substToRHS term2
-
-class AlphaEq a where
-  isAlphaEquiv :: HasCallStack => a -> a -> CheckM Bool
-  checkAlphaEquiv :: HasCallStack => a -> a -> CheckM ()
-
-instance AlphaEq T.Term where
-  checkAlphaEquiv term1 term2 = do
-    Log.logInfoN . pack $ "Checking that M and N are alpha equivalent"
-    Log.logInfoN . pack $ "| where M = "++showTypedTerm term1
-    Log.logInfoN . pack $ "| and   N = "++showTypedTerm term2
-    Log.logInfoN . pack $ "| see debug output for details."
-    alphaEq <- isAlphaEquiv term1 term2
-    assert alphaEq $ "| The locally-nameless representation "
-      ++"of M and N should be equal"
-
-  isAlphaEquiv :: T.Term -> T.Term -> CheckM Bool
-  isAlphaEquiv term1 term2 | term1 == term2 = return True
-                           | otherwise = do
-    Log.logDebugN . pack $ "Determining wheter M and N are alpha equivalent,"
-    Log.logDebugN . pack $ "| where M = "++ showTypedTerm term1
-    Log.logDebugN . pack $ "| and   N = "++showTypedTerm term2
-    let (lnlTerm1, _) = toLocallyNameless term1
-    let (lnlTerm2, _) = toLocallyNameless term2
-    Log.logDebugN . pack $ "| Locally nameless representation of M is "
-      ++showLNL lnlTerm1
-    Log.logDebugN . pack $ "| Locally nameless representation of N is "
-      ++ showLNL lnlTerm2
-    return (lnlTerm1 == lnlTerm2)
+      Log.logInfoN . pack $ "Checking that the substitutions into the "
+        ++"transformed term is alpha-equal to the transformed term."
+      checkAlphaEqWrtLetReorder substToRHS term2
+      Log.logInfoN . pack $ "Checking side conditions."
+      checkSideCondition sideCond substitutionsWctx varFreeVars
 
 -- | Given the law term L and two terms M and N,
 -- this function checks alpha equivalance of M and N. If L contains let-terms
@@ -145,49 +138,96 @@ instance AlphaEq T.Term where
 -- that are saved. Some things may also easily be paralellizable.
 --
 -- Subfunctions may be moved to base level
-checkRuleAlphaEquiv :: HasCallStack => Law.Term -> T.Term -> T.Term -> CheckM ()
-checkRuleAlphaEquiv lawTerm m n = do
+checkAlphaEqWrtLetReorder :: HasCallStack => T.Term -> T.Term -> CheckM ()
+checkAlphaEqWrtLetReorder m n = do
   orderedEq <- isAlphaEquiv m n
   if orderedEq
     then return ()
-    else if containsLet lawTerm
-      then let permutations = getAllLetPermutations m
-           in if any (isOrderedAlphaEq n) permutations
-                then return ()
-                else throwCallstackError $ "Not alpha equivalent, even with "
-                      ++ "reordering of let:s"
-      else throwCallstackError $ "Not alpha equivalent, and law term does not "
-                                 ++ "contain let."
+    else
+      let permutations = getAllLetPermutations m
+      in if any (isOrderedAlphaEq n) permutations
+              then return ()
+              else throwCallstackError $ "Not alpha equivalent, even with "
+                    ++ "reordering of let:s. Non-reordered difference: \n"
+                    ++nonReorderedDiff
   where
-    containsLet :: Law.Term -> Bool
-    containsLet (Law.TValueMetaVar _) = False
-    containsLet (Law.TVar _) = False
-    containsLet (Law.TAppCtx mv term) = containsLet term
-    containsLet (Law.TLet _ _) = True
-    containsLet (Law.TDummyBinds _ term) = containsLet term
+    nonReorderedDiff = let (lnl1, _) = toLocallyNameless m
+                           (lnl2, _) = toLocallyNameless n
+                       in computeDifference lnl1 lnl2
 
     getAllLetPermutations :: T.Term -> [T.Term]
-    getAllLetPermutations term = case term of
-      (T.TVar var) -> [T.TVar var]
-      (T.TNum i) -> [T.TNum i]
-      (T.TLam var term) -> recursePerms term (T.TLam var)
-      (T.THole) -> [T.THole]
-      (T.TLet letBindings term) ->
-        let permsLB = permutations letBindings
-            permsTerm = getAllLetPermutations term
-            combinedPerms = [(lbs, term) | lbs <- permsLB, term <- permsTerm]
-            toLetBindings = (\(lbs, term) -> T.TLet lbs term)
-        in map toLetBindings combinedPerms
-      (T.TDummyBinds varSet term) -> recursePerms term (T.TDummyBinds varSet)
-      (T.TRedWeight rw1 red) -> case red of
+    getAllLetPermutations bigTerm = case bigTerm of
+      T.TNonTerminating -> [bigTerm]
+      T.TVar var -> [bigTerm]
+      T.TNum i -> [bigTerm]
+      T.TConstructor _ _ -> [bigTerm]
+      T.TLam var term -> recursePerms term (T.TLam var)
+      T.THole -> [bigTerm]
+      T.TLet letBindings term ->
+        let (vars, sws, hws, terms) = unzip4 letBindings
+            a = map getAllLetPermutations terms :: [[T.Term]]
+            -- a = permutations of let:s in inner terms
+            b = combinations a :: [[T.Term]]
+            -- b = combinations of permutations, which can make up a let
+            c = map (zip4 vars sws hws) b :: [T.LetBindings]
+            -- c = b, but turned into actual let:s with binding variable and
+            -- weights
+            d = map permutations c :: [[T.LetBindings]]
+            -- d = all permutations of every combination of let bindings
+            bindingPermutations = concat d :: [T.LetBindings]
+            -- since every permutation is equally relevant, we concatinate.
+            mainTermPermutations = getAllLetPermutations term :: [T.Term]
+        in [T.TLet lbs term | lbs <- bindingPermutations
+                              , term <- mainTermPermutations]
+
+      T.TDummyBinds varSet term -> recursePerms term (T.TDummyBinds varSet)
+      T.TStackSpikes sw term -> recursePerms term (T.TStackSpikes sw)
+      T.THeapSpikes hw term -> recursePerms term (T.THeapSpikes hw)
+      T.TRedWeight rw1 red -> case red of
         T.RApp term var ->
           recursePerms term (\t -> T.TRedWeight rw1 (T.RApp t var))
+        T.RCase decideTerm cases ->
+          let (constructors, boundVars, terms) = unzip3 cases
+              termPerms = map getAllLetPermutations terms :: [[T.Term]]
+              combinedTermPerms = combinations termPerms :: [[T.Term]]
+              caseBranches = map (zip3 constructors boundVars) combinedTermPerms
+                :: [[(String, [String], T.Term)]]
+              decideTermPerms = getAllLetPermutations decideTerm :: [T.Term]
+              allCaseTups = [(term, branches) | term <- decideTermPerms,
+                                                branches <- caseBranches]
+                :: [(T.Term, [(String, [String], T.Term)])]
+           in map toCase allCaseTups
+           where
+            toCase (term, branches) = T.TRedWeight rw1 $ T.RCase term branches
         T.RPlusWeight term1 rw2 term2 ->
-          let perms1 = getAllLetPermutations term1
-              perms2 = getAllLetPermutations term2
-              combinedPerms = [(t1, t2) | t1 <- perms1, t2 <- perms2]
-              toPlus = \(t1, t2) -> T.TRedWeight rw1 (T.RPlusWeight t1 rw2 t2)
-          in map toPlus combinedPerms
+          let toPlus = \(t1, t2) -> T.TRedWeight rw1 (T.RPlusWeight t1 rw2 t2)
+          in map toPlus $ combinedPermutations term1 term2
+        T.RAddConst i term ->
+          recursePerms term (\t -> T.TRedWeight rw1 (T.RAddConst i t))
+        T.RIsZero term ->
+          recursePerms term (\t -> T.TRedWeight rw1 (T.RIsZero t))
+        T.RSeq term1 term2 ->
+          map toSeq $ combinedPermutations term1 term2
+          where
+            toSeq (t1, t2) = T.TRedWeight rw1 $ T.RSeq t1 t2
+
+    -- Given a list of lists, combines those permutations. For example,
+    -- combinations ["ab","12", "xy"] = [ "a1x", "a1y", "a2x", "a2y"
+    --                                  , "b1x", "b1y", "b2x", "b2y"]
+    -- also works on lists of different lengths
+    combinations :: [[a]] -> [[a]]
+    combinations [] = [[]]
+    combinations (p1:[]) = [[p] | p <- p1]
+    combinations (p1:p2:[]) = [[a,b] | a <- p1, b <- p2]
+    combinations (p1:ps) =
+      let tailPerms = combinations ps
+      in [h:t | h <- p1, t <- tailPerms]
+
+    combinedPermutations :: T.Term -> T.Term -> [(T.Term, T.Term)]
+    combinedPermutations term1 term2 =
+      let perms1 = getAllLetPermutations term1
+          perms2 = getAllLetPermutations term2
+      in [(t1, t2) | t1 <- perms1, t2 <- perms2]
 
     recursePerms recurseTerm wrapTerm =
       let perms = getAllLetPermutations recurseTerm
