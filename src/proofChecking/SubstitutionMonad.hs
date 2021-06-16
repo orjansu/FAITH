@@ -12,6 +12,7 @@ module SubstitutionMonad (runSubstM
                          , getSubstitute
                          , applyContext
                          , getCtxFreeVars
+                         , getBindingSize
                          , isFresh
                          , liftCheckM
                          , SubstM) where
@@ -364,6 +365,17 @@ getCtxFreeVars mv = do
     Just (T.SValueContext vctx,_) -> return $ getFreeVariables vctx
     Just _ -> internalException "getCtxFreeVars used for a non-context"
     Nothing -> internalException $ "substitute for "++mv++" not found."
+
+-- | returns the size of a binding. Used for bool terms.
+getBindingSize :: String -> SubstM (Integer, Integer)
+getBindingSize metaG = do
+  substMap <- gets substitutions
+  case Map.lookup metaG substMap of
+    Just (T.SLetBindings concreteG, _) ->
+      let (_, stackWeights, heapWeights, _) = unzip4 concreteG
+      in return (sum stackWeights, sum heapWeights)
+    _ -> internalException $ "substitute for "++metaG++" not found or wrong"
+           ++" type"
 
 -- | given a name corresponding to a context C and a term M, returns C[M],
 -- properly renamed.
