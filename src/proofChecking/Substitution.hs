@@ -24,7 +24,7 @@ import TermCorrectness (checkBoundVariablesDistinct, getBoundVariables
 import ShowTypedTerm (showTypedTerm)
 import ToLocallyNameless (toLocallyNameless)
 import SubstitutionMonad (runSubstM, SubstM, getSubstitute, applyContext
-                          , getCtxFreeVars, isFresh, liftCheckM)
+                          , getCtxFreeVars, isFresh, liftCheckM, getBindingSize)
 import ShowLaw (showLaw)
 import OtherUtils (applyOnLawSubterms, applyOnLawSubtermsM, applyAndRebuild)
 import LanguageLogic (reduce)
@@ -410,9 +410,9 @@ substituteAndEvalVarSet index law = case law of
 -- provided (see check in the typechecker).
 evalBoolTerm :: HasCallStack => Law.BoolTerm -> SubstM Bool
 evalBoolTerm (Law.BTSizeEq metaG1 metaG2) = do
-  T.SLetBindings concreteG1 <- getSubstitute metaG1
-  T.SLetBindings concreteG2 <- getSubstitute metaG2
-  return $ length concreteG1 == length concreteG2
+  size1 <- getBindingSize metaG1
+  size2 <- getBindingSize metaG2
+  return $ size1 == size2
 evalBoolTerm (Law.BTSetEq lVarSet1 lVarSet2) = do
   cVarSet1 <- evalPossiblyVectorizedVarSet lVarSet1
   cVarSet2 <- evalPossiblyVectorizedVarSet lVarSet2
@@ -484,6 +484,7 @@ evalPossiblyVectorizedVarSet lVarSet = case lVarSet of
           Law.TMVTerms metaN_i -> do
             T.STerms concreteN_i <- getSubstitute metaN_i
             return $ Just $ length concreteN_i
+          -- dummy binds kan ha unions, så detta blir lite fel.
           Law.TDummyBinds (Law.VSFreeVars (Law.VCTerm fvTerm)) term -> do
             mlfvt <- getLenIfVectorized fvTerm
             mlt <- getLenIfVectorized term
