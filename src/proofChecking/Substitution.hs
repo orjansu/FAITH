@@ -179,12 +179,26 @@ getBoundSubstVars substitutions law = case law of
     in mainBounds `Set.union` innerBounds
     where
       innerBounds = case letBindings of
-        -- It only makes sense to substitute bound varibles, so even though
-        -- metaBinds may contain a substitution, that substitution is not
-        -- allowed to be on a variable in a binding position. Therefore, we
-        -- can ignore _MetaBinds.
-        Law.LBSBoth _MetaBinds innerLetbinds ->
-          Set.unions $ map getLBBound innerLetbinds
+        Law.LBSBoth metaG innerLetbinds ->
+          let bvsG = Set.unions $ map getBoundG metaG
+              bvsInner = Set.unions $ map getLBBound innerLetbinds
+          in bvsG `Set.union` bvsInner
+
+      -- It only makes sense to substitute bound varibles, so even though
+      -- metaBinds may contain a substitution, that substitution is not
+      -- allowed to be on a variable in a binding position. Therefore, we
+      -- can ignore x and y in the law term G[x/y] (MBSSubstitution)
+      getBoundG :: HasCallStack => Law.MetaBindSet -> Set.Set String
+      getBoundG metaBind =
+        let metaG = case metaBind of
+                      Law.MBSMetaVar metaG' -> metaG'
+                      Law.MBSSubstitution metaG' _x _y -> metaG'
+        in case Map.lookup metaG substitutions of
+          Just (T.SLetBindings lbs) ->
+            let (bindNames, _sw, _hw, _terms) = unzip4 lbs
+            in Set.fromList bindNames
+          _ -> substitutionNotfound metaG
+
       getLBBound :: HasCallStack => Law.LetBinding -> Set.Set String
       getLBBound (Law.LBConcrete lawVar _ _ term) =
         case Map.lookup lawVar substitutions of
@@ -232,11 +246,9 @@ applyTermSubstM index bigLawTerm = do
       T.SVar var <- getSubstitute mvName
       return $ T.TVar var
     Law.TAppCtx mvName lawTerm -> do
-      concreteTerm <- applyTermSubstM index lawTerm
-      applyContext mvName concreteTerm
+      applyContext mvName (applyTermSubstM index lawTerm)
     Law.TAppValCtx mvName lawTerm -> do
-      concreteTerm <- applyTermSubstM index lawTerm
-      applyContext mvName concreteTerm
+      applyContext mvName (applyTermSubstM index lawTerm)
     Law.TNonTerminating -> return T.TNonTerminating
     Law.TNum int -> return $ T.TNum int
     Law.TConstructor (Law.CGeneral lname largs) -> do
@@ -305,8 +317,8 @@ applyTermSubstM index bigLawTerm = do
       return $ T.TRedWeight rw red
       where
         substRed (Law.RMetaVar lReduction lTerm) = do
-          term <- applyTermSubstM index lTerm
-          T.TRedWeight 1 reduction <- applyContext lReduction term
+          let termInstr = applyTermSubstM index lTerm
+          T.TRedWeight 1 reduction <- applyContext lReduction termInstr
           return reduction
         substRed (Law.RApp lterm lvar) = do
           term <- applyTermSubstM index lterm
@@ -443,8 +455,7 @@ evalBoolTerm (Law.BTGT lIntExpr1 lIntExpr2) = do
 evalBoolTerm (Law.BTIsFresh x) = isFresh x
 evalBoolTerm (Law.BTAreFresh xs) = isFresh xs
 evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
-  T.SValue value <- getSubstitute lValueStr
-  substituted <- applyContext lReductionStr value
+  substituted <- applyContext lReductionStr valueInstruction
   Log.logInfoN . pack $ "reducing R[V]="
     ++showTypedTerm substituted
   result <- reduce substituted
@@ -458,6 +469,10 @@ evalBoolTerm (Law.BTReducesTo lReductionStr lValueStr lTerm) = do
           ++computeDifference lnlRes lnlTerm
     else return ()
   return res
+  where
+    valueInstruction = do
+      T.SValue value <- getSubstitute lValueStr
+      return value
 evalBoolTerm (Law.BTAnd lBoolTerm1 lBoolTerm2) = do
   b1 <- evalBoolTerm lBoolTerm1
   b2 <- evalBoolTerm lBoolTerm2

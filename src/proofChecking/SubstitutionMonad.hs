@@ -8,6 +8,14 @@
 -- are distinct from the other bound variables from terms that are
 -- previously gotten out of the monad and the initial set of forbidden
 -- names.
+--
+-- The previous implementation relied on the false assumption that variables do
+-- not need to be renamed the first time. This is not true. A counterexample is
+-- (M + M + N)[(\a.a)/M][(\b.b)/N]
+-- because the second M will be renamed to \b.b
+--
+-- The current implementetation relies on renaming all variables that need to
+-- be renamed before letting them out of the monad, using renameNeeded.
 module SubstitutionMonad (runSubstM
                          , getSubstitute
                          , applyContext
@@ -79,39 +87,11 @@ runSubstM substSimpleMap initForbiddenNames monadic = do
   let substMap = prepareSubstitutions substSimpleMap
       initSt = MkSubstSt {substitutions = substMap
                          , forbiddenNames = initForbiddenNames}
-  (a, finalState) <- (flip runStateT) initSt $ getSubstM $ do
-    addContextBVToForbiddenNames
-    monadic
+  (a, finalState) <- (flip runStateT) initSt $ getSubstM $ monadic
   let finalForbiddenNames = forbiddenNames finalState
   assertInternal (initForbiddenNames `Set.isSubsetOf` finalForbiddenNames)
     "Substitution map should only accumulate forbidden names."
   return (a, finalForbiddenNames)
-  where
-    addContextBVToForbiddenNames =
-      mapM addBVToForbiddenNames
-        $ map toGeneralContext
-        $ Map.elems
-        $ Map.filter isContext substSimpleMap
-    isContext :: T.Substitute -> Bool
-    isContext (T.SLetBindings _)     = False
-    isContext (T.SValue _)           = False
-    isContext (T.SContext _)         = True
-    isContext (T.SIntegerVar _)      = False
-    isContext (T.SVar _)             = False
-    isContext (T.SVarVect _)         = False
-    isContext (T.SValueContext _)    = True
-    isContext (T.SReduction _)       = True
-    isContext (T.SVarSet _)          = False
-    isContext (T.STerm _)            = False
-    isContext (T.STerms _)           = False
-    isContext (T.SPatterns _)        = False
-    isContext (T.SCaseStms _)        = False
-    isContext (T.SConstructorName _) = False
-
-    toGeneralContext (T.SContext ctx) = ctx
-    toGeneralContext (T.SValueContext ctx) = ctx
-    toGeneralContext (T.SReduction red) = T.TRedWeight 1 red
-    toGeneralContext _ = error "Internal: Contexts not correctly filtered"
 
 -- | Checks that none of the substitutions has a bound variable that
 -- has a name that is forbidden (in the forbidden names) or that one bound
@@ -261,18 +241,15 @@ getSubstitute metaVar = do
   case Map.lookup metaVar substMap of
     Just (subst, isUsed) ->
       case subst of
-        T.SLetBindings letBindings -> do
-          let dummy = T.TLet letBindings (T.TNum 1)
-          addBVToForbiddenNames dummy
-          return subst
-          -- In LawTypeChecker, there is a check that makes sure that let-
-          -- bindings are not copied in a term. Therefore, if they are used
-          -- multiple times, they are used in varSets, where the names of their
-          -- bound variables are needed. However, their names are still part
-          -- of the forbidden names, so their bound variables need to be added
-          -- to the set of forbiddenNames, but they do not need to be renamed.
+        T.SLetBindings letBindings1 -> do
+          letBindings2 <- mapM renameLB letBindings1
+          return $ T.SLetBindings letBindings2
+          where
+            renameLB (name1, sw1, hw1, term1) = do
+              term2 <- prepareTermForSubstitution term1
+              return (name1, sw1, hw1, term2)
         T.SValue term -> do
-          prepared <- prepareTermForSubstitution metaVar term isUsed
+          prepared <- prepareTermForSubstitution term
           return $ T.SValue prepared
         T.SContext ctx -> contextUsed
         T.SIntegerVar intExpr -> return subst
@@ -282,15 +259,15 @@ getSubstitute metaVar = do
         T.SReduction _ -> contextUsed
         T.SVarSet varSet -> return subst
         T.STerm term -> do
-          prepared <- prepareTermForSubstitution metaVar term isUsed
+          prepared <- prepareTermForSubstitution term
           return $ T.STerm prepared
         T.STerms terms -> do
-          prepared <- prepareTerms metaVar terms isUsed
+          prepared <- mapM prepareTermForSubstitution terms
           return $ T.STerms prepared
         T.SPatterns ptns -> return subst
         T.SCaseStms caseStms1 -> do
           let dummy1 = T.TRedWeight 1 $ T.RCase (T.TNum 1) caseStms1
-          dummy2 <- prepareTermForSubstitution metaVar dummy1 isUsed
+          dummy2 <- prepareTermForSubstitution dummy1
           T.TRedWeight 1 (T.RCase (T.TNum 1) caseStms2) <- return dummy2
           return $ T.SCaseStms caseStms2
         T.SConstructorName name -> return subst
@@ -299,44 +276,11 @@ getSubstitute metaVar = do
     contextUsed = internalException $  "use applyContext or "
                   ++"getContextFreeVars, not getSubstitute for contexts"
 
-prepareTerms :: HasCallStack => String -> [T.Term] -> Bool -> SubstM [T.Term]
-prepareTerms mv terms areUsed =
-  if areUsed
-    then do
-      renamed <- mapM renameAllBound terms
-      return renamed
-    else do
-      setToUsed mv
-      let termsBV = Set.unions $ map getBoundVariables terms
-        --We know that the bound variables of the terms are disjoint by the
-        --check in checkSubstBVDistinct in Substitution.hs
-      forbidden <- gets forbiddenNames
-      assertInternal (termsBV `Set.disjoint` forbidden)
-        $ "terms "++mv++" inserted for the first time should only contain "
-        ++"new names for bound variables. "++mv++
-        " = [" ++ concat (intersperse ", " (map showTypedTerm terms))++"]."
-      mapM addBVToForbiddenNames terms
-      return terms
-
-prepareTermForSubstitution :: HasCallStack =>
-                              String -> T.Term -> Bool -> SubstM T.Term
-prepareTermForSubstitution metaVar term isUsed =
-  if isUsed
-    then do
-      renamed <- renameAllBound term
-      return renamed
-    else do
-      setToUsed metaVar
-      let termBV = getBoundVariables term
-      forbidden <- gets forbiddenNames
-      assertInternal (termBV `Set.disjoint` forbidden)
-        $ "term M inserted the first time should only contain new "
-          ++"names for bound variables. M="++showTypedTerm term++" BV(M)"
-          ++"="++show termBV++" should be disjoint from "++show forbidden
-          ++". That is, "++show (termBV `Set.intersection` forbidden)
-          ++" should be empty."
-      addBVToForbiddenNames term
-      return term
+prepareTermForSubstitution :: HasCallStack => T.Term -> SubstM T.Term
+prepareTermForSubstitution term = do
+  res <- renameNeeded term
+  addBVToForbiddenNames res
+  return res
 
 -- | given a substitution name, sets the substitution to used.
 setToUsed :: HasCallStack => String -> SubstM ()
@@ -367,30 +311,16 @@ getCtxFreeVars mv = do
 
 -- | given a name corresponding to a context C and a term M, returns C[M],
 -- properly renamed.
--- TODO the context may be a Value context or a reduction too.
-applyContext :: HasCallStack => String -> T.Term -> SubstM T.Term
-applyContext ctxName term = do
-  assertInternal (numHoles term == 0)
-    "You may not insert a context into a context"
+applyContext :: HasCallStack => String -> SubstM T.Term -> SubstM T.Term
+applyContext ctxName termInstruction = do
   substMap <- gets substitutions
   (ctx, isUsed) <- getUniformContext ctxName substMap
-  if isUsed
-    then do
-      appliedButWithOldNames <- applyContext1 ctx term
-      appliedWithNewNames <- renameNeeded appliedButWithOldNames
-      return appliedWithNewNames
-    else do
-      res <- applyContext1 ctx term
-      let resBV = getBoundVariables res
-      forbidden <- gets forbiddenNames
-      assertInternal (resBV `Set.isSubsetOf` forbidden)
-        $ "The context should have added its bound variables in the beginning, "
-        ++"so when used for the first time, its bound variables should have "
-        ++"been added. The new variables from the insertion should also have "
-        ++"allready been added. That is, "++show resBV++" should be a subset "
-        ++"of "++show forbidden++"."
-      setToUsed ctxName
-      return res
+  addBVToForbiddenNames ctx
+  term <- termInstruction
+  assertInternal (numHoles term == 0)
+    "You may not insert a context into a context"
+  appliedOldNames <- applyContext1 ctx term
+  renameNeeded appliedOldNames
   where
     getUniformContext ctxName substMap = case Map.lookup ctxName substMap of
       Just (T.SContext ctx, isUsed) -> return (ctx, isUsed)
@@ -406,22 +336,13 @@ applyContext ctxName term = do
         $ "The term to be inserted to a context should have added its bound "
         ++"variables to the set of forbidden names."
         ++show termBV++" should be a subset of "++show forbiddenNames1
-      let ctxForbiddenNames = forbiddenNames1 Set.\\ termBV
-      -- The reason that I remove the forbidden names of the term from the
-      -- forbidden names is that otherwise the monad will think that something
-      -- is wrong (specifically, the assertion in prepareTermForSubstitution
-      -- will fail) since we will insert something that we have gotten out of
-      -- the monad.
       oldSubstitutions <- gets substitutions
-      modify (\st -> st{forbiddenNames = ctxForbiddenNames
-                       , substitutions = holeSubstitution})
+      modify (\st -> st{substitutions = holeSubstitution})
 
       appliedCtx <- applyContext2 ctx
 
       modify  (\st -> st{substitutions = oldSubstitutions})
       forbiddenNames2 <- gets forbiddenNames
-      assertInternal (termBV `Set.isSubsetOf` forbiddenNames2)
-        "The term should have been inserted and have its bound vars recorded."
       return appliedCtx
 
     dummy :: String
@@ -468,10 +389,11 @@ renameNeeded :: HasCallStack => T.Term -> SubstM T.Term
 renameNeeded term1 = do
   let initBV = getBoundVariables term1
       (initLNL, initFV) = toLocallyNameless term1
-
   forbiddenNames1 <- gets forbiddenNames
   let shouldBeUnchanged = initBV Set.\\ forbiddenNames1
+
   term2 <- runRenameNeeded term1
+
   Log.logInfoN . pack $ "Checking correctness of renaming "
     ++showTypedTerm term1++" to "++showTypedTerm term2
   let newBV = getBoundVariables term2
@@ -500,8 +422,16 @@ renameNeeded term1 = do
       checkBoundVariablesDistinct term1
       runRenameM $ renameNeededMonadic term1
 
-data RenameSt = MkRenameSt { renamings :: Map.Map String String
-                           , forbiddenNames' :: Set.Set String}
+data RenameSt = MkRenameSt
+ { renamings :: Map.Map String String
+     -- This is the map describing renamings that should take place.
+ , forbiddenNames' :: Set.Set String
+     -- These are the names that, if found in a term, that name should be
+     -- changed to another name.
+ , unchangedNames :: Set.Set String
+     -- These are the names that should not be renamed to a new name if found
+     -- in a term, but any new name should not be distinct from unchangedNames.
+ }
 
 newtype RenameM a = MkRenameM {getRenameM :: StateT RenameSt CheckM a}
   deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadError String
