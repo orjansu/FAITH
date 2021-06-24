@@ -83,7 +83,7 @@ runSubstM :: HasCallStack =>
              Map.Map String T.Substitute -> Set.Set String -> SubstM a
              -> CheckM (a, Set.Set String)
 runSubstM substSimpleMap initForbiddenNames monadic = do
-  checkSubstBVDistinct substSimpleMap initForbiddenNames
+  -- checkSubstBVDistinct substSimpleMap initForbiddenNames
   let substMap = prepareSubstitutions substSimpleMap
       initSt = MkSubstSt {substitutions = substMap
                          , forbiddenNames = initForbiddenNames}
@@ -392,12 +392,14 @@ renameNeeded term1 = do
   forbiddenNames1 <- gets forbiddenNames
   let shouldBeUnchanged = initBV Set.\\ forbiddenNames1
 
-  term2 <- runRenameNeeded term1
+  term2 <- runRenameNeeded term1 shouldBeUnchanged
 
   Log.logInfoN . pack $ "Checking correctness of renaming "
     ++showTypedTerm term1++" to "++showTypedTerm term2
   let newBV = getBoundVariables term2
-      expectedForbiddenNames2 = newBV `Set.union` forbiddenNames1
+      expectedForbiddenNames2 = newBV
+                                  `Set.union` forbiddenNames1
+                                  Set.\\ shouldBeUnchanged
   forbiddenNames2 <- gets forbiddenNames
   assertInternal (forbiddenNames2 == expectedForbiddenNames2) $
     "expected forbiddenNames ="++show expectedForbiddenNames2++
@@ -417,17 +419,18 @@ renameNeeded term1 = do
   return term2
   where
     runRenameNeeded :: HasCallStack =>
-                        T.Term -> SubstM T.Term
-    runRenameNeeded term1 = do
+                        T.Term -> Set.Set String -> SubstM T.Term
+    runRenameNeeded term1 unchangedNames = do
       checkBoundVariablesDistinct term1
-      runRenameM $ renameNeededMonadic term1
+      runRenameM unchangedNames $ renameNeededMonadic term1
 
 data RenameSt = MkRenameSt
  { renamings :: Map.Map String String
      -- This is the map describing renamings that should take place.
  , forbiddenNames' :: Set.Set String
      -- These are the names that, if found in a term, that name should be
-     -- changed to another name.
+     -- changed to another name. If a variable is renamed, the new name will
+     -- also be added to this set.
  , unchangedNames :: Set.Set String
      -- These are the names that should not be renamed to a new name if found
      -- in a term, but any new name should not be distinct from unchangedNames.
@@ -437,11 +440,12 @@ newtype RenameM a = MkRenameM {getRenameM :: StateT RenameSt CheckM a}
   deriving (Functor, Applicative, Monad, Log.MonadLogger, MonadError String
            , MonadState RenameSt)
 
-runRenameM :: RenameM a -> SubstM a
-runRenameM monadic = do
+runRenameM :: Set.Set String -> RenameM a -> SubstM a
+runRenameM unchangedNames monadic = do
   forbiddenNames1 <- gets forbiddenNames
   let initSt = (MkRenameSt {renamings = Map.empty
-                           , forbiddenNames' = forbiddenNames1})
+                           , forbiddenNames' = forbiddenNames1
+                           , unchangedNames = unchangedNames})
   (res, finalState) <- liftCheckM $
                           (flip runStateT) initSt
                             $ getRenameM monadic
@@ -526,7 +530,8 @@ toCorrectBoundVar oldName = do
   forbiddenNames1 <- gets forbiddenNames'
   if (oldName `Set.member` forbiddenNames1)
     then do
-      newName <- freshName oldName forbiddenNames1
+      unchangedNames <- gets unchangedNames
+      newName <- freshName oldName (forbiddenNames1 `Set.union` unchangedNames)
       renameMap1 <- gets renamings
       assertInternal (oldName `Map.notMember` renameMap1)
         "Old names should not be renamed twice, since binders are unique"
