@@ -6,7 +6,7 @@ proof: -simple -single{
   -test
     ctx= [.]
     M=(\a.a)
-    N=(\b.b)
+    N=(\a.a)
     x=d;
   |~>
 }qed;
