@@ -26,7 +26,7 @@
         ./sie proofFiles/laws/moreLaws.sie proofFiles/proofs/substitution/any3.hs
 
 ## Master's thesis
-The thesis will be published by Chalmers soon. Search for the title "Improving Memory Consumption with FAITH - a Proof Assistant for Improvement Theory" by Örjan Sunnerhagen in 2021
+The thesis will be published by Chalmers at [Chalmers Open Digital Repository](https://odr.chalmers.se/) soon. Search for the title "Improving Memory Consumption with FAITH - a Proof Assistant for Improvement Theory" by Örjan Sunnerhagen in 2021
 
 ## Contact
 I will not be actively maintaining this repo, but if you have any questions or comments, you can reach me at orjan.sun (at) gmail (dot) com. I would be very happy if there would be another master's thesis developing FAITH further.
