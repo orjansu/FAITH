@@ -4,27 +4,33 @@
 Örjan Sunnerhagen 2021
 
 ## How to run
-1. Build with
+### Prerequisites
+stack
+### How to build
+Build with
 
         make
 
-2. The executable will be called sie (for Space Improvement Engine, working title). Make it runnable with
+### How to run
+If you have built or downladed a release file called sie, continue from here:
+
+1. The executable will be called sie (for Space Improvement Engine, working title). Make it runnable with
 
         chmod +x sie
 
-3. then run it with
+2. then run it with
 
         ./sie <law file> <proof file>
 
-4. Run the first case study with
+3. Run the first case study with
 
         ./sie proofFiles/laws/moreLaws.sie proofFiles/proofs/substitution/repeat.hs
 
-5. Run the adding of gadgets to the second case study with
+4. Run the adding of gadgets to the second case study with
 
         ./sie proofFiles/laws/moreLaws.sie proofFiles/proofs/substitution/any.sie
 
-6. Run the inductive part of the second case study with
+5. Run the inductive part of the second case study with
 
         ./sie proofFiles/laws/moreLaws.sie proofFiles/proofs/substitution/any3.hs
 
