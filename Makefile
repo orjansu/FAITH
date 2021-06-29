@@ -6,7 +6,7 @@ proofChecking := $(wildcard src/proofChecking/*.hs)
 typeChecking := $(wildcard src/typeChecking/*.hs)
 types := $(wildcard src/types/*.hs)
 util := $(wildcard src/util/*.hs)
-stackFiles := sie.cabal stack.yaml stack.yaml.lock
+stackFiles := sie.cabal stack.yaml
 
 all : sie
 
