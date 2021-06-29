@@ -1,5 +1,6 @@
 # FAITH - a Proof Assistant for Improvement Theory
 (a Proo**f** **A**ssistant for **I**mprovement **Th**eory)
+
 Örjan Sunnerhagen 2021
 
 ## How to run
