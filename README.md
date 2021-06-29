@@ -5,7 +5,9 @@
 
 ## How to run
 1. Build with
-    make
+
+        make
+
 2. The executable will be called sie (for Space Improvement Engine, working title). Make it runnable with
 
         chmod +x sie
